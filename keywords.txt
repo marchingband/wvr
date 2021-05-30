@@ -1,0 +1,32 @@
+# Syntax Coloring Map For ExampleLibrary
+
+# Datatypes (KEYWORD1)
+
+# Methods and Functions (KEYWORD2)
+onPress	KEYWORD2
+onRelease	KEYWORD2
+play	KEYWORD2
+serverPause	KEYWORD2
+serverResume	KEYWORD2
+
+# Instances (KEYWORD2)
+WVR	KEYWORD2
+Button	KEYWORD2
+
+# Structures KEYWORD3
+wav_player_event_t	KEYWORD3
+
+# Constants (LITERAL1)
+D0	LITERAL1
+D1	LITERAL1
+D2	LITERAL1
+D3	LITERAL1
+D4	LITERAL1
+D5	LITERAL1
+D6	LITERAL1
+D7	LITERAL1
+D8	LITERAL1
+D9	LITERAL1
+D10	LITERAL1
+D11	LITERAL1
+D12	LITERAL1

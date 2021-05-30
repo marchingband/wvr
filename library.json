@@ -1,0 +1,33 @@
+{
+  "name":"WVR",
+  "description":"Firmware for WVR, the ESP32 Audio Board",
+  "keywords":"wvr,audio,esp32",
+  "authors":
+  {
+    "name": "Andrew March",
+    "maintainer": true
+  },
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/marchingband/WVR.git"
+  },
+  "version": "0.0.1",
+  "license": "LGPL-3.0",
+  "frameworks": "arduino",
+  "platforms": ["espressif32"],
+  "dependencies": [
+    {
+      "name": "AsyncTCP",
+      "platforms": "espressif32"
+    },
+    {
+      "name": "ESPAsyncWebServer",
+      "platforms": "espressif32"
+    },
+    {
+      "name": "Adafruit_NeoPixel",
+      "platforms": "espressif32"
+    }
+  ]
+}

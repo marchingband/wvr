@@ -450,7 +450,8 @@ void handleNewGUI(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
 void handleFsjson(AsyncWebServerRequest *request){
   char *json = print_fs_json();
   size_t size = strlen(json);
-  request->send("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+  wlog_e("fs size is %d",size);
+  AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
     size_t toWrite = min(size - index, maxLen);
     memcpy(buffer, json + index, toWrite);
     if(index + toWrite == size){
@@ -458,6 +459,16 @@ void handleFsjson(AsyncWebServerRequest *request){
     }
     return toWrite;
   });
+  response->addHeader("size",String(size));
+  request->send(response);
+  // request->send("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+  //   size_t toWrite = min(size - index, maxLen);
+  //   memcpy(buffer, json + index, toWrite);
+  //   if(index + toWrite == size){
+  //     free(json);
+  //   }
+  //   return toWrite;
+  // });
 }
 
 void handleEmmcGUI(AsyncWebServerRequest *request){

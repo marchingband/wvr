@@ -31,27 +31,23 @@ static const char* TAG = "wav_player";
 #define DAC_BUFFER_SIZE_IN_BYTES ( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t) ) 
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
 
-#define NUM_BUFFERS 18
+// #define NUM_BUFFERS 18
 // #define NUM_BUFFERS 20
+#define NUM_BUFFERS 22
+// #define NUM_BUFFERS 25
+
 // #define DAMPEN_BITS 2
 #define DAMPEN_BITS 1
-#define USE_SQRT_SCALE 0
-#define USE_VOLUME 0
-#define USE_VOLUME_FP 1
-#define USE_VOLUME_FP_SQRT 0
-
-// #define FADE_OUT_NUM_LOOPS 30
-// #define DAMPEN_PER_FADE_OUT_LOOP 5
-// #define FADE_OUT_NUM_LOOPS 20
-// #define DAMPEN_PER_FADE_OUT_LOOP 7
-#define FADE_OUT_NUM_LOOPS 15
-#define DAMPEN_PER_FADE_OUT_LOOP 8
-// #define FADE_OUT_NUM_LOOPS 10
-// #define DAMPEN_PER_FADE_OUT_LOOP 13
+// #define USE_SQRT_SCALE 0
+// #define USE_VOLUME 0
+// #define USE_VOLUME_FP 1
+// #define USE_VOLUME_FP_SQRT 0
 #define LOG_PERFORMANCE 0
 
 #define MAX_READS_PER_LOOP 4
 // #define MAX_READS_PER_LOOP 3
+
+struct metadata_t metadata;
 
 struct buf_t {
   struct wav_lu_t wav_data;
@@ -97,23 +93,8 @@ int new_midi_buf = -1;
 
 float float_lut[128];
 
-int current_bank = 0;
 uint32_t tmp32;
 int16_t tmp16;
-
-void current_bank_up(void)
-{
-  // current_bank += (current_bank < 15);
-  if(current_bank < 15) 
-    current_bank++;
-}
-
-void current_bank_down(void)
-{
-  // current_bank -= (current_bank > 0);
-  if(current_bank > 0)
-    current_bank--;
-}
 
 void init_buffs(void)
 {
@@ -163,7 +144,6 @@ void free_bufs(void)
 
 void init_float_lut(void)
 {
-  // float_lut = (float *)ps_malloc(128 * sizeof(float));
   for(int i=0;i<128;i++)
   {
     float num = (float)i/127;
@@ -185,20 +165,7 @@ void stop_wav(uint8_t voice, uint8_t note)
   wav_player_event.note = note;
   xQueueSendToBack(wav_player_queue, &wav_player_event, portMAX_DELAY);
 }
-void _stop_wav(uint8_t voice, uint8_t note)
-{
-  for(int b=0;b<NUM_BUFFERS;b++)
-  {
-    if(
-      bufs[b].voice == voice &&
-      bufs[b].wav_player_event.note == note
-    )
-    {
-      bufs[b].done=1;
-      rpc_out(RPC_NOTE_OFF, voice, note, NULL);
-    }
-  }
-}
+
 void play_wav(uint8_t voice, uint8_t note, uint8_t velocity)
 {
   struct wav_player_event_t wav_player_event;
@@ -207,56 +174,6 @@ void play_wav(uint8_t voice, uint8_t note, uint8_t velocity)
   wav_player_event.velocity = velocity;
   wav_player_event.note = note;
   xQueueSendToBack(wav_player_queue, &wav_player_event, portMAX_DELAY);
-}
-void _play_wav(uint8_t voice, uint8_t note, uint8_t velocity)
-{
-  // wlog_i("start play voice %d note %d velocity %d", voice, note, velocity);
-  for(int8_t i=0; i<=NUM_BUFFERS; i++)
-  {
-    if(i == NUM_BUFFERS)
-    {
-      wlog_i("out of buffers");
-      break;
-    }
-    if(bufs[i].free == 1)
-    {
-      new_midi = 1;
-      new_midi_buf = i;
-      // wlog_i("adding to buffer %d",i);
-      bufs[i].wav_data = get_file_t_from_lookup_table(voice, note, velocity);
-
-      if(bufs[i].wav_data.length == 0)
-      {
-        // its a null_wav_file because it was a rack and it wasn't within the velocity ranges
-        break;
-      }
-      wav_player_event.note = note;
-      wav_player_event.velocity = velocity;
-      bufs[i].wav_player_event = wav_player_event;
-      bufs[i].voice = voice;
-      bufs[i].free = 0;
-      bufs[i].done = 0;
-      bufs[i].full = 0;
-      bufs[i].current_buf = 0;
-      bufs[i].head_position = 0;
-      bufs[i].read_block = bufs[i].wav_data.start_block;
-      bufs[i].wav_position = 0;
-      bufs[i].size = bufs[i].wav_data.length;
-      bufs[i].voice = voice;
-      if(bufs[i].wav_data.isRack == -2)
-      {
-        // wlog_i("rack memebr");
-        bufs[i].volume = 127;
-      }
-      else
-      {
-        // wlog_i("not rack memebr");
-        bufs[i].volume = velocity;
-      }
-      rpc_out(RPC_NOTE_ON, voice, note, velocity);
-      break;
-    }
-  }
 }
 
 int prune(uint8_t priority)
@@ -274,19 +191,19 @@ int prune(uint8_t priority)
       if(bufs[i].wav_data.priority < bufs[candidate].wav_data.priority)
       {
         candidate = i;
-        // wlog_i("didnt check wav position");
+        wlog_v("didnt check wav position");
       } 
       else if(
         (bufs[i].wav_data.priority == bufs[candidate].wav_data.priority) &&
         (bufs[i].wav_position > bufs[candidate].wav_position)
       )
       {
-        // wlog_i("checked wav position");
+        wlog_v("checked wav position");
         candidate = i;
       } 
     }
   }
-  // wlog_i("pruned buf %d",candidate);
+  wlog_d("pruned buf %d",candidate);
   return candidate;
 }
 
@@ -296,8 +213,6 @@ void wav_player_task(void* pvParameters)
   size_t base_index;
   int16_t *buf_pointer;
   int num_reads = 0;
-  // int new_midi = 0;
-  // int new_midi_buf = -1;
   bool abort_note = false;
 
   if((wav_player_queue = xQueueCreate(wav_player_queue_SIZE, sizeof(struct wav_player_event_t)))==pdFAIL)
@@ -356,7 +271,6 @@ void wav_player_task(void* pvParameters)
       if(wav_player_event.code == MIDI_NOTE_ON && !abort_note)
       {
         // get the wav file
-        // struct wav_lu_t new_wav = get_file_t_from_lookup_table(current_bank, wav_player_event.note, wav_player_event.velocity);
         for(int8_t i=0; i<=NUM_BUFFERS; i++)
         {
           if(i == NUM_BUFFERS)
@@ -365,7 +279,7 @@ void wav_player_task(void* pvParameters)
             int to_prune = prune(new_wav.priority);
             if(to_prune == -1) 
             {
-              // wlog_i("note blocked because bufs full of higher priorities");
+              wlog_d("note blocked because bufs full of higher priorities");
               break;
             }
             else
@@ -380,8 +294,7 @@ void wav_player_task(void* pvParameters)
             rpc_out(RPC_NOTE_ON, bufs[i].voice, wav_player_event.note, wav_player_event.velocity);
             new_midi = 1;
             new_midi_buf = i;
-            // wlog_i("adding to buffer %d",i);
-            // struct wav_lu_t new_wav = get_file_t_from_lookup_table(current_bank, wav_player_event.note, wav_player_event.velocity);
+            wlog_d("adding to buffer %d",i);
             bufs[i].wav_data = new_wav;
             if(bufs[i].wav_data.length == 0){
               // its a null_wav_file because it was a rack and it wasn't within the velocity ranges
@@ -402,13 +315,13 @@ void wav_player_task(void* pvParameters)
             {
               // it's a rack member or a fixed volume file
               bufs[i].volume = 127;
-              // wlog_i("playing a rack member");
+              wlog_d("playing a rack member");
             }
             else
             {
               // its not a rack member or a fixed volume file
               bufs[i].volume = wav_player_event.velocity;
-              // wlog_i("playing a non-rack memeber");
+              wlog_d("playing a non-rack memeber");
             }
             break;
           }
@@ -517,62 +430,6 @@ void wav_player_task(void* pvParameters)
               }
             }
         }
-        // if(USE_SQRT_SCALE)
-        // {
-        //   for(int s=0; s<to_write; s++)
-        //   {
-        //     tmp32 = buf_pointer[base_index + s] * sqrtLUT[bufs[i].volume];
-        //     output_buf[s] += (tmp32 >> (15 + DAMPEN_BITS));
-        //     if(bufs[i].fade)
-        //       bufs[i].volume -= ( bufs[i].volume > 0 );
-        //   }
-        // } 
-        // else if(USE_VOLUME)
-        // {
-        //   for(int s=0; s<to_write; s++)
-        //   {
-        //     tmp32 = buf_pointer[base_index + s] * bufs[i].volume;
-        //     output_buf[s] += ( tmp32 >> (7 + DAMPEN_BITS) ) ;
-        //   }
-        // }
-        // else if(USE_VOLUME_FP)
-        // {
-        //   int min = 1000;
-        //   for(int s=0; s<to_write; s++)
-        //   {
-        //     tmp16 = scale_sample(buf_pointer[base_index + s], bufs[i].volume);
-        //     output_buf[s] += ( tmp16 >> DAMPEN_BITS ) ;
-        //     if(bufs[i].fade)
-        //     {
-        //       if(bufs[i].volume > 0)
-        //       {
-        //         bufs[i].volume--;
-        //       }
-        //       else
-        //       {
-        //         bufs[i].done = 1;
-        //       }
-        //     }
-        //   }
-        // }
-        // this one makes no sense does it?
-        // else if(USE_VOLUME_FP_SQRT)
-        // {
-        //   for(int s=0; s<to_write; s++)
-        //   // for(int s=0; s<DAC_BUFFER_SIZE_IN_SAMPLES; s++)
-        //   {
-        //     tmp16 = scale_sample(buf_pointer[base_index + s], bufs[i].volume);
-        //     tmp32 = tmp16 * sqrtLUT[bufs[i].volume];
-        //     output_buf[s] += (tmp32 >> (15 + DAMPEN_BITS));
-        //   }
-        // }
-        // else
-        // {
-        //   for(int s=0; s<to_write; s++)
-        //   {
-        //     output_buf[s] += (buf_pointer[base_index + s] >> DAMPEN_BITS);
-        //   }
-        // }
         
         // incriment that buffers position
         bufs[i].head_position++;
@@ -605,10 +462,19 @@ void wav_player_task(void* pvParameters)
         }
       }
     }
+
+    // apply the global volume
+    for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
+    {
+      output_buf[i] = scale_sample(output_buf[i], metadata.global_volume);
+    }
+
+    // send to the DAC
     ret = dac_write((int16_t *)output_buf, DAC_BUFFER_SIZE_IN_BYTES, &bytes_to_dma);
     if(ret != ESP_OK){
       log_i("i2s write error %s", esp_err_to_name(ret));
     }
+    
     // clear the output buffer
     for(int i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
     {
@@ -652,12 +518,12 @@ void wav_player_start(void)
   init_buffs();
   bool dmaablebuf = esp_ptr_dma_capable(output_buf);
   log_i( "dma capable buf : %d",(int)dmaablebuf);
-  task_return = xTaskCreatePinnedToCore(&wav_player_task, "wav_player_task", 1024 * 4, NULL, 10, &wav_player_task_handle, 0);
+  // task_return = xTaskCreatePinnedToCore(&wav_player_task, "wav_player_task", 1024 * 4, NULL, 10, &wav_player_task_handle, 0);
+  task_return = xTaskCreatePinnedToCore(&wav_player_task, "wav_player_task", 1024 * 4, NULL, 24, &wav_player_task_handle, 1);
   if(task_return != pdPASS)
   {
     log_e("failed to create wav player task");
   }
-  // log_i("cpu0 speed : %u",getCpuFrequencyMhz());
 }
 
 void wav_player_pause(void)

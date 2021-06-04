@@ -16,6 +16,10 @@ void WVR::play(uint8_t voice, uint8_t note, uint8_t velocity)
 {
     play_wav(voice,note,velocity);
 }
+void WVR::stop(uint8_t voice, uint8_t note)
+{
+    stop_wav(voice,note);
+}
 void WVR::serverPause()
 {
     server_pause();

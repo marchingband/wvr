@@ -65,7 +65,8 @@
 #define FILE_STORAGE_END_BLOCK (RECOVERY_FIRMWARE_START_BLOCK - 1)
 
 
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_7"; 
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_10"; 
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_11"; 
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -190,10 +191,13 @@ void init_metadata(void){
         .num_websites = 10,
         .current_firmware_index = -1,
         .current_website_index = -1,
-        .recovery_mode_straping_pin = 5, // button 1 on dev board
+        .recovery_mode_straping_pin = 5, // button 1 on dev board,
+        .should_check_strapping_pin = 1, // default to should check
         .global_volume = 127,
         .wlog_verbosity = 0,
         .wifi_starts_on = 1,
+        .ssid = "WVR",
+        .passphrase = "12345678"
     };
     memcpy(new_metadata.tag, waver_tag, METADATA_TAG_LENGTH);
     write_metadata(new_metadata);
@@ -879,7 +883,13 @@ void add_metadata_json(cJSON * RESPONSE_ROOT){
     cJSON_AddNumberToObject(RESPONSE_ROOT,"numFirmwares",metadata.num_firmwares);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"numWebsites",metadata.num_websites);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"currentFirmwareIndex",metadata.current_firmware_index);
-    cJSON_AddNumberToObject(RESPONSE_ROOT,"currentWebsiteIndex",metadata.current_website_index);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"shouldCheckStrappingPin",metadata.should_check_strapping_pin);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"recoveryModeStrappingPin",metadata.recovery_mode_straping_pin);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"globalVolume",metadata.global_volume);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"wLogVerbosity",metadata.wlog_verbosity);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiStartsOn",metadata.wifi_starts_on);
+    cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkName",metadata.ssid);
+    cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkPassword",metadata.passphrase);
 }
 
 void add_pin_config_json(cJSON *RESPONSE_ROOT){
@@ -1129,6 +1139,29 @@ void updatePinConfig(cJSON *config){
     }
     ESP_ERROR_CHECK(emmc_write(pin_config_lut,PIN_CONFIG_START_BLOCK,PIN_CONFIG_BLOCKS));
     wlog_i("wrote pin config to disk");
+    cJSON_Delete(json);
+}
+
+void updateMetadata(cJSON *config){
+    cJSON *json = cJSON_Parse(config);
+    metadata.global_volume = cJSON_GetObjectItemCaseSensitive(json, "globalVolume")->valueint;
+    metadata.should_check_strapping_pin = cJSON_GetObjectItemCaseSensitive(json, "shouldCheckStrappingPin")->valueint;
+    metadata.recovery_mode_straping_pin = cJSON_GetObjectItemCaseSensitive(json, "recoveryModeStrappingPin")->valueint;
+    metadata.wifi_starts_on = cJSON_GetObjectItemCaseSensitive(json, "wifiStartsOn")->valueint;
+    metadata.wlog_verbosity = cJSON_GetObjectItemCaseSensitive(json, "wLogVerbosity")->valueint;
+    memcpy(&metadata.ssid,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring,20);
+    memcpy(&metadata.passphrase,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring,20);
+    // metadata.ssid = cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring;
+    // metadata.passphrase = cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring;
+    write_metadata(metadata);
+    wlog_i("gv:%d scsp:%d rmsp:%d wso:%d wlv:%d",
+        metadata.global_volume,
+        metadata.should_check_strapping_pin,
+        metadata.recovery_mode_straping_pin,
+        metadata.wifi_starts_on,
+        metadata.wlog_verbosity
+    );
+    wlog_i("updated and saved metadata");
     cJSON_Delete(json);
 }
 

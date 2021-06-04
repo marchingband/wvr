@@ -6,7 +6,7 @@ extern "C"
 #endif
 
 
-#define VERSION_CODE "0.2.18"
+#define VERSION_CODE "0.3.5"
 void wvr_init();
 
 #ifdef __cplusplus

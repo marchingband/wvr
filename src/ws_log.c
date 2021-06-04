@@ -1,11 +1,14 @@
 #include "esp32-hal.h"
 #include "Arduino.h"
 #include <stdarg.h>
+#include "file_system.h"
 
 int log_printf(const char *fmt, ...);
 void sendWSLog(char* msg);
 
-int w_log_printf(const char *format, ...)
+struct metadata_t metadata;
+
+int w_log_printf(int verbosity, const char *format, ...)
 {
     static char loc_buf[64];
     char * temp = loc_buf;
@@ -25,7 +28,10 @@ int w_log_printf(const char *format, ...)
     vsnprintf(temp, len+1, format, arg);
 
     log_printf(temp);
-    sendWSLog(temp);
+    if(metadata.wlog_verbosity >= verbosity)
+    {
+        sendWSLog(temp);
+    }
 // #if !CONFIG_DISABLE_HAL_LOCKS
 //     if(_uart_bus_array[s_uart_debug_nr].lock){
 //         xSemaphoreTake(_uart_bus_array[s_uart_debug_nr].lock, portMAX_DELAY);

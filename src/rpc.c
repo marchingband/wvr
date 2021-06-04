@@ -17,14 +17,7 @@ QueueHandle_t rpc_out_queue;
 TaskHandle_t rpc_out_task_handle;
 BaseType_t task_return;
 
-#define NO_RPC_OUT 1
-
-// wav_player.c
-// int play_wav(uint8_t voice, uint8_t note, uint8_t velocity);
-// int stop_wav(uint8_t voice, uint8_t note);
-// server.cpp
-// void server_pause(void);
-// void server_resume(void);
+#define NO_RPC_OUT 0
 
 void sendWSMsg(char* msg);
 
@@ -32,7 +25,7 @@ void rpc_out(int procedure, int arg0, int arg1, int arg2)
 {
     if(ARDUHAL_LOG_LEVEL == ARDUHAL_LOG_LEVEL_NONE) return;
     if(NO_RPC_OUT) return;
-    wlog_i("rpc_out called");
+    wlog_d("rpc_out called");
     struct rpc_event_t rpc_event_out;
     rpc_event_out.procedure = procedure;
     rpc_event_out.arg0 = arg0;
@@ -61,7 +54,7 @@ char* on_rpc_in(cJSON *json)
             uint8_t voice = cJSON_GetObjectItemCaseSensitive(json, "voice")->valueint;
             uint8_t note = cJSON_GetObjectItemCaseSensitive(json, "note")->valueint;
             stop_wav(voice, note);
-            char * res = "started wav";
+            char * res = "stopped wav";
             return(res);
             break;
         }
@@ -77,11 +70,11 @@ void rpc_out_task(void* pvParameters)
         if(xQueueReceive(rpc_out_queue, (void *)&event, (portTickType)portMAX_DELAY))
         {
 
-            wlog_i("rpc_out_task received event");
+            log_v("rpc_out_task received event");
             cJSON *rpc_root = cJSON_CreateObject();
             switch(event.procedure){
                 case RPC_NOTE_ON:
-                    wlog_i("rpc note on");
+                    wlog_d("rpc note on");
                     cJSON_AddNumberToObject(rpc_root, "procedure", RPC_NOTE_ON);
                     cJSON_AddNumberToObject(rpc_root, "voice", event.arg0);
                     cJSON_AddNumberToObject(rpc_root, "note", event.arg1);
@@ -95,9 +88,10 @@ void rpc_out_task(void* pvParameters)
                 default: break;
             }
             char *json = cJSON_PrintUnformatted(rpc_root);
-            // wlog_i("json: %s",json);
+            log_v(" rpc json: %s",json);
             sendWSMsg(json);
             cJSON_Delete(rpc_root);
+            // sendWSMsg("hit");
         }
     }
 }
@@ -107,5 +101,5 @@ void rpc_init(void)
     // rpc_in_queue = xQueueCreate(20, sizeof(struct rpc_event_t));
     rpc_out_queue = xQueueCreate(20, sizeof(struct rpc_event_t));
     // task_return = xTaskCreate(rpc_in_task,"rpc_in_task", 1024, NULL, 1, rpc_in_task_handle);
-    task_return = xTaskCreate(rpc_out_task,"rpc_out_task", 1024 * 4, NULL, 1, rpc_out_task_handle);
+    task_return = xTaskCreatePinnedToCore(rpc_out_task,"rpc_out_task", 1024 * 4, NULL, 3, rpc_out_task_handle,0);
 }

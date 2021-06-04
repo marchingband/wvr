@@ -21,11 +21,15 @@ void on1(void)
   // wvr.play(0,40,127);
   if(serverOn)
   {
+    log_i("server pause");
     wvr.serverPause();
+    log_i("wifi on %d", get_metadata()->wifi_starts_on);
   }
   else
   {
+    log_i("server resume");
     wvr.serverResume();
+    log_i("wifi on %d", get_metadata()->wifi_starts_on);
   }
   serverOn = !serverOn;
 }
@@ -33,6 +37,8 @@ void on1(void)
 void setup() {
   // put your setup code here, to run once:
   wvr.begin();
+  serverOn = get_metadata()->wifi_starts_on;
+  log_i("wifi on %d", serverOn);
   pinMode(D2, INPUT_PULLUP);
   btn1.onPress(on1);
 }

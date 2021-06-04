@@ -13,6 +13,7 @@ class WVR {
         WVR();
         void begin();
         void play(uint8_t voice, uint8_t note, uint8_t velocity);
+        void stop(uint8_t voice, uint8_t note);
         void serverPause();
         void serverResume();
 };

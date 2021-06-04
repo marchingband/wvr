@@ -149,6 +149,6 @@ static void read_uart_task()
 void midi_init(void)
 {
     init_gpio();
-    xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", 4096, NULL, 9, NULL, 1);
+    xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", 4096, NULL, 3, NULL, 0);
     // xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", 4096, NULL, 3, NULL, 1);
 }

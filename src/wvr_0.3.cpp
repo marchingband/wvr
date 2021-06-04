@@ -20,6 +20,7 @@
 struct wav_lu_t **wav_lut;
 
 void server_begin(void);
+void server_pause(void);
 extern "C" void emmc_init(void);
 extern "C" void dac_init(void);
 extern "C" void midi_init(void);
@@ -29,7 +30,7 @@ extern "C" void touch_test(void);
 extern "C" void pot_init(void);
 extern "C" void rpc_init(void);
 void bootFromEmmc(int index);
-void bootIntoRecoveryMode(void);
+void boot_into_recovery_mode(void);
 int check_for_recovery_mode(void);
 void dev_board_init();
 void rgb_init(void);
@@ -44,9 +45,14 @@ void wifi_log_boot_stage(void){
   static int done = 0;
   if(!done){
     done = 1;
+    wlog_n("firmware version %s", VERSION_CODE);
+
+    wlog_n("wlog_n");
+    wlog_e("wlog_e");
+    wlog_w("wlog_w");
     wlog_i("wlog_i");
-    log_i("log_i");
-    wlog_i("firmware version %s", VERSION_CODE);
+    wlog_d("wlog_d");
+    wlog_v("wlog_v");
   }
 }
 
@@ -63,7 +69,7 @@ void logRam(){
   Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
 }
 
-void wvr_init() {
+void wvr_init(void) {
   Serial.begin(115200);
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
@@ -84,7 +90,7 @@ void wvr_init() {
   int ret = check_for_recovery_mode();
   if(!ret)
   {
-    bootIntoRecoveryMode();
+    boot_into_recovery_mode();
     return;
   }
 
@@ -108,6 +114,11 @@ void wvr_init() {
 
   rpc_init();
   logSize("rpc");
+
+  if(get_metadata()->wifi_starts_on == 0)
+  {
+    server_pause();
+  }
 
   logRam();
 }

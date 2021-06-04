@@ -24,6 +24,7 @@ extern "C" void add_wav_to_file_system(char *name,int voice,int note,size_t star
 extern "C" size_t place_wav(struct lut_t *_data,  size_t num_data_entries, size_t start, size_t end, size_t file_size);
 extern "C" void updateVoiceConfig(char* json);
 extern "C" void updatePinConfig(char* json);
+extern "C" void updateMetadata(char* json);
 extern "C" char* on_rpc_in(cJSON* json);
 extern "C" char* write_recovery_firmware_to_emmc(uint8_t* source, size_t size);
 extern "C" char* close_recovery_firmware_to_emmc(size_t recovery_firmware_size);
@@ -237,6 +238,28 @@ void handleUpdatePinConfig(AsyncWebServerRequest *request, uint8_t *data, size_t
     //done
     updatePinConfig((char *)pin_config_json);
     free(pin_config_json);
+    request->send(200, "text/plain", "all done pin config update");
+  }
+}
+
+uint8_t *metadata_json = NULL;
+
+void handleUpdateMetadata(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+  if(index==0){
+    //start
+    metadata_json = (uint8_t*)ps_malloc(total);
+    if(!metadata_json){
+      wlog_i("failed to malloc for metadata json");
+    }
+  }
+  //always
+  for(int i=0;i<len;i++){
+    metadata_json[i + index] = data[i];
+  }
+  if(index + len == total){
+    //done
+    updateMetadata((char *)metadata_json);
+    free(metadata_json);
     request->send(200, "text/plain", "all done pin config update");
   }
 }
@@ -492,9 +515,20 @@ void _server_pause(){
 void server_begin() {
   Serial.println("Configuring access point...");
 
-  WiFi.mode(WIFI_AP); //Access Point mode
-  WiFi.softAP("ESPWebServer", "12345678");
+  WiFi.mode(WIFI_AP);
+
+  IPAddress IP = IPAddress (192, 168, 5, 18);
+  IPAddress gateway = IPAddress (192, 168, 5, 20);
+  IPAddress NMask = IPAddress (255, 255, 255, 0);
+
+  WiFi.softAPConfig(IP, gateway, NMask);
+
+  WiFi.softAP(metadata.ssid, metadata.passphrase);
+  log_i("set ssid :%s, set passphrase: %s",metadata.ssid, metadata.passphrase);
  
+  //  again??
+  WiFi.softAPConfig(IP, gateway, NMask);
+
   IPAddress myIP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(myIP);
@@ -502,9 +536,7 @@ void server_begin() {
   server.on(
     "/",
     HTTP_GET,
-    [](AsyncWebServerRequest *request){
-      request->send(200, "text/html", MAIN_page);
-    }
+    handleMain
   );
 
   server.on(
@@ -555,6 +587,14 @@ void server_begin() {
     [](AsyncWebServerRequest * request){request->send(204);},
     NULL,
     handleUpdatePinConfig
+  );
+
+  server.on(
+    "/updateMetadata",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleUpdateMetadata
   );
 
   server.on(
@@ -616,9 +656,11 @@ void server_begin() {
 }
 
 void server_pause(void){
-  _server_pause();
+  // _server_pause();
+  WiFi.mode(WIFI_OFF);
 }
 
 void server_resume(void){
-  server_begin();
+  // server_begin();
+  WiFi.mode(WIFI_AP);
 }

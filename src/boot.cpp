@@ -67,7 +67,7 @@ void bootFromEmmc(int index)
     free(buf);
 }
 
-void bootIntoRecoveryMode(void)
+void boot_into_recovery_mode(void)
 {
     int index = -1;
     firmware_t *firmware = get_firmware_slot(index);
@@ -125,14 +125,14 @@ void bootIntoRecoveryMode(void)
 int check_for_recovery_mode(void)
 {
     metadata_t *new_metadata = get_metadata();
+    if(!new_metadata->should_check_strapping_pin)
+    {
+        // do a normal boot
+        return 1;
+    }
     gpio_reset_pin(gpio_pins[new_metadata->recovery_mode_straping_pin]);
     pinMode(wvr_pins[new_metadata->recovery_mode_straping_pin], INPUT_PULLUP);
     int res = digitalRead(wvr_pins[new_metadata->recovery_mode_straping_pin]);
     log_i("strapping pin %d reads %d",new_metadata->recovery_mode_straping_pin,res);
-    // if(res == 0) // boot from recovery slot
-    // {
-    //     log_i("booting in recovery mode!");
-    //     bootFromEmmc(-1);
-    // }
     return res;
 }

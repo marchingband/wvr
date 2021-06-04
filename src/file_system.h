@@ -94,12 +94,17 @@ struct metadata_t {
     int current_website_index;
     // struct pin_config_t pin_config[14];
     ///new
-    int recovery_mode_straping_pin;
     size_t recovery_firmware_size;
+    int recovery_mode_straping_pin;
     uint8_t global_volume;
     uint8_t wlog_verbosity;
     uint8_t wifi_starts_on;
+    uint8_t should_check_strapping_pin;
+    char ssid[20];
+    char passphrase[20];
 };
+
+// struct metadata_t metadata;
 
 struct wav_lu_t {
     size_t length;
@@ -337,6 +342,7 @@ int sort_lut(const void * a, const void * b);
 size_t search_directory(struct wav_lu_t *_data,  size_t num_data_entries, size_t start, size_t end, size_t file_size);
 void current_bank_up(void);
 void current_bank_down(void);
+struct metadata_t *get_metadata(void);
 
 #ifdef __cplusplus
 }

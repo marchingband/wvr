@@ -343,6 +343,7 @@ size_t search_directory(struct wav_lu_t *_data,  size_t num_data_entries, size_t
 void current_bank_up(void);
 void current_bank_down(void);
 struct metadata_t *get_metadata(void);
+void log_pin_config(void);
 
 #ifdef __cplusplus
 }

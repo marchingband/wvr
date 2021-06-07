@@ -1,15 +1,10 @@
 #ifndef WVR_0_3_H
 #define WVR_0_3_H
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
+// #include "WVR.h"
 
-#define VERSION_CODE "0.3.5"
-void wvr_init();
+#define VERSION_CODE "0.3.6"
 
-#ifdef __cplusplus
-}
-#endif
+void wvr_init(void);
+
 #endif

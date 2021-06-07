@@ -16,6 +16,8 @@
 #include "freertos/queue.h"
 #include "wvr_0.3.h"
 #include "file_system.h"
+#include "WVR.h"
+#include "gpio.h"
 
 struct wav_lu_t **wav_lut;
 
@@ -36,7 +38,6 @@ void dev_board_init();
 void rgb_init(void);
 void neopixel_test(void);
 void mkr_init(void);
-void gpio_init(void);
 void midi_parser_init(void);
 
 size_t heap_remaining = esp_get_free_heap_size();
@@ -69,7 +70,9 @@ void logRam(){
   Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
 }
 
-void wvr_init(void) {
+struct metadata_t metadata;
+
+void wvr_init() {
   Serial.begin(115200);
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
@@ -94,6 +97,9 @@ void wvr_init(void) {
     return;
   }
 
+  // wvr->globalVolume = metadata.global_volume;
+  // log_i("set global volume : %d", wvr->globalVolume);
+
   dac_init();
   logSize("dac");
 
@@ -111,6 +117,9 @@ void wvr_init(void) {
 
   button_init();
   logSize("button");
+  
+  wvr_gpio_init();
+  logSize("gpio");
 
   rpc_init();
   logSize("rpc");
@@ -119,6 +128,14 @@ void wvr_init(void) {
   {
     server_pause();
   }
+
+  log_pin_config();
+
+  // if(wvr->autoConfigPins)
+  // {
+  //   log_i("auto config pins");
+  // wvr_gpio_init();
+  // }
 
   logRam();
 }

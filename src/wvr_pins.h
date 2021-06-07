@@ -5,6 +5,9 @@ extern "C"
 {
 #endif
 
+#include "driver/gpio.h"
+#include "driver/touch_pad.h"
+
 #define D0_GPIO GPIO_NUM_3
 #define D1_GPIO GPIO_NUM_1
 #define D2_GPIO GPIO_NUM_21
@@ -99,62 +102,9 @@ static const uint8_t wvr_pins[14] = {
 #define PAD13 D1
 #define PAD14 D0
 
-// 34
-// 35
-// 36
-// 39
-
-// int wvr_get_pin_name(int pin){
-//     switch (pin)
-//     {
-//     case D0:
-//         return 0;
-//         break;
-//     case D1:
-//         return 1;
-//         break;
-//     case D2:
-//         return 2;
-//         break;
-//     case D3:
-//         return 3;
-//         break;
-//     case D4:
-//         return 4;
-//         break;
-//     case D5:
-//         return 5;
-//         break;
-//     case D6:
-//         return 6;
-//         break;
-//     case D7:
-//         return 7;
-//         break;
-//     case D8:
-//         return 8;
-//         break;
-//     case D9:
-//         return 9;
-//         break;
-//     case D10:
-//         return 10;
-//         break;
-//     case D11:
-//         return 11;
-//         break;
-//     case D12:
-//         return 12;
-//         break;
-//     case D13:
-//         return 13;
-//         break;    
-//     default:
-//         return -1;
-//         break;
-//     }
-// }
-// D7,D8,D9,D10 (34,35,36,39) INPUT ONLY, No PULLUPS
+int gpioNumToPinNum(int gpio);
+touch_pad_t gpioNumToTPNum(int gpio);
+gpio_num_t gpioNumToGpioNum_T(int gpio);
 
 #ifdef __cplusplus
 }

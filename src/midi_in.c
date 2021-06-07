@@ -52,6 +52,11 @@ void init_gpio(void)
 
 uint8_t channel_lut[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
+uint8_t *get_channel_lut(void)
+{
+    return &channel_lut[0];
+}
+
 static void read_uart_task()
 {
     uart_event_t event;

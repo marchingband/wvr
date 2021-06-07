@@ -16,6 +16,8 @@ struct midi_event_t {
   uint8_t channel;
 };
 
+uint8_t *get_channel_lut(void);
+
 #ifdef __cplusplus
 }
 #endif

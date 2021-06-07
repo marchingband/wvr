@@ -15,6 +15,7 @@
 #include "wvr_0.3.h"
 #include "server.h"
 #include "file_system.h"
+#include "server.h"
 
 extern "C" char* print_fs_json();
 extern "C" size_t find_gap_in_file_system(size_t size);
@@ -30,7 +31,7 @@ extern "C" char* write_recovery_firmware_to_emmc(uint8_t* source, size_t size);
 extern "C" char* close_recovery_firmware_to_emmc(size_t recovery_firmware_size);
 // extern "C" size_t add_firmware_and_gui_to_file_system(char *gui_name,char *firmware_name,size_t gui_start_block,size_t firmware_start_block,size_t gui_size,size_t firmware_size);
 
-struct metadata_t metadata;
+static struct metadata_t *metadata = get_metadata();
 struct wav_lu_t **lut;
 struct firmware_t *firmware_lut;
 struct website_t *website_lut;
@@ -450,7 +451,7 @@ void handleNewGUI(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
 void handleFsjson(AsyncWebServerRequest *request){
   char *json = print_fs_json();
   size_t size = strlen(json);
-  wlog_e("fs size is %d",size);
+  // wlog_e("fs size is %d",size);
   AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
     size_t toWrite = min(size - index, maxLen);
     memcpy(buffer, json + index, toWrite);
@@ -472,8 +473,8 @@ void handleFsjson(AsyncWebServerRequest *request){
 }
 
 void handleEmmcGUI(AsyncWebServerRequest *request){
-  size_t size = website_lut[metadata.current_website_index].length;
-  size_t start_block = website_lut[metadata.current_website_index].start_block;
+  size_t size = website_lut[metadata->current_website_index].length;
+  size_t start_block = website_lut[metadata->current_website_index].start_block;
   request->send("text/html", size, [size,start_block](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
     size_t toWrite = min(size - index, maxLen);
     size_t written = get_website_chunk(start_block, toWrite, buffer, size);
@@ -528,14 +529,15 @@ void server_begin() {
 
   WiFi.mode(WIFI_AP);
 
+
   IPAddress IP = IPAddress (192, 168, 5, 18);
   IPAddress gateway = IPAddress (192, 168, 5, 20);
   IPAddress NMask = IPAddress (255, 255, 255, 0);
 
   WiFi.softAPConfig(IP, gateway, NMask);
 
-  WiFi.softAP(metadata.ssid, metadata.passphrase);
-  log_i("set ssid :%s, set passphrase: %s",metadata.ssid, metadata.passphrase);
+  WiFi.softAP(metadata->ssid, metadata->passphrase);
+  log_i("set ssid :%s, set passphrase: %s",metadata->ssid, metadata->passphrase);
  
   //  again??
   WiFi.softAPConfig(IP, gateway, NMask);
@@ -666,12 +668,21 @@ void server_begin() {
   Serial.println("Server started");
 }
 
+bool wifi_is_on = true;
+
+bool get_wifi_is_on()
+{
+  return wifi_is_on;
+}
+
 void server_pause(void){
   // _server_pause();
   WiFi.mode(WIFI_OFF);
+  wifi_is_on = false;
 }
 
 void server_resume(void){
   // server_begin();
   WiFi.mode(WIFI_AP);
+  wifi_is_on = true;
 }

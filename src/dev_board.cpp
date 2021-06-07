@@ -8,11 +8,11 @@ extern "C" void encoder_init(void);
 void rgb_init(void);
 extern "C" void pot_init(void);
 
-Button b1(D5,FALLING, 50);
-Button b2(D6,FALLING, 50);
-Button b3(D7,FALLING, 50);
-Button s1(D3,FALLING, 50);
-Button s2(D4,FALLING, 50);
+// Button b1(D5,FALLING, 50);
+// Button b2(D6,FALLING, 50);
+// Button b3(D7,FALLING, 50);
+// Button s1(D3,FALLING, 50);
+// Button s2(D4,FALLING, 50);
 
 void logB1(){
     wlog_i("1");
@@ -45,6 +45,11 @@ void logSw2Down(){
 }
 
 void dev_board_init(){
+    Button b1(D5,FALLING, 50);
+    Button b2(D6,FALLING, 50);
+    Button b3(D7,FALLING, 50);
+    Button s1(D3,FALLING, 50);
+    Button s2(D4,FALLING, 50);
 
     button_init();
     encoder_init();

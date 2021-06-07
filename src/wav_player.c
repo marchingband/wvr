@@ -48,7 +48,7 @@ static const char* TAG = "wav_player";
 // #define MAX_READS_PER_LOOP 3
 
 struct metadata_t metadata;
-
+bool mute = false;
 struct buf_t {
   struct wav_lu_t wav_data;
   struct wav_player_event_t wav_player_event;
@@ -467,6 +467,14 @@ void wav_player_task(void* pvParameters)
     for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
     {
       output_buf[i] = scale_sample(output_buf[i], metadata.global_volume);
+    }
+    // apply the mute
+    if(mute)
+    {
+      for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
+      {
+        output_buf[i] = 0;
+      }
     }
 
     // send to the DAC

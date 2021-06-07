@@ -518,7 +518,8 @@ void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,siz
     voice_data[note].start_block = start_block;
     voice_data[note].length = size;
     voice_data[note].empty = 0;
-    memcpy(voice_data[note].name,name,24);
+    bzero(voice_data[note].name,24);
+    strcpy(voice_data[note].name,name);
     ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
     read_wav_lut_from_disk();
     // read_rack_lut_from_disk();
@@ -1140,6 +1141,23 @@ void updatePinConfig(cJSON *config){
     ESP_ERROR_CHECK(emmc_write(pin_config_lut,PIN_CONFIG_START_BLOCK,PIN_CONFIG_BLOCKS));
     wlog_i("wrote pin config to disk");
     cJSON_Delete(json);
+}
+
+void log_pin_config(void)
+{
+    for(int i=0;i<14;i++)
+    {
+        log_i("pin %d action:%d edge:%d gpio:%d note:%d touch:%d velocity:%d dbnc:%d",
+            i,
+            pin_config_lut[i].action,
+            pin_config_lut[i].edge,
+            pin_config_lut[i].gpio_num,
+            pin_config_lut[i].note,
+            pin_config_lut[i].touch,
+            pin_config_lut[i].velocity,
+            pin_config_lut[i].debounce
+        );
+    }
 }
 
 void updateMetadata(cJSON *config){

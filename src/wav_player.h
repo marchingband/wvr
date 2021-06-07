@@ -5,6 +5,8 @@ extern "C"
 {
 #endif
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 
 struct wav_player_event_t {
     uint8_t code;

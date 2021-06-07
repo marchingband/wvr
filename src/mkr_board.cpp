@@ -5,20 +5,20 @@
 
 extern "C" void play_sound_ext(int i);
 
-Button p1(D13,FALLING, 50);
-Button p2(D12,FALLING, 50);
-Button p3(D11,FALLING, 50);
-Button p4(D10,FALLING, 50);
-Button p5(D9,FALLING, 50);
-Button p6(D8,FALLING, 50);
-Button p7(D7,FALLING, 50);
-Button p8(D6,FALLING, 50);
-Button p9(D5,FALLING, 50);
-Button p10(D4,FALLING, 50);
-Button p11(D3,FALLING, 50);
-Button p12(D2,FALLING, 50);
-Button p13(D1,FALLING, 50);
-Button p14(D0,FALLING, 50);
+// Button p1(D13,FALLING, 50);
+// Button p2(D12,FALLING, 50);
+// Button p3(D11,FALLING, 50);
+// Button p4(D10,FALLING, 50);
+// Button p5(D9,FALLING, 50);
+// Button p6(D8,FALLING, 50);
+// Button p7(D7,FALLING, 50);
+// Button p8(D6,FALLING, 50);
+// Button p9(D5,FALLING, 50);
+// Button p10(D4,FALLING, 50);
+// Button p11(D3,FALLING, 50);
+// Button p12(D2,FALLING, 50);
+// Button p13(D1,FALLING, 50);
+// Button p14(D0,FALLING, 50);
 
 void logPress(){
   play_sound_ext(40);
@@ -30,6 +30,21 @@ void logPress2(){
 }
 
 void mkr_init(){
+  Button p1(D13,FALLING, 50);
+  Button p2(D12,FALLING, 50);
+  Button p3(D11,FALLING, 50);
+  Button p4(D10,FALLING, 50);
+  Button p5(D9,FALLING, 50);
+  Button p6(D8,FALLING, 50);
+  Button p7(D7,FALLING, 50);
+  Button p8(D6,FALLING, 50);
+  Button p9(D5,FALLING, 50);
+  Button p10(D4,FALLING, 50);
+  Button p11(D3,FALLING, 50);
+  Button p12(D2,FALLING, 50);
+  Button p13(D1,FALLING, 50);
+  Button p14(D0,FALLING, 50);
+
 
   button_init();
 

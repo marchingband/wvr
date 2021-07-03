@@ -1,3 +1,4 @@
+#include "defines.h"
 #include "cJSON.h"
 #include "esp32-hal-log.h"
 #include "esp32-hal-cpu.h"
@@ -25,7 +26,7 @@ void server_begin(void);
 void server_pause(void);
 extern "C" void emmc_init(void);
 extern "C" void dac_init(void);
-extern "C" void midi_init(void);
+extern "C" void midi_init(bool useUsbMidi);
 extern "C" void wav_player_start(void);
 extern "C" void encoder_init(void);
 extern "C" void touch_test(void);
@@ -42,7 +43,7 @@ void midi_parser_init(void);
 
 size_t heap_remaining = esp_get_free_heap_size();
 
-void wifi_log_boot_stage(void){
+void on_ws_connect(void){
   static int done = 0;
   if(!done){
     done = 1;
@@ -72,7 +73,7 @@ void logRam(){
 
 struct metadata_t metadata;
 
-void wvr_init() {
+void wvr_init(bool useFTDI, bool useUsbMidi) {
   Serial.begin(115200);
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
@@ -103,7 +104,7 @@ void wvr_init() {
   dac_init();
   logSize("dac");
 
-  midi_init();
+  midi_init(useUsbMidi);
   logSize("midi");
 
   midi_parser_init();
@@ -118,7 +119,7 @@ void wvr_init() {
   button_init();
   logSize("button");
   
-  wvr_gpio_init();
+  wvr_gpio_init(useFTDI, useUsbMidi);
   logSize("gpio");
 
   rpc_init();

@@ -10,6 +10,7 @@
 #include "midi_in.h"
 #include "rpc.h"
 #include "wav_player.h"
+#include "file_system.h"
 
 // QueueHandle_t rpc_in_queue;
 QueueHandle_t rpc_out_queue;
@@ -17,7 +18,7 @@ QueueHandle_t rpc_out_queue;
 TaskHandle_t rpc_out_task_handle;
 BaseType_t task_return;
 
-#define NO_RPC_OUT 0
+#define NO_RPC_OUT 1
 
 void sendWSMsg(char* msg);
 
@@ -63,6 +64,8 @@ char* on_rpc_in(cJSON *json)
     }
 }
 
+extern struct metadata_t metadata;
+
 void rpc_out_task(void* pvParameters)
 {
     struct rpc_event_t event;
@@ -70,7 +73,12 @@ void rpc_out_task(void* pvParameters)
         if(xQueueReceive(rpc_out_queue, (void *)&event, (portTickType)portMAX_DELAY))
         {
 
-            log_v("rpc_out_task received event");
+            log_d("rpc_out_task received event");
+            if(metadata.wlog_verbosity == 0)
+            {
+                // dont do RPC if UI log level is "NONE"
+                continue;
+            }
             cJSON *rpc_root = cJSON_CreateObject();
             switch(event.procedure){
                 case RPC_NOTE_ON:
@@ -101,5 +109,5 @@ void rpc_init(void)
     // rpc_in_queue = xQueueCreate(20, sizeof(struct rpc_event_t));
     rpc_out_queue = xQueueCreate(20, sizeof(struct rpc_event_t));
     // task_return = xTaskCreate(rpc_in_task,"rpc_in_task", 1024, NULL, 1, rpc_in_task_handle);
-    task_return = xTaskCreatePinnedToCore(rpc_out_task,"rpc_out_task", 1024 * 4, NULL, 3, rpc_out_task_handle,0);
+    task_return = xTaskCreatePinnedToCore(rpc_out_task,"rpc_out_task", 1024 * 4, NULL, 2, rpc_out_task_handle,0);
 }

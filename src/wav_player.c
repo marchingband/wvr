@@ -31,21 +31,21 @@ static const char* TAG = "wav_player";
 #define DAC_BUFFER_SIZE_IN_BYTES ( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t) ) 
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
 
-// #define NUM_BUFFERS 18
+#define NUM_BUFFERS 18
 // #define NUM_BUFFERS 20
-#define NUM_BUFFERS 22
-// #define NUM_BUFFERS 25
 
-// #define DAMPEN_BITS 2
 #define DAMPEN_BITS 1
-// #define USE_SQRT_SCALE 0
-// #define USE_VOLUME 0
-// #define USE_VOLUME_FP 1
-// #define USE_VOLUME_FP_SQRT 0
 #define LOG_PERFORMANCE 0
 
 #define MAX_READS_PER_LOOP 4
 // #define MAX_READS_PER_LOOP 3
+
+#define USE_EQ 1
+#define USE_PAN 1
+
+// from midi.c
+uint8_t channel_lut[16];
+struct pan_t channel_pan[16];
 
 struct metadata_t metadata;
 bool mute = false;
@@ -83,7 +83,6 @@ esp_err_t dac_write(const void *src, size_t size, size_t *bytes_written);
 void dac_pause(void);
 void dac_resume(void);
 
-int16_t sqrtLUT[128];
 
 struct buf_t bufs[NUM_BUFFERS];
 int16_t *output_buf;
@@ -91,6 +90,8 @@ struct wav_player_event_t wav_player_event;
 int new_midi = 0;
 int new_midi_buf = -1;
 
+int16_t sqrtLUT[128];
+float sqrt_float_LUT[128];
 float float_lut[128];
 
 uint32_t tmp32;
@@ -146,14 +147,67 @@ void init_float_lut(void)
 {
   for(int i=0;i<128;i++)
   {
-    float num = (float)i/127;
+    // float_lut
+    float num = (float)i/127.0;
     float_lut[i] = num;
+    // sqrt_float_lut
+    float a = (float)sqrt(i * 127.0);
+    float b = a / 127;
+    sqrt_float_LUT[i] = b;
   }
 }
 
 int16_t IRAM_ATTR scale_sample (int16_t in, uint8_t volume)
 {
   return (int16_t)(in * float_lut[volume]);
+}
+
+int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t volume)
+{
+  return (int16_t)(in * sqrt_float_LUT[volume]);
+}
+
+float eq_high = 1;
+float eq_low = 0;
+
+static float temp_low_L;
+static float temp_high_L;
+static float temp_low_R;
+static float temp_high_R;
+static float distanceToGo;
+static float trebleOnly;
+
+int16_t IRAM_ATTR apply_EQ(int16_t in, bool left)
+{
+  if(left)
+  {
+    // Treble calculations
+    distanceToGo = in - temp_low_L;
+    temp_low_L += distanceToGo * 0.125; // Number controls treble frequency
+    trebleOnly = in - temp_low_L;
+
+    // Bass calculations
+    distanceToGo = temp_low_L - temp_high_L;
+    temp_high_L += distanceToGo * 0.125; // Number controls bass frequency
+
+    return (int16_t)(temp_low_L + trebleOnly * eq_high + temp_high_L * eq_low);
+  }
+  else
+  {
+    // Treble calculations
+    distanceToGo = in - temp_low_R;
+    temp_low_R += distanceToGo * 0.125; // Number controls treble frequency
+    trebleOnly = in - temp_low_R;
+
+    // Bass calculations
+    distanceToGo = temp_low_R - temp_high_R;
+    temp_high_R += distanceToGo * 0.125; // Number controls bass frequency
+
+    return (int16_t)(temp_low_R + trebleOnly * eq_high + temp_high_R * eq_low);
+  }
+  // return (int16_t)(temp_low_R + trebleOnly * 1 + temp_high_R * 0);
+  // The "1" controls treble. 0 = none; 1 = untouched; 2 = +6db
+  // The "0" controls bass. -1 = none; 0 = untouched; 1 = +6db
 }
 
 void stop_wav(uint8_t voice, uint8_t note)
@@ -173,6 +227,7 @@ void play_wav(uint8_t voice, uint8_t note, uint8_t velocity)
   wav_player_event.voice = voice;
   wav_player_event.velocity = velocity;
   wav_player_event.note = note;
+  wav_player_event.channel = 0;
   xQueueSendToBack(wav_player_queue, &wav_player_event, portMAX_DELAY);
 }
 
@@ -387,49 +442,45 @@ void wav_player_task(void* pvParameters)
 
         size_t remaining = (bufs[i].size - bufs[i].wav_position) / sizeof(int16_t);
         size_t to_write = remaining < DAC_BUFFER_SIZE_IN_SAMPLES ? remaining : DAC_BUFFER_SIZE_IN_SAMPLES;
-        
-        switch(bufs[i].wav_data.response_curve){
-          case RESPONSE_ROOT_SQUARE:
+
+        uint8_t channel = bufs[i].wav_player_event.channel;
+        uint8_t left_vol = channel_pan[channel].left_vol;
+        uint8_t right_vol = channel_pan[channel].right_vol;
+
+        bool left = false;
+        for(int s=0; s<to_write; s++)
+        {
+          left = !left;
+          // apply volume
+          if(bufs[i].wav_data.response_curve == RESPONSE_ROOT_SQUARE)
+          {
+            tmp16 = scale_sample_sqrt(buf_pointer[base_index + s], bufs[i].volume);
+          }
+          else
+          {
+            tmp16 = scale_sample(buf_pointer[base_index + s], bufs[i].volume);
+          }
+          // apply PAN
+          if(USE_PAN)
+          {
+            tmp16 = scale_sample(tmp16, left ? left_vol : right_vol);
+          }
+          // mix into master
+          output_buf[s] += ( tmp16 >> DAMPEN_BITS );
+          // incriment fade var
+          if(bufs[i].fade)
+          {
+            if(bufs[i].volume > 0)
             {
-              for(int s=0; s<to_write; s++)
-              {
-                tmp32 = buf_pointer[base_index + s] * sqrtLUT[bufs[i].volume];
-                output_buf[s] += (tmp32 >> (15 + DAMPEN_BITS));
-                if(bufs[i].fade)
-                {
-                  if(bufs[i].volume > 0)
-                  {
-                    bufs[i].volume--;
-                  }
-                  else
-                  {
-                    bufs[i].done = true;
-                  }
-                }
-              }
+              bufs[i].volume--;
             }
-            break;
-          case RESPONSE_FIXED:
-          case RESPONSE_LINEAR:
+            else
             {
-              for(int s=0; s<to_write; s++)
-              {
-                tmp16 = scale_sample(buf_pointer[base_index + s], bufs[i].volume);
-                output_buf[s] += ( tmp16 >> DAMPEN_BITS ) ;
-                if(bufs[i].fade)
-                {
-                  if(bufs[i].volume > 0)
-                  {
-                    bufs[i].volume--;
-                  }
-                  else
-                  {
-                    bufs[i].done = true;
-                  }
-                }
-              }
+              bufs[i].done = true;
             }
+          }
         }
+
         
         // incriment that buffers position
         bufs[i].head_position++;
@@ -463,10 +514,16 @@ void wav_player_task(void* pvParameters)
       }
     }
 
-    // apply the global volume
+    // apply the global volume and EQ
+    bool left = false; 
     for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
     {
+      left = !left;
       output_buf[i] = scale_sample(output_buf[i], metadata.global_volume);
+      if(USE_EQ )
+      {
+        output_buf[i] = apply_EQ(output_buf[i], left);
+      }
     }
     // apply the mute
     if(mute)
@@ -504,24 +561,11 @@ void wav_player_task(void* pvParameters)
   vTaskDelete(NULL);
 }
 
-void initSqrtLut(int16_t *lut)
-{
-  // omega = pow(32767, 2) / 127
-  int32_t omega = 8454144;
-  for(int i=0;i<128;i++)
-  {
-    int32_t x = i * omega;
-    int32_t y = sqrt(x);
-    lut[i] = (int16_t)y;
-  }
-}
-
 TaskHandle_t wav_player_task_handle;
 BaseType_t task_return;
 
 void wav_player_start(void)
 {
-  initSqrtLut(sqrtLUT);
   init_float_lut();
   init_buffs();
   bool dmaablebuf = esp_ptr_dma_capable(output_buf);

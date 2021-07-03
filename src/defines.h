@@ -1,0 +1,7 @@
+#ifndef DEFINES_H
+#define DEFINES_H
+
+// #define CONFIG_ASYNC_TCP_RUNNING_CORE 0
+// #define CONFIG_ASYNC_TCP_USE_WDT 0
+
+#endif

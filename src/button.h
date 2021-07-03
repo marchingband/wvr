@@ -10,6 +10,7 @@ class Button {
         int last;
         int mode;
         bool touch;
+        bool pressed;
         void (*handlePress)();
         void (*handleRelease)();
         button_event_t event;

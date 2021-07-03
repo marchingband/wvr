@@ -1,7 +1,11 @@
 #ifndef GPIO_H
 #define GPIO_H
 
-void wvr_gpio_init(void);
+#include "button.h"
+
+extern Button *buttons[14];
+
+void wvr_gpio_init(bool useFTDI, bool useUsbMidi);
 void on_press(uint8_t i);
 void on_release(uint8_t pin);
 

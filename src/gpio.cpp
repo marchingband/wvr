@@ -10,6 +10,7 @@
 #include "WVR.h"
 #include "midi_in.h"
 #include "server.h"
+#include "gpio.h"
 
 // extern "C" {
 //     #include "wav_player.h"
@@ -31,6 +32,17 @@ static struct metadata_t *metadata = get_metadata();
 struct wav_player_event_t wav_player_event;
 extern "C" {
     QueueHandle_t wav_player_queue;
+}
+
+void on_release_per_config(int pin_num)
+{
+    uint8_t *channel_lut = get_channel_lut();
+    struct pin_config_t pin = pin_config_lut[pin_num];
+    wav_player_event.code = MIDI_NOTE_OFF;
+    wav_player_event.note = pin.note;
+    wav_player_event.velocity = pin.velocity;
+    wav_player_event.voice = channel_lut[0];
+    xQueueSendToBack(wav_player_queue, (void *)&wav_player_event, portMAX_DELAY);
 }
 
 void on_press_per_config(int pin_num)
@@ -93,9 +105,12 @@ void on_press_per_config(int pin_num)
     }
 }
 
-void wvr_gpio_init(void)
+void wvr_gpio_init(bool useFTDI, bool useUsbMidi)
 {
-    for(int i=2;i<14;i++)
+    log_i("useFTDI is %d",useFTDI);
+    int start = useFTDI ? useUsbMidi ? 3 : 2 : 0;
+    log_i("gpio start is %d",start);
+    for(int i=start;i<14;i++)
     {
         gpio_num_t gpio_num = gpio_pins[i];
         int pin_num = wvr_pins[i];
@@ -115,7 +130,7 @@ void wvr_gpio_init(void)
             }
             else if(pin.edge == EDGE_RISING)
             {
-                pinMode(pin_num, INPUT_PULLDOWN);
+                pinMode(pin_num, INPUT_PULLUP);
                 buttons[i] = new Button(pin_num, RISING, pin.debounce);
             }
         }
@@ -126,17 +141,31 @@ void wvr_gpio_init(void)
         }
     }
     if(buttons[0] != NULL) buttons[0]->onPress([](){on_press_per_config(0);});
+    if(buttons[0] != NULL) buttons[0]->onRelease([](){on_release_per_config(0);});
     if(buttons[1] != NULL) buttons[1]->onPress([](){on_press_per_config(1);});
+    if(buttons[1] != NULL) buttons[1]->onRelease([](){on_release_per_config(1);});
     if(buttons[2] != NULL) buttons[2]->onPress([](){on_press_per_config(2);});
+    if(buttons[2] != NULL) buttons[2]->onRelease([](){on_release_per_config(2);});
     if(buttons[3] != NULL) buttons[3]->onPress([](){on_press_per_config(3);});
+    if(buttons[3] != NULL) buttons[3]->onRelease([](){on_release_per_config(3);});
     if(buttons[4] != NULL) buttons[4]->onPress([](){on_press_per_config(4);});
+    if(buttons[4] != NULL) buttons[4]->onRelease([](){on_release_per_config(4);});
     if(buttons[5] != NULL) buttons[5]->onPress([](){on_press_per_config(5);});
+    if(buttons[5] != NULL) buttons[5]->onRelease([](){on_release_per_config(5);});
     if(buttons[6] != NULL) buttons[6]->onPress([](){on_press_per_config(6);});
+    if(buttons[6] != NULL) buttons[6]->onRelease([](){on_release_per_config(6);});
     if(buttons[7] != NULL) buttons[7]->onPress([](){on_press_per_config(7);});
+    if(buttons[7] != NULL) buttons[7]->onRelease([](){on_release_per_config(7);});
     if(buttons[8] != NULL) buttons[8]->onPress([](){on_press_per_config(8);});
+    if(buttons[8] != NULL) buttons[8]->onRelease([](){on_release_per_config(8);});
     if(buttons[9] != NULL) buttons[9]->onPress([](){on_press_per_config(9);});
+    if(buttons[9] != NULL) buttons[9]->onRelease([](){on_release_per_config(9);});
     if(buttons[10] != NULL) buttons[10]->onPress([](){on_press_per_config(10);});
+    if(buttons[10] != NULL) buttons[10]->onRelease([](){on_release_per_config(10);});
     if(buttons[11] != NULL) buttons[11]->onPress([](){on_press_per_config(11);});
+    if(buttons[11] != NULL) buttons[11]->onRelease([](){on_release_per_config(11);});
     if(buttons[12] != NULL) buttons[12]->onPress([](){on_press_per_config(12);});
+    if(buttons[12] != NULL) buttons[12]->onRelease([](){on_release_per_config(12);});
     if(buttons[13] != NULL) buttons[13]->onPress([](){on_press_per_config(13);});
+    if(buttons[13] != NULL) buttons[13]->onRelease([](){on_release_per_config(13);});
 }

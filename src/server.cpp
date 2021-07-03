@@ -1,3 +1,7 @@
+// #define CONFIG_ASYNC_TCP_RUNNING_CORE 0
+// #define CONFIG_ASYNC_TCP_USE_WDT 0
+
+#include "defines.h"
 #include "Arduino.h"
 
 #include <WiFi.h>
@@ -29,7 +33,8 @@ extern "C" void updateMetadata(char* json);
 extern "C" char* on_rpc_in(cJSON* json);
 extern "C" char* write_recovery_firmware_to_emmc(uint8_t* source, size_t size);
 extern "C" char* close_recovery_firmware_to_emmc(size_t recovery_firmware_size);
-// extern "C" size_t add_firmware_and_gui_to_file_system(char *gui_name,char *firmware_name,size_t gui_start_block,size_t firmware_start_block,size_t gui_size,size_t firmware_size);
+extern "C" void wav_player_pause(void);
+extern "C" void wav_player_resume(void);
 
 static struct metadata_t *metadata = get_metadata();
 struct wav_lu_t **lut;
@@ -37,7 +42,7 @@ struct firmware_t *firmware_lut;
 struct website_t *website_lut;
 
 void bootFromEmmc(int index);
-void wifi_log_boot_stage(void);
+void on_ws_connect(void);
 
 const char *ssid = "yourAP";
 const char *password = "yourPassword";
@@ -63,92 +68,23 @@ cJSON *ws_root;
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
   if(type == WS_EVT_CONNECT){
     Serial.printf("ws[%s][%u] connect\n", server->url(), client->id());
-    client->printf("Hello Client %u :) firmware v%s", client->id(), VERSION_CODE);
-    wifi_log_boot_stage();
+    client->printf("ws_client %u", client->id());
+    client->printf("firmware v%s", VERSION_CODE);
+    on_ws_connect();
     client->ping();
   } else if(type == WS_EVT_DISCONNECT){
     Serial.printf("ws[%s][%u] disconnect\n", server->url(), client->id());
   } else if(type == WS_EVT_ERROR){
     Serial.printf("ws[%s][%u] error(%u): %s\n", server->url(), client->id(), *((uint16_t*)arg), (char*)data);
   } else if(type == WS_EVT_PONG){
-    Serial.printf("ws[%s][%u] pong[%u]: %s\n", server->url(), client->id(), len, (len)?(char*)data:"");
+    // Serial.printf("ws[%s][%u] pong[%u]: %s\n", server->url(), client->id(), len, (len)?(char*)data:"");
   } else if(type == WS_EVT_DATA){
     AwsFrameInfo * info = (AwsFrameInfo*)arg;
     String msg = "";
     if(info->final && info->index == 0 && info->len == len){
       //the whole message is in a single frame and we got all of it's data
-
-      /////////////////
-      // receive RPC //
-      /////////////////
-
       ws_root = cJSON_Parse((char *)data);
-      // int procedure = cJSON_GetObjectItem(ws_root,"procedure")->valueint;
-      // wlog_i("ws procedure: %d",procedure);
       on_rpc_in(ws_root);
-      // switch(procedure){
-      //   case(NOTE_ON):
-      //     // play note
-      //     break;
-      //   default:
-      //     wlog_i("RPC received unknown procedure code: %d", procedure);
-      //     break;
-      // }
-
-      /////////////////
-      ////// end //////
-      /////////////////
-
-  //     Serial.printf("ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(), (info->opcode == WS_TEXT)?"text":"binary", info->len);
-  //     if(info->opcode == WS_TEXT){
-  //       for(size_t i=0; i < info->len; i++) {
-  //         msg += (char) data[i];
-  //       }
-  //     } else {
-  //       char buff[3];
-  //       for(size_t i=0; i < info->len; i++) {
-  //         sprintf(buff, "%02x ", (uint8_t) data[i]);
-  //         msg += buff ;
-  //       }
-  //     }
-  //     Serial.printf("%s\n",msg.c_str());
-
-  //     if(info->opcode == WS_TEXT)
-  //       client->text("I got your text message");
-  //     else
-  //       client->binary("I got your binary message");
-  //   } else {
-  //     //message is comprised of multiple frames or the frame is split into multiple packets
-  //     if(info->index == 0){
-  //       if(info->num == 0)
-  //         Serial.printf("ws[%s][%u] %s-message start\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
-  //       Serial.printf("ws[%s][%u] frame[%u] start[%llu]\n", server->url(), client->id(), info->num, info->len);
-  //     }
-
-  //     Serial.printf("ws[%s][%u] frame[%u] %s[%llu - %llu]: ", server->url(), client->id(), info->num, (info->message_opcode == WS_TEXT)?"text":"binary", info->index, info->index + len);
-
-  //     if(info->opcode == WS_TEXT){
-  //       for(size_t i=0; i < len; i++) {
-  //         msg += (char) data[i];
-  //       }
-  //     } else {
-  //       char buff[3];
-  //       for(size_t i=0; i < len; i++) {
-  //         sprintf(buff, "%02x ", (uint8_t) data[i]);
-  //         msg += buff ;
-  //       }
-  //     }
-  //     Serial.printf("%s\n",msg.c_str());
-  //     if((info->index + len) == info->len){
-  //       Serial.printf("ws[%s][%u] frame[%u] end[%llu]\n", server->url(), client->id(), info->num, info->len);
-  //       if(info->final){
-  //         Serial.printf("ws[%s][%u] %s-message end\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
-  //         if(info->message_opcode == WS_TEXT)
-  //           client->text("I got your text message");
-  //         else
-  //           client->binary("I got your binary message");
-  //       }
-  //     }
     }
   }
 }
@@ -165,11 +101,16 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
   }
 }
 
+int loop_num = 0;
+
 void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(!index){
+    wav_player_pause();
+    loop_num = 0;
     Update.begin(total);
     Serial.println("starting update");
   }
+  feedLoopWDT();
   size_t written = Update.write(data,len);
   if(written != len){
     Serial.println("write failed");
@@ -177,8 +118,14 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
     Update.abort();
     return;
   }
-  Serial.print(".");
+
+  if(loop_num++ % 20 == 0)
+  {
+    Serial.print(".");
+  }
+
   if(index + len == total){
+    feedLoopWDT();
     Serial.println(".");
     if(Update.end()){
       if(Update.isFinished()){
@@ -196,6 +143,7 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
       Serial.println("failed");
     }
     request->send(204);
+    wav_player_resume();
   }
 }
 
@@ -204,6 +152,7 @@ uint8_t *voice_config_json = NULL;
 void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
+    wav_player_pause();
     voice_config_json = (uint8_t*)ps_malloc(total + 1);
     if(!voice_config_json){
       wlog_i("failed to malloc for json");
@@ -213,11 +162,14 @@ void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size
   for(int i=0;i<len;i++){
     voice_config_json[i + index] = data[i];
   }
+  feedLoopWDT();
   if(index + len == total){
     //done
+    feedLoopWDT();
     updateVoiceConfig((char *)voice_config_json);
     free(voice_config_json);
     request->send(200, "text/plain", "all done voice config update");
+    wav_player_resume();
   }
 }
 
@@ -226,6 +178,7 @@ uint8_t *pin_config_json = NULL;
 void handleUpdatePinConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
+    wav_player_pause();
     pin_config_json = (uint8_t*)ps_malloc(total);
     if(!pin_config_json){
       wlog_i("failed to malloc for json");
@@ -235,11 +188,13 @@ void handleUpdatePinConfig(AsyncWebServerRequest *request, uint8_t *data, size_t
   for(int i=0;i<len;i++){
     pin_config_json[i + index] = data[i];
   }
+  feedLoopWDT();
   if(index + len == total){
     //done
     updatePinConfig((char *)pin_config_json);
     free(pin_config_json);
     request->send(200, "text/plain", "all done pin config update");
+    wav_player_resume();
   }
 }
 
@@ -248,6 +203,7 @@ uint8_t *metadata_json = NULL;
 void handleUpdateMetadata(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
+    wav_player_pause();
     metadata_json = (uint8_t*)ps_malloc(total);
     if(!metadata_json){
       wlog_i("failed to malloc for metadata json");
@@ -257,11 +213,13 @@ void handleUpdateMetadata(AsyncWebServerRequest *request, uint8_t *data, size_t 
   for(int i=0;i<len;i++){
     metadata_json[i + index] = data[i];
   }
+  feedLoopWDT();
   if(index + len == total){
     //done
     updateMetadata((char *)metadata_json);
     free(metadata_json);
     request->send(200, "text/plain", "all done pin config update");
+    wav_player_resume();
   }
 }
 
@@ -275,6 +233,7 @@ size_t w_start_block;
 void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
+    wav_player_pause();
     AsyncWebHeader* size_string = request->getHeader("size");
     sscanf(size_string->value().c_str(), "%d", &w_size);
     AsyncWebHeader* name = request->getHeader("name");
@@ -286,6 +245,7 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     w_start_block = find_gap_in_file_system(w_size);
   }
   //always
+  feedLoopWDT();
   write_wav_to_emmc(data, w_start_block, len);
   w_bytes_read += len;
   if(index + len == total){
@@ -293,6 +253,7 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     close_wav_to_emmc();
     add_wav_to_file_system(&w_name[0],w_voice,w_note,w_start_block,total);
     request->send(200, "text/plain", "done upload wav");
+    wav_player_resume();
   }
 }
 
@@ -306,6 +267,7 @@ size_t r_start_block;
 void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
+    wav_player_pause();
     strcpy(&r_name[0], request->getHeader("name")->value().c_str());
     sscanf(request->getHeader("voice")->value().c_str(), "%d", &r_voice);
     sscanf(request->getHeader("note")->value().c_str(), "%d", &r_note);
@@ -315,6 +277,7 @@ void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_
     r_start_block = find_gap_in_file_system(total);
   }
   //always
+  feedLoopWDT();
   write_wav_to_emmc(data, r_start_block, len);
   w_bytes_read += len;
   if(index + len == total){
@@ -322,6 +285,7 @@ void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_
     close_wav_to_emmc();
     add_rack_to_file_system(&r_name[0],r_voice,r_note,r_start_block,total,r_layer,r_rack_json);
     free(r_rack_json);
+    wav_player_resume();
   }
 }
 
@@ -336,6 +300,7 @@ char f_firmware_name[24];
 void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   //once
   if(index==0){
+    wav_player_pause();
     AsyncWebHeader* firmware_slot_string = request->getHeader("slot-index");
     sscanf(firmware_slot_string->value().c_str(), "%d", &f_firmware_slot);
     AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
@@ -355,16 +320,19 @@ void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len
   }
 
   Serial.print(".");
+  feedLoopWDT();
   write_firmware_to_emmc(f_firmware_slot, data, len);
   f_bytes_read += len;
 
   //done
   if(index + len == total){
+    feedLoopWDT();
     close_firmware_to_emmc(f_firmware_slot);
     log_i("done");
     log_i("wrote %u bytes",f_bytes_read);
     f_bytes_read = 0;
     request->send(200, "text/plain", "all done firmware");
+    wav_player_resume();
   }
 }
 
@@ -379,35 +347,30 @@ size_t rf_firmware_size;
 void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   //once
   if(index==0){
-    // AsyncWebHeader* firmware_slot_string = request->getHeader("slot-index");
-    // sscanf(firmware_slot_string->value().c_str(), "%d", &f_firmware_slot);
+    wav_player_pause();
     AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
     sscanf(firmware_size_string->value().c_str(), "%d", &rf_firmware_size);
-    // AsyncWebHeader* firmware_name_string = request->getHeader("firmware-name");
-    // strcpy(&f_firmware_name[0], firmware_name_string->value().c_str());
-    // log_i("firmware size %u, firmware name %s",f_firmware_size,f_firmware_name);
-
-    // struct firmware_t *f = get_firmware_slot(-1);
-    // f->length = rf_firmware_size;
-    // strcpy(f->name, firmware_name_string->value().c_str());
   }
-  //always
   if(rf_firmware_size > MAX_FIRMWARE_SIZE){
     request->send(400, "text/plain", "FILES TOO LARGE");
     return;
   }
 
   Serial.print(".");
+  feedLoopWDT();
   write_recovery_firmware_to_emmc(data, len);
   rf_bytes_read += len;
 
   //done
   if(index + len == total){
+    feedLoopWDT();
     close_recovery_firmware_to_emmc(total);
+    feedLoopWDT();
     log_i("done");
     log_i("wrote %u bytes",rf_bytes_read);
     rf_bytes_read = 0;
     request->send(200, "text/plain", "all done recovery firmware");
+    wav_player_resume();
   }
 }
 
@@ -427,9 +390,11 @@ void handleNewGUI(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
     struct website_t *w = get_website_slot(f_firmware_slot);
     w->length = f_gui_size;
     strcpy(w->name, gui_name_string->value().c_str());
+    feedLoopWDT();
   }
   //always
   if((f_firmware_size > MAX_FIRMWARE_SIZE) || (f_gui_size > MAX_WEBSITE_SIZE)){
+    feedLoopWDT();
     request->send(400, "text/plain", "FILES TOO LARGE");
     return;
   }
@@ -440,6 +405,7 @@ void handleNewGUI(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
 
   //done
   if(index + len == total){
+    feedLoopWDT();
     close_website_to_emmc(f_firmware_slot);
     log_i("done");
     log_i("wrote %u bytes",f_bytes_read);
@@ -449,10 +415,12 @@ void handleNewGUI(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
 }
 
 void handleFsjson(AsyncWebServerRequest *request){
+  // wav_player_pause();
   char *json = print_fs_json();
   size_t size = strlen(json);
   // wlog_e("fs size is %d",size);
   AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+    feedLoopWDT();
     size_t toWrite = min(size - index, maxLen);
     memcpy(buffer, json + index, toWrite);
     if(index + toWrite == size){
@@ -462,6 +430,7 @@ void handleFsjson(AsyncWebServerRequest *request){
   });
   response->addHeader("size",String(size));
   request->send(response);
+  // wav_player_resume();
   // request->send("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
   //   size_t toWrite = min(size - index, maxLen);
   //   memcpy(buffer, json + index, toWrite);
@@ -476,6 +445,7 @@ void handleEmmcGUI(AsyncWebServerRequest *request){
   size_t size = website_lut[metadata->current_website_index].length;
   size_t start_block = website_lut[metadata->current_website_index].start_block;
   request->send("text/html", size, [size,start_block](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+    feedLoopWDT();
     size_t toWrite = min(size - index, maxLen);
     size_t written = get_website_chunk(start_block, toWrite, buffer, size);
     // memcpy(buffer, buf, toWrite);
@@ -486,6 +456,7 @@ void handleEmmcGUI(AsyncWebServerRequest *request){
 void handleMain(AsyncWebServerRequest *request){
   size_t size = sizeof(MAIN_page) / sizeof(char);
   request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+    feedLoopWDT();
     size_t toWrite = min(size - index, maxLen);
     memcpy(buffer, MAIN_page + index, toWrite);
     return toWrite;
@@ -500,6 +471,7 @@ void handleRPC(AsyncWebServerRequest *request){
 }
 
 void handleBootFromEmmc(AsyncWebServerRequest *request){
+  wav_player_pause();
   char index = 0;
   AsyncWebHeader* firmware_slot_string = request->getHeader("index");
   sscanf(firmware_slot_string->value().c_str(), "%d", &index);

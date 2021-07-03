@@ -66,7 +66,7 @@
 
 
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_10"; 
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_11"; 
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_12"; 
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -286,7 +286,7 @@ void init_rack_lut(void){
         rack_lut[j] = blank;
     }
     struct rack_file_t *buf = (struct rack_file_t*)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-    if(buf == NULL){log_i("failed to alloc rack_file_t buf");};
+    if(buf == NULL){log_e("failed to alloc rack_file_t buf");};
     for(int k=0; k < NUM_RACK_DIRECTORY_ENTRIES; k++){
         buf[k] = blank_file;
     }
@@ -318,7 +318,7 @@ void init_firmware_lut(void){
 void write_firmware_lut_to_disk(void){
     // log_i("writting firmware wav_lut to disk");
     struct firmware_t *buf = (struct firmware_t*)ps_malloc(FIRMWARE_LUT_BLOCKS * SECTOR_SIZE);
-    if(buf == NULL){log_i("failed to alloc firmware_t buf");};
+    if(buf == NULL){log_e("failed to alloc firmware_t buf");};
     // log_i("allocated buffer of %u blocks for %u firmwares to write to disk", FIRMWARE_LUT_BLOCKS, MAX_FIRMWARES);
     for(int i=0; i< MAX_FIRMWARES; i++){
         buf[i] = firmware_lut[i];
@@ -1147,7 +1147,7 @@ void log_pin_config(void)
 {
     for(int i=0;i<14;i++)
     {
-        log_i("pin %d action:%d edge:%d gpio:%d note:%d touch:%d velocity:%d dbnc:%d",
+        log_d("pin %d action:%d edge:%d gpio:%d note:%d touch:%d velocity:%d dbnc:%d",
             i,
             pin_config_lut[i].action,
             pin_config_lut[i].edge,

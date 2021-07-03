@@ -21,7 +21,8 @@ class WVR {
         // bool mute;
         // bool autoConfigPins;
         bool wifiIsOn;
-
+        bool useFTDI;
+        bool useUsbMidi;
 };
 
 #endif

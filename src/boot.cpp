@@ -110,7 +110,7 @@ void boot_into_recovery_mode(void)
             new_metadata->current_firmware_index = index;
             write_metadata(*new_metadata);
             // sdmmc_host_deinit();
-            // feedLoopWDT();
+            feedLoopWDT();
             // delay(1000);
             ESP.restart();
         } else {

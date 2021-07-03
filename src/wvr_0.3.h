@@ -3,8 +3,8 @@
 
 // #include "WVR.h"
 
-#define VERSION_CODE "0.3.6"
+#define VERSION_CODE "1.0.0"
 
-void wvr_init(void);
+void wvr_init(bool useFTDI, bool useUsbMidi);
 
 #endif

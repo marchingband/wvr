@@ -6,15 +6,14 @@
 
 WVR::WVR()
 {
-    // this->autoConfigPins = true;
     this->wifiIsOn = get_wifi_is_on();
-    // this->mute = false;
-    // this->globalVolume = 127;
+    this->useFTDI = false;
+    this->useUsbMidi = false;
 }
 
 void WVR::begin()
 {
-    wvr_init();
+    wvr_init(useFTDI, useUsbMidi);
 }
 
 void WVR::play(uint8_t voice, uint8_t note, uint8_t velocity)

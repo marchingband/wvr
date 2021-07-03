@@ -17,13 +17,12 @@
 xQueueHandle gpio_queue_handle;
 xTaskHandle gpio_task_handle;
 
-
 static void gpioTask(void* x) {
     button_event_t *event;
     uint32_t touch_reg = 0;
     for(;;) {
         if(xQueueReceive(gpio_queue_handle, &event, portMAX_DELAY)) {
-            log_i("gpio task pin:%d val:%d",event->pin, event->val);
+            log_d("gpio task pin:%d val:%d",event->pin, event->val);
             if(event->button->touch != 1)
             {
                 // digital
@@ -46,15 +45,15 @@ static void gpioTask(void* x) {
 void IRAM_ATTR isr(void *e){
     button_event_t *event = (button_event_t*)e;
     event->val = digitalRead(event->pin);
+    isr_log_d("read %d",event->val);
     xQueueSendFromISR(gpio_queue_handle, &event, NULL);
 }
 
 void IRAM_ATTR touch_isr(void *e){
-    // isr_log_i("touch isr");
     button_event_t *event = (button_event_t*)e;
     uint32_t pad_intr = touch_pad_get_status();
     touch_pad_clear_status();
-    // send the whole register to the queue so the other pad interrupts can read it even though its bee cleared
+    // send the whole register to the queue so the other pad interrupts can read it even though its been cleared
     event->val = pad_intr;
     xQueueSendFromISR(gpio_queue_handle, &event, NULL);
 }
@@ -67,6 +66,7 @@ Button::Button(int pin, int mode, int dbnc){
     this->touch = false;
     this->handlePress = NULL;
     this->handleRelease = NULL;
+    this->pressed = false;
     event.pin = pin;
     event.button = this;
     // gpio_reset_pin(gpioNumToGpioNum_T(pin));
@@ -78,6 +78,7 @@ Button::Button(int pin, int mode, int dbnc, bool touch){
     this->dbnc = dbnc;
     this->last = 0;
     this->touch = true;
+    this->pressed = false;
     this->handlePress = NULL;
     this->handleRelease = NULL;
     event.pin = pin;
@@ -86,7 +87,7 @@ Button::Button(int pin, int mode, int dbnc, bool touch){
 }
 
 Button::~Button(){
-    log_i("destructor button on %u",pin);
+    log_d("destructor button on %u",pin);
     detachInterrupt(pin);
 }
 
@@ -105,33 +106,53 @@ void Button::onPress(void(*handlePress)()){
 }
 
 void Button::onRelease(void(*handleRelease)()){
-    this->handleRelease=handleRelease;
-    attachInterruptArg(pin, isr, (void*)&event, CHANGE);
+    if(this->touch != 1)
+    {
+        // digital read mode
+        this->handleRelease=handleRelease;
+        attachInterruptArg(pin, isr, (void*)&event, CHANGE);
+    }
+    else
+    {
+        // capacitive touch mode has no onRelease()
+        return;
+    }
 }
 
 void Button::handleChange(int val){
+    log_d("pin:%d val:%d",pin,val);
     // if EDGE_NONE then ignore
-    log_i("pin:%d val:%d",pin,val);
     if(mode != RISING && mode != FALLING) return;
     int now = millis();
     if((now - last) > dbnc){
-        last = now;
+        // last = now;
         if(
-            (val==0 && mode == FALLING) ||
-            (val==1 && mode == RISING)  
+            (val==0 && mode == FALLING && !pressed) ||
+            (val==1 && mode == RISING && !pressed)  
         ){
             if(handlePress != NULL)
             {
                 handlePress();
             }
+            last = now;
         }
-        else
-        {
-            if(handleRelease != NULL)
+        else if(
+            (val==1 && mode == FALLING && pressed) ||
+            (val==0 && mode == RISING && pressed)  
+        ){
+            if(handleRelease != NULL && pressed)
             {
                 handleRelease();
             }
+            last = now;
         }
+    }
+    // make sure the pressed state updates even when debounced (this isr logic is annoying)
+    // touch pins have no such concept
+    if(!touch)
+    {
+        pressed = (val==0 && mode==FALLING) || (val==1 && mode==RISING);
+        log_d("pressed %d", pressed);
     }
 }
 
@@ -139,17 +160,13 @@ static bool touch_initialized = false;
 
 void init_touch(void)
 {
-    log_i("*");
     touch_pad_init();
     touch_pad_set_fsm_mode(TOUCH_FSM_MODE_TIMER);
     touch_pad_set_voltage(TOUCH_HVOLT_2V7, TOUCH_LVOLT_0V5, TOUCH_HVOLT_ATTEN_0V5);
-    // touch_pad_filter_start(TOUCHPAD_FILTER_TOUCH_PERIOD);
-    // touch_initialized = true;
 }
 
 void init_touch_pad(int pin, void *event)
 {
-    log_i("*");
     if(!touch_initialized)
     {
         init_touch();
@@ -161,7 +178,7 @@ void init_touch_pad(int pin, void *event)
 
     touch_pad_read_filtered( gpioNumToTPNum(pin), &touch_value);
     ESP_ERROR_CHECK(touch_pad_set_thresh( gpioNumToTPNum(pin), touch_value * 2 / 3));
-    log_i("touch setup TPNUM:%d touchValue:%d",gpioNumToTPNum(pin),touch_value);
+    log_d("touch setup TPNUM:%d touchValue:%d",gpioNumToTPNum(pin),touch_value);
     touch_pad_isr_register(touch_isr, (void*)event);
     touch_pad_intr_enable();
 }

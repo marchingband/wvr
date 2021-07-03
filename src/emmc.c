@@ -43,25 +43,13 @@ esp_err_t emmc_read(void *dst, size_t start_sector, size_t sector_count)
 
 void emmc_init(void)
 {
-	wlog_i("********************");
-	wlog_i("hello from emmc");
-	wlog_i("*********************");
   sdmmc_host_t host = SDMMC_HOST_DEFAULT();
   sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-  // slot_config.width = 4;
-//   slot_config.width = 1;
   host.flags = SDMMC_HOST_FLAG_4BIT;
-//   host.flags = SDMMC_HOST_FLAG_1BIT;
-
   host.max_freq_khz = SDMMC_FREQ_52M;
-  // host.max_freq_khz = SDMMC_FREQ_HIGHSPEED;
-  // host.max_freq_khz = 80000;
-  // host.max_freq_khz = SDMMC_FREQ_DEFAULT;
-  // host.max_freq_khz = SDMMC_FREQ_PROBING;
-
   ret = sdmmc_host_set_bus_ddr_mode(SDMMC_HOST_SLOT_1, true);
   if(ret != ESP_OK){
-    log_i( "sdmmc_host_init : %s", esp_err_to_name(ret));
+    log_e( "sdmmc_host_init : %s", esp_err_to_name(ret));
   }
   gpio_set_pull_mode(15, GPIO_PULLUP_ONLY);   // CMD, needed in 4- and 1- line modes
   gpio_set_pull_mode(2, GPIO_PULLUP_ONLY);    // D0, needed in 4- and 1-line modes

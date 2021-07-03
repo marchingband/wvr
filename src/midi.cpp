@@ -16,22 +16,11 @@ extern "C" uint8_t* midi_parse(uint8_t in)
 {
     if ( midiParser.parse( in ) )  // Do we received a channel voice msg ?
     {
-        if ( midiParser.isMidiStatus(midiXparser::noteOnStatus) || midiParser.isMidiStatus(midiXparser::noteOffStatus) || midiParser.isMidiStatus(midiXparser::programChangeStatus) ) 
+        if ( midiParser.isMidiStatus(midiXparser::noteOnStatus) || midiParser.isMidiStatus(midiXparser::noteOffStatus) || midiParser.isMidiStatus(midiXparser::programChangeStatus) || midiParser.isMidiStatus(midiXparser::controlChangeStatus) ) 
         {
-            // if ( midiParser.isMidiStatus(midiXparser::noteOnStatus)){
-            //     log_i("on");
-            // }
-            // if ( midiParser.isMidiStatus(midiXparser::noteOffStatus)){
-            //     log_i("off");
-            // }
             msg = midiParser.getMidiMsg();
             return msg;
         }
-        //  if ( midiParser.isMidiStatus(midiXparser::noteOffStatus) || midiParser.isMidiStatus(midiXparser::noteOnStatus) ) {
-        //     log_i("got message");
-            //  delay(200);
-            //  Serial.write(midiParser1.getMidiMsg(),midiParser1.getMidiMsgLen());
-            //  Serial.write(midiParser1.getMidiMsg(),midiParser1.getMidiMsgLen());
     }
     return NULL;
 }

@@ -168,17 +168,10 @@ struct rack_file_t {
     uint8_t free;
 };
 
-// static struct metadata_t metadata;
-// static struct wav_lu_t **wav_lut;
-// static struct firmware_t *firmware_lut;
-// static struct website_t *website_lut;
-// static struct rack_lu_t *rack_lut;
-// static struct pin_config_t *pin_config_lut;
-
 static struct pin_config_t default_pin_config_array[14] = {
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D0,
         .note = 40,
         .touch = -1, //no touch on this pin
@@ -187,7 +180,7 @@ static struct pin_config_t default_pin_config_array[14] = {
     },
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D1,
         .note = 41,
         .touch = -1, //no touch on this pin
@@ -196,7 +189,7 @@ static struct pin_config_t default_pin_config_array[14] = {
     },
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D2,
         .note = 42,
         .touch = -1, //no touch on this pin
@@ -205,7 +198,7 @@ static struct pin_config_t default_pin_config_array[14] = {
     },
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D3,
         .note = 43,
         .touch = -1, //no touch on this pin
@@ -214,7 +207,7 @@ static struct pin_config_t default_pin_config_array[14] = {
     },
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D4,
         .note = 44,
         .touch = -1, //no touch on this pin
@@ -223,7 +216,7 @@ static struct pin_config_t default_pin_config_array[14] = {
     },
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D5,
         .note = 45,
         .touch = -1, //no touch on this pin
@@ -232,7 +225,7 @@ static struct pin_config_t default_pin_config_array[14] = {
     },
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D6,
         .note = 46,
         .touch = 0,
@@ -277,7 +270,7 @@ static struct pin_config_t default_pin_config_array[14] = {
     },
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D11,
         .note = 51,
         .touch = 0,
@@ -286,7 +279,7 @@ static struct pin_config_t default_pin_config_array[14] = {
     },
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D12,
         .note = 52,
         .touch = 0,
@@ -295,7 +288,7 @@ static struct pin_config_t default_pin_config_array[14] = {
     },
     {
         .action = NOTE_ON,
-        .edge = EDGE_FALLING,
+        .edge = EDGE_NONE,
         .gpio_num = D13,
         .note = 53,
         .touch = 0,

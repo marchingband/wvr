@@ -1,12 +1,9 @@
 # welcome to wvr
 
-[getting started](#getting-started)
-
-[setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
-
-[using arduino cli](#using-arduino-cli)
-
-[using FTDI](#using-ftdi)
+*[getting started](#getting-started)
+*[setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
+*[using arduino cli](#using-arduino-cli)
+*[using FTDI](#using-ftdi)
 
 
 # getting started

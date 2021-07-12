@@ -9,7 +9,7 @@
 [using FTDI to flash firmware and get logs from WVR](#-using-FTDI-to-flash-firmware-and-get-logs–from-WVR)
 
 
-## getting started
+# getting started
 * Create a folder on your computer where you will store firmwares for your WVR
 * download these 2 firmares, saving them to this folder wvr_safemode.bin and wvr_v1.0.1.bin
 * Apply power to your WVR using a usb cable.
@@ -24,7 +24,7 @@
 
 Congradulations! You now have the most up-to-date firmware loaded onto your WVR, and in case something goes wrong, you can boot into a safe-mode firmware by holding D5 to ground when you press reset on the WVR
 
-## setting up for Arduino IDE programming
+# setting up for Arduino IDE programming
 * install the latest Arduino IDE
 * follow instructions online to install the ESP32 stuff
 * create a folder called **Libries** in your Arduino sketch folder and unzip WVRduino into that folder
@@ -40,11 +40,11 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR,
 
 Congradulations! You have flashed a custom firmware to your WVR!
 
-## using arduino cli and wvr.sh to flash firmware ##
+# using arduino cli and wvr.sh to flash firmware ##
 * install the arduino CLI
 * in a fresh terminal cd into /Arduino/WVR/examples/wvr_basic
 * join the **WVR** wifi network
 * type ```./wvr.sh code```, and wait for this sketch to compile and upload to your WVR
 
-## using FTDI to flash firmware and get logs from WVR ##
+# using FTDI to flash firmware and get logs from WVR ##
 to connect a usb->fdti module to your WVR, connect **D0** to **RX**, **D1** to **TX**, and **GND** to **GND**. Open the sketch examples/wvr_ftdi, where you will see ```wvr->useFTDI = true```. The ESP32 on the WVR needs to be booted into a special FTDI boot mode, to do this, ground **D6** and ground the small copper pad on the top of the WVR labeled "boot" (it's right next to the eMMC), and hit reset. You can release D6 and the boot pad now. The ESP32 is now in FTDI boot mode, and if you have a serial monitor attached the WVR, it should print ```waiting for downlaod``` That's all! Now you can use the **UPLOAD** button in the Arduin IDE, or use ```./wvr.sh ftdi``` from the Arduino CLI to flash, and Arduino Serial Monitor (or any Serial monitor app you like) to get logs from WVR

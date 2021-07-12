@@ -19,9 +19,10 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR,
 * install the latest Arduino IDE
 * follow instructions online to install the ESP32 stuff
 * create a folder called **Libries** in your Arduino sketch folder and unzip WVRduino into that folder
-* using the Arduino library manager, install **Async TCP**, **ESP ASYNC WEBSERVER** and **ADAFRUIT NEOPIXEL*
-* restart Arduino IDE, create a new sketch, select the **ESP32 WROVER dev board** in the boards menu
+* using the Arduino library manager, install **Async TCP**, **ESP ASYNC WEBSERVER** and **ADAFRUIT NEOPIXEL**
+* restart Arduino IDE
 * go to file->examples and under **WVR**, open **wvr_basic**
+* select the **ESP32 WROVER dev board** in the boards menu
 * click **sketch->export compiled binary**, choose a good name, and save the .bin to your WVR firmware folder
 * join the **WVR** wifi network, open the WVR UI at http://192.168.5.18/
 * click **firware** and then choose a new slot, hit **select binary** for that slot, and choose your .bin file from the file picker

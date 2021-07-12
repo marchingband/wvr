@@ -4,9 +4,9 @@
 
 [setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
 
-[using arduino cli and wvr.sh to flash firmware](#using-arduino-cli)
+[using arduino cli](#using-arduino-cli)
 
-[using FTDI to flash firmware and get logs from WVR](#using-ftdi)
+[using FTDI](#using-ftdi)
 
 
 # getting started

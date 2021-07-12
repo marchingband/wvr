@@ -2,7 +2,7 @@
 
 * [getting started](#getting-started)
 * [setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
-* [using arduino cli](#using-arduino-cli)
+* [using Arduino CLI](#using-arduino-cli)
 * [using FTDI](#using-ftdi)
 
 
@@ -37,7 +37,7 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR,
 
 Congradulations! You have flashed a custom firmware to your WVR!
 
-# using arduino cli
+# using Arduino CLI
 * install the arduino CLI
 * in a fresh terminal cd into /Arduino/WVR/examples/wvr_basic
 * join the **WVR** wifi network

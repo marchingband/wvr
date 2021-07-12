@@ -1,9 +1,13 @@
 # welcome to wvr
 
 [getting started](#-getting-started)
+
 [setting up for Arduino IDE programming](#-setting-up-for-Arduino-IDE-programming)
+
 [using arduino cli and wvr.sh to flash firmware](#-using-arduino-cli-and-wvr.sh–to-flash-firmware)
+
 [using FTDI to flash firmware and get logs from WVR](#-using-FTDI-to-flash-firmware-and-get-logs–from-WVR)
+
 
 ## getting started
 * Create a folder on your computer where you will store firmwares for your WVR

@@ -38,8 +38,8 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR,
 Congradulations! You have flashed a custom firmware to your WVR!
 
 # using Arduino CLI
-* install the arduino CLI
-* in a fresh terminal cd into /Arduino/WVR/examples/wvr_basic
+* install the Arduino CLI
+* in a fresh terminal cd into /Arduino/libraries/WVR/examples/wvr_basic
 * join the **WVR** wifi network
 * type ```./wvr.sh code```, and wait for this sketch to compile and upload to your WVR
 

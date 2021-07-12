@@ -14,3 +14,17 @@
 * Click **upload** then click **boot** when upload is complete
 
 Congradulations! You now have the most up-to-date firmware loaded onto your WVR, and in case something goes wrong, you can boot into a safe-mode firmware by holding D5 to ground when you press reset on the WVR
+
+## setting up for Arduino IDE programming
+* install the latest Arduino IDE
+* follow instructions online to install the ESP32 stuff
+* create a folder called **Libries** in your Arduino sketch folder and unzip WVRduino into that folder
+* using the Arduino library manager, install **Async TCP**, **ESP ASYNC WEBSERVER** and **ADAFRUIT NEOPIXEL*
+* restart Arduino IDE, create a new sketch, select the **ESP32 WROVER dev board** in the boards menu
+* go to file->examples and under **WVR**, open **wvr_basic**
+* click **sketch->export compiled binary**, choose a good name, and save the .bin to your WVR firmware folder
+* join the **WVR** wifi network, open the WVR UI at http://192.168.5.18/
+* click **firware** and then choose a new slot, hit **select binary** for that slot, and choose your .bin file from the file picker
+* click **upload**, then click **boot** when upload is complete
+
+Congradulations! You have flashed a custom firmware to your WVR!

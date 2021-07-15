@@ -11,9 +11,9 @@
 * Create a folder on your computer where you will store firmwares for your WVR
 * download these 2 firmares, saving them to this new folder
 https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.1/wvr_safemode.ino.bin  
-and if you have a wvr_basic:
+and if you have a wvr_basic: 
 https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.1/wvr_basic.ino.bin  
-or if you have a USB Backpack as well:  
+or if you have a USB Backpack as well: 
 https://github.com/marchingband/wvr_binaries/blob/main/wvr_usb/1.0.1/wvr_usb.ino.bin  
 
 

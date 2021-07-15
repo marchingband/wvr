@@ -8,7 +8,11 @@
 
 # getting started
 * Create a folder on your computer where you will store firmwares for your WVR
-* download these 2 firmares, saving them to this folder wvr_safemode.bin and wvr_v1.0.1.bin
+* download these 2 firmares, saving them to this new folder
+
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.1/wvr_basic.ino.bin  https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.1/wvr_safemode.ino.bin
+
+
 * Apply power to your WVR using a usb cable.
 * On a computer, join the wifi network **WVR**, using the password **12345678**
 * In a browser, navigate to the address http://192.168.5.18/, and the WVR UI will open

@@ -108,10 +108,17 @@ void on_press_per_config(int pin_num)
 void wvr_gpio_init(bool useFTDI, bool useUsbMidi)
 {
     log_i("useFTDI is %d",useFTDI);
-    int start = useFTDI ? useUsbMidi ? 3 : 2 : 0;
-    log_i("gpio start is %d",start);
-    for(int i=start;i<14;i++)
+    log_i("useUsbMidi is %d",useUsbMidi);
+    for(int i=0;i<14;i++)
     {
+        if(
+            ((i == 0) && useFTDI) ||
+            ((i == 1) && useFTDI) ||
+            ((i == 2) && useUsbMidi)
+        )
+        {
+            continue;
+        }
         gpio_num_t gpio_num = gpio_pins[i];
         int pin_num = wvr_pins[i];
         pin_config_t pin = pin_config_lut[i];
@@ -126,18 +133,18 @@ void wvr_gpio_init(bool useFTDI, bool useUsbMidi)
             else if(pin.edge == EDGE_FALLING)
             {
                 pinMode(pin_num, INPUT_PULLUP);
-                buttons[i] = new Button(pin_num, FALLING, pin.debounce);
+                buttons[i] = new Button(pin_num, FALLING, pin.debounce); // digital constructor
             }
             else if(pin.edge == EDGE_RISING)
             {
                 pinMode(pin_num, INPUT_PULLUP);
-                buttons[i] = new Button(pin_num, RISING, pin.debounce);
+                buttons[i] = new Button(pin_num, RISING, pin.debounce); // digital constructor
             }
         }
         else
         {
             // touch mode
-            buttons[i] = new Button(pin_num, FALLING, pin.debounce, true);
+            buttons[i] = new Button(pin_num, FALLING, pin.debounce, true); // touch constructor
         }
     }
     if(buttons[0] != NULL) buttons[0]->onPress([](){on_press_per_config(0);});

@@ -10,11 +10,12 @@
 # getting started
 * Create a folder on your computer where you will store firmwares for your WVR
 * download these 2 firmares, saving them to this new folder
-
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.1/wvr_safemode.ino.bin  
+and if you have a wvr_basic:
 https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.1/wvr_basic.ino.bin  
 or if you have a USB Backpack as well:  
 https://github.com/marchingband/wvr_binaries/blob/main/wvr_usb/1.0.1/wvr_usb.ino.bin  
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.1/wvr_safemode.ino.bin
+
 
 
 * Apply power to your WVR using a usb cable.
@@ -24,7 +25,7 @@ https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.1/wvr_sa
 * Click on **select recovery firmware** and choose wvr_safemode.ino.bin in the file upload dialog
 * Click on **update recovery firmware** and wait for the upload to complete
 * Click on **firmware** menu item at the top of the page
-* Click **select binary** for **slot 0**, and select wvr_basic.ino.bin in the file upload dialog
+* Click **select binary** for **slot 0**, and select wvr_basic.ino.bin (or wvr_usb.ino.bin if you have the USB Backpack) in the file upload dialog
 * Click **upload** then click **boot** for **slot 0** when upload is complete
 
 Congradulations! You now have the most up-to-date firmware loaded onto your WVR, and in case something goes wrong, you can boot into a safe-mode firmware by holding D5 to ground when you press reset on the WVR

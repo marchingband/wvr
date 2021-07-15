@@ -64,7 +64,7 @@ If you have a WVR Dev Board, there is room to have the USB Backpack on the botto
 
 Place the pin headers into the WVR Dev Board, or into a breadboard. Place the 2 boards onto the pin headers. There will be JUST enough length that the pin header should almost reach through both boards.
 
-here is an image (this shows the USB Backpack on top) : https://imgur.com/a/CyD6zfh
+here is an image (this shows the USB Backpack on top) : https://imgur.com/a/3H6OtFo
 
 Start with one corner (maybe the 5v pin), and touch the soldering iron so you are contacting both the pin header, and the pad, apply lots of pressure, and wait for 3 seconds. Use a thin solder if you have it! Now apply some solder, and the melted solder should wick down into the hole. We are hoping to get lots of solder all the way down, so it joins both boards, and the pin header. Apply more solder little by little, until the hole is full, and a small bulge is left on the top.
 
@@ -72,7 +72,7 @@ Next, re-melt that first solder and with your other hand, press down firmly on t
 
 Now do the same for the opposite pin, on the opposite side (one of the ground pins marked "g"). At this point everything should be secure and look even. Keep going and solder all the pins.
 
-here is an image (this one has the WVR on top) : https://imgur.com/a/3H6OtFo
+here is an image (this one has the WVR on top) : https://imgur.com/a/CyD6zfh
 
 Use a multimeter to check that there are no shorts, and that all the pins are indeed connected to the pads on both boards.
 

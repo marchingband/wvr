@@ -337,6 +337,10 @@ void current_bank_up(void);
 void current_bank_down(void);
 struct metadata_t *get_metadata(void);
 void log_pin_config(void);
+size_t getNumSectorsInEmmc(void);
+void getSector(size_t i, uint8_t *buf);
+void restore_emmc(uint8_t* source, size_t size);
+void close_restore_emmc();
 
 #ifdef __cplusplus
 }

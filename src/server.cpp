@@ -105,13 +105,14 @@ int loop_num = 0;
 
 void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(!index){
-    wav_player_pause();
+    //wav_player_pause();
     loop_num = 0;
     Update.begin(total);
     Serial.println("starting update");
   }
   feedLoopWDT();
   size_t written = Update.write(data,len);
+  feedLoopWDT();
   if(written != len){
     Serial.println("write failed");
     request->send(500);
@@ -143,7 +144,7 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
       Serial.println("failed");
     }
     request->send(204);
-    wav_player_resume();
+    //wav_player_resume();
   }
 }
 
@@ -152,7 +153,7 @@ uint8_t *voice_config_json = NULL;
 void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
-    wav_player_pause();
+    //wav_player_pause();
     voice_config_json = (uint8_t*)ps_malloc(total + 1);
     if(!voice_config_json){
       wlog_i("failed to malloc for json");
@@ -169,7 +170,7 @@ void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size
     updateVoiceConfig((char *)voice_config_json);
     free(voice_config_json);
     request->send(200, "text/plain", "all done voice config update");
-    wav_player_resume();
+    //wav_player_resume();
   }
 }
 
@@ -178,7 +179,7 @@ uint8_t *pin_config_json = NULL;
 void handleUpdatePinConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
-    wav_player_pause();
+    //wav_player_pause();
     pin_config_json = (uint8_t*)ps_malloc(total);
     if(!pin_config_json){
       wlog_i("failed to malloc for json");
@@ -194,7 +195,7 @@ void handleUpdatePinConfig(AsyncWebServerRequest *request, uint8_t *data, size_t
     updatePinConfig((char *)pin_config_json);
     free(pin_config_json);
     request->send(200, "text/plain", "all done pin config update");
-    wav_player_resume();
+    //wav_player_resume();
   }
 }
 
@@ -203,7 +204,7 @@ uint8_t *metadata_json = NULL;
 void handleUpdateMetadata(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
-    wav_player_pause();
+    //wav_player_pause();
     metadata_json = (uint8_t*)ps_malloc(total);
     if(!metadata_json){
       wlog_i("failed to malloc for metadata json");
@@ -219,7 +220,7 @@ void handleUpdateMetadata(AsyncWebServerRequest *request, uint8_t *data, size_t 
     updateMetadata((char *)metadata_json);
     free(metadata_json);
     request->send(200, "text/plain", "all done pin config update");
-    wav_player_resume();
+    //wav_player_resume();
   }
 }
 
@@ -233,7 +234,7 @@ size_t w_start_block;
 void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
-    wav_player_pause();
+    //wav_player_pause();
     AsyncWebHeader* size_string = request->getHeader("size");
     sscanf(size_string->value().c_str(), "%d", &w_size);
     AsyncWebHeader* name = request->getHeader("name");
@@ -253,7 +254,7 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     close_wav_to_emmc();
     add_wav_to_file_system(&w_name[0],w_voice,w_note,w_start_block,total);
     request->send(200, "text/plain", "done upload wav");
-    wav_player_resume();
+    //wav_player_resume();
   }
 }
 
@@ -267,7 +268,7 @@ size_t r_start_block;
 void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
-    wav_player_pause();
+    //wav_player_pause();
     strcpy(&r_name[0], request->getHeader("name")->value().c_str());
     sscanf(request->getHeader("voice")->value().c_str(), "%d", &r_voice);
     sscanf(request->getHeader("note")->value().c_str(), "%d", &r_note);
@@ -285,7 +286,7 @@ void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_
     close_wav_to_emmc();
     add_rack_to_file_system(&r_name[0],r_voice,r_note,r_start_block,total,r_layer,r_rack_json);
     free(r_rack_json);
-    wav_player_resume();
+    //wav_player_resume();
   }
 }
 
@@ -300,7 +301,7 @@ char f_firmware_name[24];
 void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   //once
   if(index==0){
-    wav_player_pause();
+    //wav_player_pause();
     AsyncWebHeader* firmware_slot_string = request->getHeader("slot-index");
     sscanf(firmware_slot_string->value().c_str(), "%d", &f_firmware_slot);
     AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
@@ -332,7 +333,7 @@ void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len
     log_i("wrote %u bytes",f_bytes_read);
     f_bytes_read = 0;
     request->send(200, "text/plain", "all done firmware");
-    wav_player_resume();
+    //wav_player_resume();
   }
 }
 
@@ -347,7 +348,7 @@ size_t rf_firmware_size;
 void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   //once
   if(index==0){
-    wav_player_pause();
+    //wav_player_pause();
     AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
     sscanf(firmware_size_string->value().c_str(), "%d", &rf_firmware_size);
   }
@@ -370,7 +371,7 @@ void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, si
     log_i("wrote %u bytes",rf_bytes_read);
     rf_bytes_read = 0;
     request->send(200, "text/plain", "all done recovery firmware");
-    wav_player_resume();
+    //wav_player_resume();
   }
 }
 
@@ -415,7 +416,7 @@ void handleNewGUI(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
 }
 
 void handleFsjson(AsyncWebServerRequest *request){
-  // wav_player_pause();
+  // //wav_player_pause();
   char *json = print_fs_json();
   size_t size = strlen(json);
   // wlog_e("fs size is %d",size);
@@ -430,15 +431,61 @@ void handleFsjson(AsyncWebServerRequest *request){
   });
   response->addHeader("size",String(size));
   request->send(response);
-  // wav_player_resume();
-  // request->send("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-  //   size_t toWrite = min(size - index, maxLen);
-  //   memcpy(buffer, json + index, toWrite);
-  //   if(index + toWrite == size){
-  //     free(json);
-  //   }
-  //   return toWrite;
-  // });
+}
+
+void handleBackupEMMC(AsyncWebServerRequest *request){
+  uint8_t *buf = (uint8_t*)ps_malloc(SECTOR_SIZE);
+  size_t numSectors = getNumSectorsInEmmc();
+  size_t numBytes = numSectors * SECTOR_SIZE;
+  size_t i = 0;
+  size_t written = SECTOR_SIZE;
+  AsyncWebServerResponse *response = request->beginResponse("text/html", numBytes, [i,written,numSectors,buf,numBytes](uint8_t *buffer, size_t maxLen, size_t index) mutable -> size_t  {
+    feedLoopWDT();
+    size_t toWrite;
+    if(written < SECTOR_SIZE) // there is some leftover
+    {
+      size_t remains = SECTOR_SIZE - written;
+      toWrite = min(remains, maxLen);
+      memcpy(buffer, buf + written, toWrite);
+      written += toWrite;
+      feedLoopWDT();
+      log_v("did partial sector of %d bytes, %d left", toWrite, SECTOR_SIZE - written);
+      feedLoopWDT();
+    }
+    else // there is no leftover
+    {
+      toWrite = min((size_t)SECTOR_SIZE, maxLen);
+      getSector(i++, buf);
+      memcpy(buffer, buf, toWrite);
+      written = toWrite;
+      if(written != SECTOR_SIZE)
+      {
+        feedLoopWDT();
+        log_v("read a full sector, wrote %d", written);
+        feedLoopWDT();
+      }
+    }
+    feedLoopWDT();
+    if(index + toWrite == numBytes){ // done
+      free(buf);
+      feedLoopWDT();
+    }
+    return toWrite;
+  });
+  response->addHeader("size",String(numBytes));
+  request->send(response);
+}
+
+void handleRestoreEMMC(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+  feedLoopWDT();
+  restore_emmc(data, len);
+  feedLoopWDT();
+  if(index + len == total){
+    //done
+    feedLoopWDT();
+    close_restore_emmc();
+    request->send(200, "text/plain", "done upload wav");
+  }
 }
 
 void handleEmmcGUI(AsyncWebServerRequest *request){
@@ -471,7 +518,7 @@ void handleRPC(AsyncWebServerRequest *request){
 }
 
 void handleBootFromEmmc(AsyncWebServerRequest *request){
-  wav_player_pause();
+  //wav_player_pause();
   char index = 0;
   AsyncWebHeader* firmware_slot_string = request->getHeader("index");
   sscanf(firmware_slot_string->value().c_str(), "%d", &index);
@@ -540,6 +587,20 @@ void server_begin() {
     "/fsjson",
     HTTP_GET,
     handleFsjson
+  );
+
+  server.on(
+    "/backupEMMC",
+    HTTP_GET,
+    handleBackupEMMC
+  );
+
+  server.on(
+    "/restoreEMMC",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleRestoreEMMC
   );
 
   server.on(

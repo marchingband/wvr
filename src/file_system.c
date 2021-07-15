@@ -64,9 +64,8 @@
 #define FILE_STORAGE_START_BLOCK (RACK_DIRECTORY_START_BLOCK + RACK_DIRECTORY_BLOCKS)
 #define FILE_STORAGE_END_BLOCK (RECOVERY_FIRMWARE_START_BLOCK - 1)
 
-
-// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_10"; 
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_12"; 
+// july 10 / 2021
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; 
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -1010,6 +1009,17 @@ void close_recovery_firmware_to_emmc(size_t recovery_firmware_size){
     write_metadata(metadata);
 }
 
+void restore_emmc(uint8_t* source, size_t size)
+{
+    size_t block = 0;
+    write_wav_to_emmc((char *)source, block, size);
+}
+
+void close_restore_emmc()
+{
+    close_wav_to_emmc();
+}
+
 struct website_t *get_website_slot(char index){
     return(&website_lut[index]);
 }
@@ -1181,6 +1191,56 @@ void updateMetadata(cJSON *config){
     );
     wlog_i("updated and saved metadata");
     cJSON_Delete(json);
+}
+
+size_t getNumSectorsInEmmc(void)
+{
+    size_t last_block_start = 0;
+    size_t last_file_size = 0;
+    // TODO add rack LUT
+    for(int i=0;i<NUM_VOICES;i++)
+    {
+        for(int j=0;j<NUM_NOTES;j++)
+        {
+            struct wav_lu_t file = wav_lut[i][j];
+            size_t start = file.start_block;
+            if(start > last_block_start)
+            {
+                last_block_start = start;
+                last_file_size = file.length;
+                // log_i("start: %d, length: %d", last_block_start, last_file_size);
+            }
+        }
+    }
+    for(int i=0;i<NUM_RACK_DIRECTORY_ENTRIES;i++)
+    {
+        struct rack_lu_t rack = rack_lut[i];
+        if(rack.free == 1)
+        {
+            continue;
+        }
+        for(int j=0;j<rack.num_layers;j++)
+        {
+            struct wav_lu_t layer = rack.layers[j];
+            size_t start = layer.start_block;
+            if(start > last_block_start)
+            {
+                last_block_start = start;
+                last_file_size = layer.length;
+            }
+        }
+    }
+    size_t last_file_num_blocks = ( last_file_size / SECTOR_SIZE ) + 1;
+    size_t total = last_block_start + last_file_num_blocks;
+    log_i("eMMC total num sectors: %d", total);
+    return total;
+}
+
+void getSector(size_t i, uint8_t *buf)
+{
+    // uint8_t *sector = (uint8_t*)ps_malloc(SECTOR_SIZE);
+    emmc_read(buf, i, 1);
+    // return sector;
 }
 
 /**

@@ -27,16 +27,17 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR,
 
 # setting up for Arduino IDE programming
 * install the latest Arduino IDE
-* follow instructions online to install the ESP32 stuff
-* create a folder called **Libries** in your Arduino sketch folder and unzip WVRduino into that folder
+* follow instructions online to install the ESP32 stuff : https://github.com/espressif/arduino-esp32
+* create a folder called **libries** in your Arduino sketch folder and unzip WVRduino into that folder, so it should be Arduino/libraries/WVR/...
 * using the Arduino library manager, install **Async TCP**, **ESP ASYNC WEBSERVER** and **ADAFRUIT NEOPIXEL**
 * we also reccomend you intall **ESP Exception Decoder**, in case you want to decode stack traces from the serial monitor, during your Arduino development
 * restart Arduino IDE
 * go to file->examples and under **WVR**, open **wvr_basic**
 * select the **ESP32 WROVER dev board** in the boards menu
-* click **sketch->export compiled binary**, the file will be saved in your sketch folder in the **build** folder
+* click file->save_as and save this as a new sketch (rename it if you like)
+* click **sketch->export compiled binary**, the file will be saved in your new sketch's folder in the **build** folder
 * join the **WVR** wifi network, open the WVR UI at http://192.168.5.18/
-* click **firware** and then choose a new slot, hit **select binary** for that slot, and choose your .bin file, click the file name and choose a new name for this firmware, so you can keep track of your custom binaries, silly Arduino will always default to the same name.
+* click **firware** and then choose a new slot, hit **select binary** for that slot, and choose your .bin file from the sketch/build/, in the UI, click the file name and choose a new name for this firmware, so you can keep track of your custom binaries, silly Arduino will always default to the same binary name.
 * click **upload**, then click **boot** when upload is complete
 
 Congradulations! You have flashed a custom firmware to your WVR!

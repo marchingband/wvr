@@ -20,7 +20,7 @@ https://github.com/marchingband/wvr_binaries/blob/main/wvr_usb/1.0.1/wvr_usb.ino
 
 * Apply power to your WVR using a usb cable.
 * On a computer, join the wifi network **WVR**, using the password **12345678**
-* In a browser, navigate to the address http://192.168.5.18/, and the WVR UI will open
+* Open Google Chrome (or another browser which [impliments the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open
 * Click on the blue **WVR** link at the top of the screen
 * Click on **select recovery firmware** and choose wvr_safemode.ino.bin in the file upload dialog
 * Click on **update recovery firmware** and wait for the upload to complete

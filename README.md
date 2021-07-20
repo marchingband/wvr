@@ -33,16 +33,17 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR,
 # setting up for Arduino IDE programming
 * install the latest Arduino IDE
 * follow instructions online to install the ESP32 stuff : https://github.com/espressif/arduino-esp32
-* create a folder called **libries** in your Arduino sketch folder and unzip WVRduino into that folder, so it should be Arduino/libraries/WVR/...
+* donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.1
+* create a folder called **libries** in your Arduino sketch folder and unzip the **WVR Arduno library** into that folder, so it should be Arduino/libraries/WVR/...
 * using the Arduino library manager, install **Async TCP**, **ESP ASYNC WEBSERVER** and **ADAFRUIT NEOPIXEL**
 * we also reccomend you intall **ESP Exception Decoder**, in case you want to decode stack traces from the serial monitor, during your Arduino development
 * restart Arduino IDE
-* go to file->examples and under **WVR**, open **wvr_basic**
+* go to file->examples, and under **WVR**, open **wvr_basic**
 * select the **ESP32 WROVER dev board** in the boards menu
 * click file->save_as and save this as a new sketch (rename it if you like)
 * click **sketch->export compiled binary**, the file will be saved in your new sketch's folder in the **build** folder
 * join the **WVR** wifi network, open the WVR UI at http://192.168.5.18/
-* click **firware** and then choose a new slot, hit **select binary** for that slot, and choose your .bin file from the sketch/build/, in the UI, click the file name and choose a new name for this firmware, so you can keep track of your custom binaries, silly Arduino will always default to the same binary name.
+* click **firware** and then choose a new slot, hit **select binary** for that slot, and choose your .bin file from the your_sketch/build folder, in the UI, click the file name and choose a new name for this firmware, so you can keep track of your custom binaries, silly Arduino will always default to the same binary name.
 * click **upload**, then click **boot** when upload is complete
 
 Congradulations! You have flashed a custom firmware to your WVR!
@@ -55,7 +56,7 @@ Congradulations! You have flashed a custom firmware to your WVR!
 * in the WVR Arduino library, look at the file ```wvr.sh``` to find some other ideas for things you can do with the arduino-cli, you can modify this bash script to work for you if you like!
 
 # using FTDI
-to connect a usb->fdti module to your WVR, connect **D0** to **RX**, **D1** to **TX**, and **GND** to **GND**. Open the sketch examples/wvr_ftdi, where you will see ```wvr->useFTDI = true```. The ESP32 on the WVR needs to be booted into a special FTDI boot mode, to do this, ground **D6** and ground the small copper pad on the top of the WVR labeled "boot" (it's right next to the eMMC), and hit reset. You can release D6 and the boot pad now. The ESP32 is now in FTDI boot mode, and if you have a serial monitor attached the WVR, it should print ```waiting for downlaod``` That's all! Now you can use the **UPLOAD** button in the Arduin IDE, or use ```./wvr.sh ftdi``` from the Arduino CLI to flash, and Arduino Serial Monitor (or any Serial monitor app you like) to get logs from WVR
+to connect a usb->fdti module to your WVR, connect **D0** to **RX**, **D1** to **TX**, and **GND** to **GND**. Open the sketch examples/wvr_ftdi, where you will see ```wvr->useFTDI = true```. The ESP32 on the WVR needs to be booted into a special FTDI boot mode, to do this, ground **D6** and ground the small copper pad on the top of the WVR labeled "boot" (it's right next to the eMMC), and hit reset. You can release D6 and the boot pad now. The ESP32 is now in FTDI boot mode, and if you have a serial monitor attached the WVR, it should print ```waiting for downlaod``` That's all! Now you can use the **UPLOAD** button in the Arduin IDE, or use ```./wvr.sh ftdi``` to flash, and Arduino Serial Monitor (or any Serial monitor app you like) to get logs from WVR
 
 # soldering the USB Backpack
 Both the WVR and the USB Backpack have all the pins labeled, so you should be able to determine the correct orientation. The big USB jack on the backpack is on the same end as the small USB jack on the WVR. The 2 boards go back-to-back.

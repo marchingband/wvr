@@ -80,4 +80,6 @@ here is an image (this one has the WVR on top) : https://imgur.com/a/CyD6zfh
 
 Use a multimeter to check that there are no shorts, and that all the pins are indeed connected to the pads on both boards.
 
+Now follow these instructions to update the firmware : https://github.com/marchingband/wvr_usb_backpack
+
 Youre done!

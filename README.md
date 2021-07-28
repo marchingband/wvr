@@ -4,6 +4,8 @@
 * [playing sounds](#playing-sounds)
 * [understanding priority](#understanding-priority)
 * [understanding response curve](#understanding-response-curve)
+* [understanding retrigger mode](#understanding-retrigger-mode)
+* * [understanding note off](#understanding-note-off)
 * [setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
 * [using Arduino CLI](#using-arduino-cli)
 * [using FTDI](#using-ftdi)
@@ -69,6 +71,10 @@ WVR can playback up to 18 stereo sounds at once. It mixes all the sounds into a 
 Every MIDI note has a velocity (or volume) attached to it. This is a value from 0 to 127. Imagine a graph with these 127 velocities on the y axis, and the playback volume that each actually triggers on the x axis. If this is a streight line, we have a **linear** response curve. Many people find other curves to be more human, or more musical. The default response curve for WVR is the **Square Root** algorithm, but you can also choose **linear** or **logarithmic**.
 
 # understanding retrigger mode
+If a sound is triggered a second time, at a time when it is already in playback, this is a "retrigger". WVR can resond to this event in a number of ways. It can respond by stopping the sound (note-off), restarting the sound from the beginning (restart), ignoring the second trigger (ignore) or by starting a new playback of the same sound without stopping the first (retrigger).
+
+# understanding note off
+When a key is lifted on a piano, and likewise, when a pin on the WVR moves from a LOW back to a HIGH state, a "note-off" event is triggered. You can opt to ignore these events by choosing the "ignore" setting, or you can choose to observe them by selecting the "halt" setting.
 
 # setting up for Arduino IDE programming
 * install the latest Arduino IDE

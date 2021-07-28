@@ -1,6 +1,9 @@
 # welcome to wvr
 
 * [getting started](#getting-started)
+* [playing sounds](#playing-sounds)
+* [understanding priority](#understanding-priority)
+* [understanding response curve](#understanding-response-curve)
 * [setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
 * [using Arduino CLI](#using-arduino-cli)
 * [using FTDI](#using-ftdi)
@@ -38,6 +41,34 @@ https://github.com/marchingband/wvr_binaries/blob/main/wvr_usb/1.0.1/wvr_usb.ino
 * if you have a WVR with USB Host Backpack, follow these instructions to update the firmware on that : https://github.com/marchingband/wvr_usb_backpack
 
 Congradulations! You now have the most up-to-date firmware loaded onto your WVR, and in case something goes wrong, you can boot into a safe-mode firmware by holding D5 to ground when you press reset on the WVR
+
+# playing sounds
+
+* in the WVR UI, click on a note ... maybe ... E2.
+* now click **select file**
+* a window will open, choose any sound file from your computer
+* you can click **audition** and it will play on your computer speakers
+* now click **pins** at the top. this is the pin configuration page
+* click on **D2**
+* on the left, you will see the options for that pin.
+* set the **note** to **E2 (40)**
+* set the **edge** to **falling** (this means that it will trigger notes when the pin goes from high to low, when you ground it. All the pins which have pullups have them turned on by default, so grounding the pins is like pressing a key on a piano. Setting the edge is important, the default setting is **none** so no sounds will be triggered by this pin untill it is changed.
+* set the debounce time : If you are manually grounding the pin with a wire use 120ms, if you have a mechanical button 60ms is good, if you are using an external microcontroller, you could use 0ms. If you get multiple triggers, and multiple sounds playing when you ground a pin, raise the debounce time :) Google "mcu debounce" if you want to learn more about this.
+* you will notice that some pins have a touch/digital option. This makes the pins touch sensitive. The same logic applies with the edge : touching the pin with a finger causes a falling edge, and 60ms is a great starting point for a debounce time. The WVR calibrates itself for capacitive touch everytime it is reset, so, it is important to have your hands away from the WVR when you reset it, so it can do an accurate calibration. If it seems off, just reset the WVR and keep your hands clear for a few seconds.
+* if you click on **action** you can see all the possible ways to use these pin events. It can trigger a sound, but it can also do many other things.
+* **velocity** is the Midi term for volume, so, set this to the playback volume that you would like to result from events on this pin.
+* when you have everything set up the way you want, click on **sync**. this will upload your sounds to the WVR, and it will also send the configuration information. Nothing will actually change on the WVR untill you hit **sync**
+* wait for the sync to complete, you will get a popup uffering to refresh the browser. First reset the WVR by pressing the reset button on the WVR, then click **yes** and the browser will refresh. You will see your pin configs have updated, and your sounds are displayed in the sounds menu. Now when you press **audition** the sound will not play in the browser, it will play on the WVR.
+* connect headphones or some line out to the WVR
+* using a wire (or a female jumper cable) connect the **GND** pin on the WVR to pin **D2**, and your sound should play.
+
+# understanding priority
+WVR can playback up to 18 stereo sounds at once. It mixes all the sounds into a stereo output. If you play very fast, or play dense chords, or have very long sounds, it's possible to ask the WVR to play back more then 18 sounds. When this happens, WVR runs an algorithm to figure out what to do. It will try to find an old, or an unimportant sound, stop playing that sound, and play the newly triggered sound instead. You can help it make this decision by giving some sounds higher **priority**. A lower priority sound will never stop a higher priority sound, only equal or lower priority. In the case where all 18 voices are busy playing high priority sounds, and a lower priority sound is triggered, WVR will not play the sound.
+
+# understanding response curve
+Every MIDI note has a velocity (or volume) attached to it. This is a value from 0 to 127. Imagine a graph with these 127 velocities on the y axis, and the playback volume that each actually triggers on the x axis. If this is a streight line, we have a **linear** response curve. Many people find other curves to be more human, or more musical. The default response curve for WVR is the **Square Root** algorithm, but you can also choose **linear** or **logarithmic**.
+
+# understanding retrigger mode
 
 # setting up for Arduino IDE programming
 * install the latest Arduino IDE

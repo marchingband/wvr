@@ -7,7 +7,15 @@
 * [soldering the USB Backpack](#soldering-the-usb-backpack)
 
 
-# getting started with WVR Basic or WVR Basic with Midi USB Host Backpack
+# getting started
+
+IF YOU HAVE A WVR MAKERS BOARD, YOU DONT NEED TO DO ANYTHING! YOUR WVR IS READY TO ROLL!
+
+* On a computer, join the wifi network **WVR**, using the password **12345678**
+* Open Google Chrome (or another browser which [impliments the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open
+
+IF YOU HAVE ANY OTHER THING, IT'S A GOOD IDEA TO UPDATE THE FIRMWARE, SET UP A RECOVERY FIRMWARE, ETC:
+
 * Create a folder on your computer where you will store firmwares for your WVR
 * download these 2 firmares, saving them to this new folder
 https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.1/wvr_safemode.ino.bin  

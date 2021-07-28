@@ -2,9 +2,10 @@
 
 * [getting started](#getting-started)
 * [playing sounds](#playing-sounds)
-* [understanding priority](#understanding-priority)
-* [understanding response curve](#understanding-response-curve)
-* [understanding retrigger mode](#understanding-retrigger-mode)
+* sound settings
+* * [understanding priority](#understanding-priority)
+* * [understanding response curve](#understanding-response-curve)
+* * [understanding retrigger mode](#understanding-retrigger-mode)
 * * [understanding note off](#understanding-note-off)
 * [setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
 * [using Arduino CLI](#using-arduino-cli)

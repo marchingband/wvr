@@ -75,7 +75,7 @@ Every MIDI note has a velocity (or volume) attached to it. This is a value from 
 If a sound is triggered a second time, at a time when it is already in playback, this is a "retrigger". WVR can resond to this event in a number of ways. It can respond by stopping the sound (note-off), restarting the sound from the beginning (restart), ignoring the second trigger (ignore) or by starting a new playback of the same sound without stopping the first (retrigger).
 
 # understanding note off
-When a key is lifted on a piano, and likewise, when a pin on the WVR moves from a LOW back to a HIGH state, a "note-off" event is triggered. You can opt to ignore these events by choosing the "ignore" setting, or you can choose to observe them by selecting the "halt" setting.
+When a key is lifted on a piano, and likewise, when a pin on the WVR moves from a LOW back to a HIGH state, a "note-off" event is triggered. You can opt to ignore these events by choosing the "ignore" setting, or you can choose to observe them by selecting the "halt" setting, in which case the sound will fade out very fast, and stop, when the note-off event for that sound occurs.
 
 # setting up for Arduino IDE programming
 * install the latest Arduino IDE

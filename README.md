@@ -9,6 +9,8 @@
 * * [understanding note off](#understanding-note-off)
 * [using racks](#using-racks)
 * [using fx](#using-fx)
+* [global settings](#global-settings)
+* [firmware manager](#firmware-manager)
 * [setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
 * [using Arduino CLI](#using-arduino-cli)
 * [using FTDI](#using-ftdi)
@@ -66,6 +68,7 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR,
 * wait for the sync to complete, you will get a popup uffering to refresh the browser. First reset the WVR by pressing the reset button on the WVR, then click **yes** and the browser will refresh. You will see your pin configs have updated, and your sounds are displayed in the sounds menu. Now when you press **audition** the sound will not play in the browser, it will play on the WVR.
 * connect headphones or some line out to the WVR
 * using a wire (or a female jumper cable) connect the **GND** pin on the WVR to pin **D2**, and your sound should play.
+* Changes to the Pin Configuration will not take effect until you reset the WVR, so get in the habit of reseting your WVR as you make changes, after perforing a SYNC. WVR only takes a few seconds to boot and present WIFI, so it is not a real bottle neck in your workflow, your computer will not even notice that the network has been reset.
 
 # understanding priority
 WVR can playback up to 18 stereo sounds at once. It mixes all the sounds into a stereo output. If you play very fast, or play dense chords, or have very long sounds, it's possible to ask the WVR to play back more then 18 sounds. When this happens, WVR runs an algorithm to figure out what to do. It will try to find an old, or an unimportant sound, stop playing that sound, and play the newly triggered sound instead. You can help it make this decision by giving some sounds higher **priority**. A lower priority sound will never stop a higher priority sound, only equal or lower priority. In the case where all 18 voices are busy playing high priority sounds, and a lower priority sound is triggered, WVR will not play the sound.
@@ -85,6 +88,18 @@ The term "rack" is our word for multi-sample functionality. With a traditional m
 # using fx
 WVR uses the web browsers built-in audio engine to do a lot of work preparing samples before it sends audio data to the WVR. It converts any sample that you choose to a standard audio format of 44.1k 16bit stereo PCM. It also adds FX. Currently the WVR UI impliments Distortion, Reverb, Pitch Shift, Panning and Volume. These FX are rendered before being sent to WVR, so the processor on WVR doesn't need to do any extra signal processing. This does mean that the reverb and it's tail are hard coded into the sample. If you have a sample with reverb, you must set up the note to ignore note-off events, otherwise there will not be a reverb tail if the note off event occurs before the sound is finished playing. You cannot return to the UI later and modify the FX settings, after you have SYNC'd the data to WVR. To change the FX you would need to select the original sound file again from your computer, apply the FX in a new way, and hit SYNC again. Click **audition** to hear how the FX sound. Depending on your computer and web browser, this rendering process is sometimes buggy, it may freeze for a moment (or a few seconds) before playback begins.
 
+# global settings
+In the UI, click the blue **WVR** button top and center of the screen. This is the **Global Settings** menu.
+* WVR has a **recovery mode** functionality that you can set up here. If you hold the **recovery pin** to ground and push reset on WVR, it will boot a special **recovery firmware**. This means that you can experiment with firmwares, and always have a fallback incase there is an error in your code that may prevent you from accessing the UI.
+* If you open the javascript console in your web browser, you will see some logs coming from the WVR. You can set the **log verbosity**. If you don't need logs, leave it set to **none**. Verbose logs can cause little glitches in the audio engine.
+* **wifi on at boot** determines weather your WVR will turn on its wifi antenna at boot. Setting this to **false** is risky. Make sure that you have a pin action set to turn it on, and have tested that pin, because if you don't, its possible you will be unable to access the UI to change this setting back! The solution could be to boot from the recovery firmware, of course, should that occur.
+* you can also change the WIFI network name and password here.
+* Backing up and restoring your eMMC (onboard memory on the WVR) is meant for cloning your WVR, in the case where you have a product that you want to quickly clone, and not have to set up all the configuration and sounds every time. **backup eMMC** will upload a binary file to your computer. On the receiving device, open this same menu and *select eMMC recovery file** then **restore eMMC**. This process may take a long time, depending on how many sounds you have in memory. Note this process will clone everything *except* the firmware running on your WVR, so make sure you have the same (or compatible) firmwares running on both devices. All the note configurations, all the sounds, the backup firmware, your stored firmwares, the global settings, and everything else will be cloned to the new WVR!
+
+# firmware manager
+WVR can store up to 10 different firmwares, and the UI allows you to boot from any of them.
+Click **select binary** for the slot you want to use, and find the compiled binary on your computer. Click on the filename (at the left) and rename your firmware so you know what it is. Click **upload** and wait for it to complete. After refreshing the browser, click **boot** and wait for the firmware to boot. It's a good idea to reset the WVR after this process, then refresh the browser. You are now in your new firmware! Note that some firmwares are not compatible. If the partition scheme on the eMMC is different between firmwares, the WVR will notice, and will have to reformat the eMMC, this means you will loose all stored configuration and sounds, and all your firmwares, etc. Releases of WVR firmware are versioned to make this clear. 1.0.1 -> 1.0.2 or 1.1.1 is safe, but 1.0.1 -> 2.0.1 would not be safe. We will aim to only VERY RARELY make a major version bump, but there may be times when it is necisary. Other developers who may release their own WVR firmwares in the future SHOULD CERTAINLY follow this tradition, and indicate which version of WVR firmware they are targeting :) <3
+
 # setting up for Arduino IDE programming
 * install the latest Arduino IDE
 * follow instructions online to install the ESP32 stuff : https://github.com/espressif/arduino-esp32
@@ -96,7 +111,7 @@ WVR uses the web browsers built-in audio engine to do a lot of work preparing sa
 * go to file->examples, and under **WVR**, open **wvr_basic**
 * select the **ESP32 WROVER dev board** in the boards menu
 * click file->save_as and save this as a new sketch (rename it if you like)
-* click **sketch->export compiled binary**, the file will be saved in your new sketch's folder in the **build** folder
+* click **sketch->export compiled binary**, the file will be saved in your new sketch's folder in the newly created **build** folder
 * join the **WVR** wifi network, open the WVR UI at http://192.168.5.18/
 * click **firware** and then choose a new slot, hit **select binary** for that slot, and choose your .bin file from the your_sketch/build folder, in the UI, click the file name and choose a new name for this firmware, so you can keep track of your custom binaries, silly Arduino will always default to the same binary name.
 * click **upload**, then click **boot** when upload is complete

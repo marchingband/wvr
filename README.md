@@ -147,7 +147,9 @@ Now do the same for the opposite pin, on the opposite side (one of the ground pi
 
 here is an image (this one has the WVR on top) : https://imgur.com/a/CyD6zfh
 
-Use a multimeter to check that there are no shorts, and that all the pins are indeed connected to the pads on both boards.
+Use a multimeter to check that there are no shorts between adjacent pins, and that all the pins are indeed connected to the pads on both boards.
+If the USB Backpack is on top, place one probe of your multimeter on the castellated edge of the WVR, and check for continuity with the pin header. Here is a photo of that procedure : https://imgur.com/a/iM4eVyv
+It is very helpful to have flux, in particular liquid flux, for this. If you find a short, or if you find that the two boards are not connected right, use lots of flux and reflow the pin well.
 
 Now follow these instructions to update the firmware : https://github.com/marchingband/wvr_usb_backpack
 

@@ -42,14 +42,16 @@ static void gpioTask(void* x) {
     };
 }
 
-void IRAM_ATTR isr(void *e){
+// void IRAM_ATTR isr(void *e){
+void isr(void *e){
     button_event_t *event = (button_event_t*)e;
     event->val = digitalRead(event->pin);
     isr_log_d("read %d",event->val);
     xQueueSendFromISR(gpio_queue_handle, &event, NULL);
 }
 
-void IRAM_ATTR touch_isr(void *e){
+// void IRAM_ATTR touch_isr(void *e){
+void touch_isr(void *e){
     button_event_t *event = (button_event_t*)e;
     uint32_t pad_intr = touch_pad_get_status();
     touch_pad_clear_status();
@@ -96,7 +98,7 @@ void Button::onPress(void(*handlePress)()){
     if(this->touch != 1)
     {
         // digital read mode
-        attachInterruptArg(pin, isr, (void*)&event, CHANGE);
+        attachInterruptArg((uint8_t)pin, isr, (void*)&event, CHANGE);
     }
     else
     {

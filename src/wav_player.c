@@ -47,7 +47,7 @@ static const char* TAG = "wav_player";
 uint8_t channel_lut[16];
 struct pan_t channel_pan[16];
 
-struct metadata_t metadata;
+extern struct metadata_t metadata;
 bool mute = false;
 struct buf_t {
   struct wav_lu_t wav_data;
@@ -595,4 +595,9 @@ void wav_player_resume(void)
   vTaskResume(wav_player_task_handle);
   dac_resume();
   log_i("wav player resumed and buffers initialized");
+}
+
+void set_mute(bool should_mute)
+{
+  mute = should_mute;
 }

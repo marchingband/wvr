@@ -3,12 +3,14 @@
 #include "wvr_0.3.h"
 #include "wav_player.h"
 #include "server.h"
+#include "file_system.h"
 
 WVR::WVR()
 {
     this->wifiIsOn = get_wifi_is_on();
     this->useFTDI = false;
     this->useUsbMidi = false;
+    this->forceWifiOn = false;
 }
 
 void WVR::begin()
@@ -43,4 +45,19 @@ void WVR::toggleWifi()
     this->wifiIsOn ? wifiOff() : wifiOn();
     // wifiIsOn = !wifiIsOn;
     this->wifiIsOn = get_wifi_is_on();
+}
+
+void WVR::setGlobalVolume(uint8_t volume)
+{
+    set_global_volume(volume);
+}
+
+void WVR::mute(void)
+{
+    set_mute(true);
+}
+
+void WVR::unmute(void)
+{
+    set_mute(false);
 }

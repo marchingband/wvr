@@ -28,7 +28,7 @@ extern "C" void emmc_init(void);
 extern "C" void dac_init(void);
 extern "C" void midi_init(bool useUsbMidi);
 extern "C" void wav_player_start(void);
-extern "C" void encoder_init(void);
+// extern "C" void encoder_init(void);
 extern "C" void touch_test(void);
 extern "C" void pot_init(void);
 extern "C" void rpc_init(void);
@@ -129,6 +129,12 @@ void wvr_init(bool useFTDI, bool useUsbMidi) {
   {
     server_pause();
   }
+
+  // encoder_init();
+  // pot_init();
+  // rgb_init();
+  // neopixel_test();
+
 
   log_pin_config();
 

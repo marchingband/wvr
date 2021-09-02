@@ -1,8 +1,16 @@
 #include "Arduino.h"
+#include "wvr_pins.h"
+#include "pot.h"
+
+#define POT_PIN D8
 
 int sort(const void * a, const void * b) {
    return ( *(int*)a - *(int*)b );
 }
+
+uint32_t adc_reading = 0;
+
+void onPot_default(uint32_t raw_val){}
 
 static void adc_task(void* arg)
 {
@@ -26,11 +34,16 @@ static void adc_task(void* arg)
         // }
         // log_i("average : %u",acc);
 
-        uint32_t adc_reading = analogRead(39);
-        log_i("%u",adc_reading);
-        pinMode(39,OUTPUT);
-        digitalWrite(39,HIGH);
-        pinMode(39, INPUT);
+        uint32_t new_adc_reading = analogRead(POT_PIN);
+        // if(new_adc_reading != adc_reading)
+        // {
+        //     adc_reading = new_adc_reading;
+        //     log_i("pot : %u", adc_reading);
+        // }
+        onPot(new_adc_reading);
+        pinMode(POT_PIN,OUTPUT);
+        digitalWrite(POT_PIN,HIGH);
+        pinMode(POT_PIN, INPUT);
         // log_i("%u",adc_reading >> 5);
         // int new_percent = adc_reading / (0b111111111111 / 100);
         // if(new_percent != percent)
@@ -44,7 +57,9 @@ static void adc_task(void* arg)
 
 void pot_init(void){
     // analogSetWidth(8);
-    analogSetCycles(8);
+    // analogSetCycles(8);
     // analogSetSamples(4);
-    xTaskCreate(&adc_task, "adc_task", 1024 * 4, NULL, 3, NULL);
+    // xTaskCreate(&adc_task, "adc_task", 1024 * 4, NULL, 3, NULL);
+    onPot = onPot_default;
+    xTaskCreatePinnedToCore(&adc_task, "adc_task", 1024 * 4, NULL, 3, NULL, 0);
 }

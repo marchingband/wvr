@@ -17,12 +17,16 @@ class WVR {
         void wifiOff(void);
         void wifiOn(void);
         void toggleWifi(void);
+        void setGlobalVolume(uint8_t volume);
+        void mute(void);
+        void unmute(void);
         // int globalVolume;
         // bool mute;
         // bool autoConfigPins;
         bool wifiIsOn;
         bool useFTDI;
         bool useUsbMidi;
+        bool forceWifiOn;
 };
 
 #endif

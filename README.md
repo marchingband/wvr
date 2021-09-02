@@ -27,14 +27,13 @@ IF YOU HAVE A WVR MAKERS BOARD, YOU DONT NEED TO DO ANYTHING! YOUR WVR IS READY 
 IF YOU HAVE ANY OTHER THING, IT'S A GOOD IDEA TO UPDATE THE FIRMWARE, SET UP A RECOVERY FIRMWARE, ETC:
 
 * Create a folder on your computer where you will store firmwares for your WVR
-* download these 2 firmares, saving them to this new folder
+* download your firmwares, saving them to this new folder
+* first the safemode firmware, which is the same for all boards:
 https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.1/wvr_safemode.ino.bin  
-if you have a wvr_basic: 
+* second the board specific firmware. navigate to :
+https://github.com/marchingband/wvr_binaries
+and find the folder for your board, download the .ino.bin file, which will be a link like:
 https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.1/wvr_basic.ino.bin  
-or if you have a USB Backpack as well: 
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_usb/1.0.1/wvr_usb.ino.bin  
-
-
 
 * Apply power to your WVR using a usb cable.
 * On a computer, join the wifi network **WVR**, using the password **12345678**

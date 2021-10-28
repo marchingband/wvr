@@ -108,7 +108,7 @@ Click **select binary** for the slot you want to use, and find the compiled bina
 * we also reccomend you intall **ESP Exception Decoder**, in case you want to decode stack traces from the serial monitor, during your Arduino development
 * restart Arduino IDE
 * go to file->examples, and under **WVR**, open **wvr_basic**
-* select the **ESP32 WROVER dev board** in the boards menu
+* select the **ESP32 Wrover Module** in the boards menu
 * click file->save_as and save this as a new sketch (rename it if you like)
 * click **sketch->export compiled binary**, the file will be saved in your new sketch's folder in the newly created **build** folder
 * join the **WVR** wifi network, open the WVR UI at http://192.168.5.18/

@@ -19,12 +19,10 @@
 
 # getting started
 
-IF YOU HAVE A WVR MAKERS BOARD, YOU DONT NEED TO DO ANYTHING! YOUR WVR IS READY TO ROLL!
-
 * On a computer, join the wifi network **WVR**, using the password **12345678**
 * Open Google Chrome (or another browser which [impliments the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open
 
-IF YOU HAVE ANY OTHER THING, IT'S A GOOD IDEA TO UPDATE THE FIRMWARE, SET UP A RECOVERY FIRMWARE, ETC:
+If you are going to upload custom firmware, please follow these steps to setup a recovery firmware, and load up the most recent firmware for your specific WVR Board.
 
 * Create a folder on your computer where you will store firmwares for your WVR
 * download your firmwares, saving them to this new folder
@@ -42,9 +40,11 @@ https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.1/wvr_basic
 * Click on **select recovery firmware** and choose wvr_safemode.ino.bin in the file upload dialog
 * Click on **update recovery firmware** and wait for the upload to complete
 * Click on **firmware** menu item at the top of the page
-* Click **select binary** for **slot 0**, and select wvr_basic.ino.bin (or wvr_usb.ino.bin if you have the USB Backpack) in the file upload dialog
-* Click **upload** then click **boot** for **slot 0** when upload is complete
-* if you have a WVR with USB Host Backpack, follow these instructions to update the firmware on that : https://github.com/marchingband/wvr_usb_backpack
+* Click **select binary** for **slot 0**, and select the firmware that you downloaded earlier in the file upload dialog
+* Click **upload** for **slot 0**, and wait for the upload to complete
+* Click **boot** for **slot 0**, and wait for the boot to complete. 
+* Reset the WVR, then reload the webpage.
+* if you have a WVR with USB Host Backpack, you can follow these instructions to update the firmware on that : https://github.com/marchingband/wvr_usb_backpack
 
 Congradulations! You now have the most up-to-date firmware loaded onto your WVR, and in case something goes wrong, you can boot into a safe-mode firmware by holding D5 to ground when you press reset on the WVR
 

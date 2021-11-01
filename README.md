@@ -102,7 +102,7 @@ Click **select binary** for the slot you want to use, and find the compiled bina
 # setting up for Arduino IDE programming
 * install the latest Arduino IDE
 * follow instructions online to install the ESP32 stuff : https://github.com/espressif/arduino-esp32
-* donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.1
+* donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.3
 * create a folder called **libries** in your Arduino sketch folder and unzip the **WVR Arduno library** into that folder, so it should be Arduino/libraries/WVR/...
 * using the Arduino library manager, install **Async TCP**, **ESP ASYNC WEBSERVER** and **ADAFRUIT NEOPIXEL**
 * we also reccomend you intall **ESP Exception Decoder**, in case you want to decode stack traces from the serial monitor, during your Arduino development

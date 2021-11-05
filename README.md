@@ -27,11 +27,11 @@ If you are going to upload custom firmware, please follow these steps to setup a
 * Create a folder on your computer where you will store firmwares for your WVR
 * download your firmwares, saving them to this new folder
 * first the safemode firmware, which is the same for all boards:
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.1/wvr_safemode.ino.bin  
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.4/wvr_safemode.ino.bin  
 * second the board specific firmware. navigate to :
 https://github.com/marchingband/wvr_binaries
 and find the folder for your board, download the .ino.bin file, which will be a link like:
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.1/wvr_basic.ino.bin  
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.4/wvr_basic.ino.bin  
 
 * Apply power to your WVR using a usb cable.
 * On a computer, join the wifi network **WVR**, using the password **12345678**

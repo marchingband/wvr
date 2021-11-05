@@ -17,7 +17,7 @@ static uint64_t GPIO_MASK = 0;
 
 static xQueueHandle encoder_event_queue = NULL;
 
-void onEncoder_default(bool down)
+void on_encoder_default(bool down)
 {
     ESP_LOGI(tag, "%s", down ? "down" : "up");
 }
@@ -43,7 +43,7 @@ static void emit(char dir){
     // log_d("step %s",dir?"left":"right");
     // out += (dir?-1:1);
     // log_i("%d",out);
-    onEncoder((bool)dir);
+    on_encoder((bool)dir);
 }
 
 static void encoder_task(void* arg)
@@ -241,7 +241,7 @@ void encoder_init(int enc_a, int enc_b){
     encoder_event_queue = xQueueCreate(10, sizeof(uint32_t));
     xTaskCreatePinnedToCore(encoder_task, "encoder_task", 2048, NULL, 10, NULL, 0);
 
-    onEncoder = onEncoder_default;
+    on_encoder = on_encoder_default;
 
     attachInterrupt(enc_a, enc_a_handler, CHANGE);
     attachInterrupt(enc_b, enc_b_handler, CHANGE);

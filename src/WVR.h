@@ -20,6 +20,10 @@ class WVR {
         void setGlobalVolume(uint8_t volume);
         void mute(void);
         void unmute(void);
+        void setMidiHook(uint8_t*(*fn)(uint8_t *in));
+        void encoderInit(int encA, int encB);
+        void onEncoder(void (*handleEncoder)(bool up));
+
         // int globalVolume;
         // bool mute;
         // bool autoConfigPins;
@@ -27,6 +31,7 @@ class WVR {
         bool useFTDI;
         bool useUsbMidi;
         bool forceWifiOn;
+        bool checkRecoveryModePin;
 };
 
 #endif

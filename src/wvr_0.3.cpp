@@ -73,7 +73,7 @@ void logRam(){
 
 struct metadata_t metadata;
 
-void wvr_init(bool useFTDI, bool useUsbMidi) {
+void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   Serial.begin(115200);
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
@@ -92,7 +92,7 @@ void wvr_init(bool useFTDI, bool useUsbMidi) {
   logSize("file system");
 
   int ret = check_for_recovery_mode();
-  if(!ret)
+  if(!ret && checkRecoveryModePin)
   {
     boot_into_recovery_mode();
     return;

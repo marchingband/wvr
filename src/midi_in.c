@@ -9,6 +9,7 @@
 #include "ws_log.h"
 #include "wav_player.h"
 #include "file_system.h"
+#include "midi.h"
 
 #define MIDI_UART_NUM UART_NUM_2
 #define BUF_SIZE (1024)
@@ -22,7 +23,8 @@ static const char *TAG = "midi";
 // from server.cpp
 void sendWSMsg(char* msg);
 // from midiXparser.cpp
-uint8_t *midi_parse(uint8_t in);
+// uint8_t *midi_parse(uint8_t in);
+// uint8_t *midi_hook(uint8_t *in);
 
 esp_err_t ret;
 
@@ -31,7 +33,10 @@ QueueHandle_t uart_queue; // uart Events queue
 
 struct wav_player_event_t wav_player_event;
 int bytes_read;
+uint8_t *raw_msg;
 uint8_t *msg;
+
+uint8_t*(*midi_hook)(uint8_t *in);
 
 void init_gpio(bool useUsbMidi)
 {
@@ -125,8 +130,13 @@ static void read_uart_task()
                 // }
                 for(int i=0;i<bytes_read;i++)
                 {
-                    
+                    // returns uint8_t* or NULL
                     msg = midi_parse(tmp[i]);
+                    if(msg)
+                    {
+                        // send it through the midi filter hook
+                        msg = midi_hook(msg);
+                    }
                     if(msg)
                     {
                         uint8_t channel = msg[0] & 0b00001111;
@@ -245,6 +255,17 @@ void midi_init(bool useUsbMidi)
 {
     init_gpio(useUsbMidi);
     init_uart(useUsbMidi);
+    midi_hook = midi_hook_default;
     xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", 4096, NULL, 3, NULL, 0);
     // xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", 4096, NULL, 3, NULL, 1);
+}
+
+uint8_t* midi_hook_default(uint8_t* in)
+{
+    return in;
+}
+
+void set_midi_hook(uint8_t*(*fn)(uint8_t *in))
+{
+    midi_hook = fn;
 }

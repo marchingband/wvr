@@ -5,6 +5,6 @@
 
 #define VERSION_CODE "1.0.1"
 
-void wvr_init(bool useFTDI, bool useUsbMidi);
+void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin);
 
 #endif

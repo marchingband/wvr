@@ -4,6 +4,7 @@
 #include "wav_player.h"
 #include "server.h"
 #include "file_system.h"
+#include "encoder.h"
 
 WVR::WVR()
 {
@@ -11,11 +12,12 @@ WVR::WVR()
     this->useFTDI = false;
     this->useUsbMidi = false;
     this->forceWifiOn = false;
+    this->checkRecoveryModePin = true;
 }
 
 void WVR::begin()
 {
-    wvr_init(useFTDI, useUsbMidi);
+    wvr_init(useFTDI, useUsbMidi, checkRecoveryModePin);
 }
 
 void WVR::play(uint8_t voice, uint8_t note, uint8_t velocity)
@@ -60,4 +62,19 @@ void WVR::mute(void)
 void WVR::unmute(void)
 {
     set_mute(false);
+}
+
+void WVR::setMidiHook(uint8_t*(*fn)(uint8_t *in))
+{
+    set_midi_hook(fn);
+}
+
+void WVR::encoderInit(int encA, int encB)
+{
+    encoder_init(encA, encB);
+}
+
+void WVR::onEncoder(void (*handleEncoder)(bool up))
+{
+    on_encoder = handleEncoder;
 }

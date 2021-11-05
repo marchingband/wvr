@@ -13,7 +13,6 @@
 #include <gpio.h>
 #include "rgb.h"
 extern "C" {
-  #include "encoder.h"
   #include "pot.h"
 }
 
@@ -85,8 +84,7 @@ void setup() {
   wvr.useFTDI = true;
   wvr.useUsbMidi = false;
   wvr.begin();
-
-  encoder_init(D9, D10);
+  wvr.encoderInit(D9, D10);
   pot_init();
   
   // connect D13 to RGBLED pin on dev board, make sure pin D13 is set to edge:none in WEB GUI 
@@ -108,8 +106,7 @@ void setup() {
 
   wvr.wifiIsOn = get_metadata()->wifi_starts_on;
   log_i("wifi is %s", wvr.wifiIsOn ? "on" : "off");
-
-  onEncoder = onEncoderDevBoard;
+  wvr.onEncoder(onEncoderDevBoard);
   onPot = onPotDevBoard;
 }
 

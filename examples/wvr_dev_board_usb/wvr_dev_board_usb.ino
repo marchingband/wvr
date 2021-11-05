@@ -13,7 +13,6 @@
 #include <gpio.h>
 #include "rgb.h"
 extern "C" {
-  #include "encoder.h"
   #include "pot.h"
 }
 
@@ -92,7 +91,7 @@ void setup() {
   gpio_reset_pin(gpioNumToGpioNum_T(D9));
   gpio_reset_pin(gpioNumToGpioNum_T(D10));
 
-  encoder_init(D9, D10);
+  wvr.encoderInit(D9, D10);
   log_i("dev board");
   pot_init();
 
@@ -114,7 +113,7 @@ void setup() {
   wvr.wifiIsOn = get_metadata()->wifi_starts_on;
   log_i("wifi is %s", wvr.wifiIsOn ? "on" : "off");
 
-  onEncoder = onEncoderDevBoard;
+  wvr.onEncoder(onEncoderDevBoard);
   onPot = onPotDevBoard;
 }
 

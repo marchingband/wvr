@@ -1,3 +1,4 @@
 .vscode
 .DS_Store
 compile_all_boards.sh
+compile_mkr_boards.sh

@@ -78,3 +78,8 @@ void WVR::onEncoder(void (*handleEncoder)(bool up))
 {
     on_encoder = handleEncoder;
 }
+
+void WVR::resetPin(int pin)
+{
+    gpio_reset_pin(gpioNumToGpioNum_T(pin));
+}

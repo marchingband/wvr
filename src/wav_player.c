@@ -40,8 +40,8 @@ static const char* TAG = "wav_player";
 #define MAX_READS_PER_LOOP 4
 // #define MAX_READS_PER_LOOP 3
 
-#define USE_EQ 1
-#define USE_PAN 1
+#define USE_EQ 0
+#define USE_PAN 0
 
 // from midi.c
 uint8_t channel_lut[16];

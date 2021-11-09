@@ -23,7 +23,7 @@ class WVR {
         void setMidiHook(uint8_t*(*fn)(uint8_t *in));
         void encoderInit(int encA, int encB);
         void onEncoder(void (*handleEncoder)(bool up));
-
+        void resetPin(int pin);
         // int globalVolume;
         // bool mute;
         // bool autoConfigPins;

@@ -62,7 +62,7 @@ struct buf_t {
   uint8_t volume;
   uint8_t voice;
   // uint8_t head_position;
-  uint8_t current_buf;
+  uint8_t current_buf:1;
   uint8_t fade :1;
   uint8_t free :1;
   uint8_t done :1;
@@ -123,9 +123,9 @@ void init_buffs(void)
     bufs[i].size = 0;
     bufs[i].sample_pointer = 0;
     // buffers
-    bufs[i].buffer_a = (int16_t *)malloc(BYTES_PER_READ);
-    bufs[i].buffer_b = (int16_t *)malloc(BYTES_PER_READ);
-    bufs[i].buffer_head = (int16_t *)malloc(BYTES_PER_READ);
+    bufs[i].buffer_a = (int16_t *)ps_malloc(BYTES_PER_READ);
+    bufs[i].buffer_b = (int16_t *)ps_malloc(BYTES_PER_READ);
+    bufs[i].buffer_head = (int16_t *)ps_malloc(BYTES_PER_READ);
     if(bufs[i].buffer_a==NULL || bufs[i].buffer_b == NULL || bufs[i].buffer_head == NULL)
     {
       log_e("failed to alloc buffers at %d",i);
@@ -446,7 +446,7 @@ void wav_player_task(void* pvParameters)
       }
     }
 
-    new_midi_buf=-1; // why is this positioned here?
+    new_midi_buf=-1;
 
     // sum the next section of each buffer and send to DAC buffer
     for(int i=0; i<NUM_BUFFERS; i++)
@@ -514,6 +514,8 @@ void wav_player_task(void* pvParameters)
               // new_midi = 1;
               // new_midi_buf = i;
               bufs[i].full = 0;
+              remaining = bufs[i].size / sizeof(int16_t);
+              remaining_in_buffer = SAMPLES_PER_READ;
             }
             else
             {

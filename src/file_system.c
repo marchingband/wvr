@@ -504,7 +504,14 @@ struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_
     }
     for(int i=1; i<=rack.num_layers; i++){
         if(velocity <= rack.break_points[i]){
-            return(rack.layers[i-1]);
+            // add the mode enums from the parent note
+            struct wav_lu_t wav = rack.layers[i-1];
+            wav.play_back_mode = wav_lut[voice][note].play_back_mode;
+            wav.retrigger_mode = wav_lut[voice][note].retrigger_mode;
+            wav.note_off_meaning = wav_lut[voice][note].note_off_meaning;
+            wav.response_curve = wav_lut[voice][note].response_curve;
+            // return(rack.layers[i-1]);
+            return wav;
         }
     }
     // its above the top threshold

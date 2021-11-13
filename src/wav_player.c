@@ -214,7 +214,7 @@ void stop_wav(uint8_t voice, uint8_t note)
 {
   struct wav_player_event_t wav_player_event;
   wav_player_event.code = MIDI_NOTE_OFF;
-  wav_player_event.voice = 0;
+  wav_player_event.voice = voice;
   wav_player_event.velocity = 0;
   wav_player_event.note = note;
   xQueueSendToBack(wav_player_queue, &wav_player_event, portMAX_DELAY);
@@ -304,6 +304,7 @@ void wav_player_task(void* pvParameters)
             )
           {
             // it is a retrigger, do the right thing
+            
             switch(bufs[b].wav_data.retrigger_mode){
               case RESTART:
                 bufs[b].fade = 1;

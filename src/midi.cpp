@@ -6,12 +6,15 @@
 #include "midi.h"
 
 midiXparser midiParser;
+midiXparser usbMidiParser;
 uint8_t *msg;
+uint8_t *usb_msg;
 
 
 void midi_parser_init(void)
 {
     midiParser.setMidiMsgFilter( midiXparser::channelVoiceMsgTypeMsk );
+    usbMidiParser.setMidiMsgFilter( midiXparser::channelVoiceMsgTypeMsk );
 }
 
 extern "C" uint8_t* midi_parse(uint8_t in)
@@ -27,6 +30,24 @@ extern "C" uint8_t* midi_parse(uint8_t in)
         {
             msg = midiParser.getMidiMsg();
             return msg;
+        }
+    }
+    return NULL;
+}
+
+extern "C" uint8_t* usb_midi_parse(uint8_t in)
+{
+    if ( usbMidiParser.parse( in ) )  // Do we received a channel voice msg ?
+    {
+        if ( 
+                usbMidiParser.isMidiStatus(midiXparser::noteOnStatus) || 
+                usbMidiParser.isMidiStatus(midiXparser::noteOffStatus) || 
+                usbMidiParser.isMidiStatus(midiXparser::programChangeStatus) || 
+                usbMidiParser.isMidiStatus(midiXparser::controlChangeStatus) 
+            ) 
+        {
+            usb_msg = usbMidiParser.getMidiMsg();
+            return usb_msg;
         }
     }
     return NULL;

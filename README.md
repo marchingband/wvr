@@ -1,11 +1,10 @@
 # welcome to wvr
 
-Forum : https://groups.google.com/g/wvr-audio  
-Schematics :  https://github.com/marchingband/wvr_hardware  
-  
-Binaries : https://github.com/marchingband/wvr_binaries  
-Web UI code : https://github.com/marchingband/wvr_ui  
-WVR USB Backpack code : https://github.com/marchingband/wvr_usb_backpack  
+Join us on the WVR Forum : https://groups.google.com/g/wvr-audio  
+Download the WVR schematics :  https://github.com/marchingband/wvr_hardware  
+Binaries for all the WVR boards are here : https://github.com/marchingband/wvr_binaries  
+Code for the Web UI is here : https://github.com/marchingband/wvr_ui  
+Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_backpack  
 
 * [getting started](#getting-started)
 * [playing sounds](#playing-sounds)
@@ -111,7 +110,8 @@ Click **select binary** for the slot you want to use, and find the compiled bina
 * follow instructions online to install the ESP32 stuff : https://github.com/espressif/arduino-esp32
 * donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.3
 * create a folder called **libries** in your Arduino sketch folder and unzip the **WVR Arduno library** into that folder, so it should be Arduino/libraries/WVR/...
-* using the Arduino library manager, install **Async TCP**, **ESP ASYNC WEBSERVER** and **ADAFRUIT NEOPIXEL**
+* using the Arduino library manager, install **ADAFRUIT NEOPIXEL**
+* download https://github.com/me-no-dev/ESPAsyncWebServer and https://github.com/me-no-dev/ESPAsyncTCP (click **CODE** -> **download zip**) and then unzip them into the **libraries** folder as well.
 * we also reccomend you intall **ESP Exception Decoder**, in case you want to decode stack traces from the serial monitor, during your Arduino development
 * restart Arduino IDE
 * go to file->examples, and under **WVR**, open **wvr_basic**

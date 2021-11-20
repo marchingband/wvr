@@ -1,5 +1,12 @@
 # welcome to wvr
 
+Forum : https://groups.google.com/g/wvr-audio  
+Schematics :  https://github.com/marchingband/wvr_hardware  
+  
+Binaries : https://github.com/marchingband/wvr_binaries  
+Web UI code : https://github.com/marchingband/wvr_ui  
+WVR USB Backpack code : https://github.com/marchingband/wvr_usb_backpack  
+
 * [getting started](#getting-started)
 * [playing sounds](#playing-sounds)
 * sound settings

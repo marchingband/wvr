@@ -108,7 +108,7 @@ Click **select binary** for the slot you want to use, and find the compiled bina
 # setting up for Arduino IDE programming
 * install the latest Arduino IDE
 * follow instructions online to install the ESP32 stuff : https://github.com/espressif/arduino-esp32
-* donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.3
+* donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.8
 * create a folder called **libries** in your Arduino sketch folder and unzip the **WVR Arduno library** into that folder, so it should be Arduino/libraries/WVR/...
 * using the Arduino library manager, install **ADAFRUIT NEOPIXEL**
 * download https://github.com/me-no-dev/ESPAsyncWebServer and https://github.com/me-no-dev/AsyncTCP (click **CODE** -> **download zip**) and then unzip them into the **libraries** folder as well.

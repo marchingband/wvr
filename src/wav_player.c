@@ -60,7 +60,7 @@ struct buf_t {
   uint8_t volume;
   uint8_t voice;
   uint8_t head_position;
-  uint8_t fade :1;
+  uint8_t fade;
   uint8_t free :1;
   uint8_t done :1;
   uint8_t full :1;
@@ -346,7 +346,6 @@ void wav_player_task(void* pvParameters)
           }
           if(bufs[i].free == 1)
           {
-            // send RPC
             rpc_out(RPC_NOTE_ON, bufs[i].voice, wav_player_event.note, wav_player_event.velocity);
             new_midi = 1;
             new_midi_buf = i;
@@ -431,7 +430,7 @@ void wav_player_task(void* pvParameters)
       }
     }
 
-    new_midi_buf=-1; // why is this positioned here?
+    new_midi_buf=-1;
 
     // sum the next section of each buffer and send to DAC buffer
     for(int i=0; i<NUM_BUFFERS; i++)
@@ -449,9 +448,13 @@ void wav_player_task(void* pvParameters)
         uint8_t right_vol = channel_pan[channel].right_vol;
 
         bool left = false;
+        bool odd = false;
         for(int s=0; s<to_write; s++)
         {
           left = !left;
+          if(left){
+            odd = !odd;
+          }
           // apply volume
           if(bufs[i].wav_data.response_curve == RESPONSE_ROOT_SQUARE)
           {
@@ -466,23 +469,37 @@ void wav_player_task(void* pvParameters)
           {
             tmp16 = scale_sample(tmp16, left ? left_vol : right_vol);
           }
+          if(bufs[i].fade > 0)
+          {
+            tmp16 = scale_sample(tmp16, 127 - bufs[i].fade);
+          }
           // mix into master
           output_buf[s] += ( tmp16 >> DAMPEN_BITS );
-          // incriment fade var
-          if(bufs[i].fade)
+          // fade
+          if(bufs[i].fade > 0 && left && odd)
           {
-            if(bufs[i].volume > 0)
+            if(bufs[i].fade < 127)
             {
-              bufs[i].volume--;
+              bufs[i].fade++;
             }
             else
             {
               bufs[i].done = true;
             }
           }
+          // if(bufs[i].fade && left && odd)
+          // // if(bufs[i].fade && left && odd && quart && oct)
+          // {
+          //   if(bufs[i].volume > 0)
+          //   {
+          //     bufs[i].volume--;
+          //   }
+          //   else
+          //   {
+          //     bufs[i].done = true;
+          //   }
+          // }
         }
-
-        
         // incriment that buffers position
         bufs[i].head_position++;
         bufs[i].wav_position += to_write * sizeof(int16_t);

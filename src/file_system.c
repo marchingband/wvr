@@ -371,6 +371,7 @@ void read_wav_lut_from_disk(void)
     if(voice == NULL){log_e("failed to alloc voice");};
     for(int i=0;i<NUM_VOICES;i++)
     {
+        // feedLoopWDT();
         ESP_ERROR_CHECK(emmc_read(
                 voice, 
                 WAV_LUT_START_BLOCK + (i * BLOCKS_PER_VOICE), 
@@ -378,6 +379,7 @@ void read_wav_lut_from_disk(void)
             ));
         for(int j=0;j<NUM_NOTES;j++)
         {
+            // feedLoopWDT();
             wav_lut[i][j].isRack = voice[j].isRack;
             wav_lut[i][j].empty = voice[j].empty;
             wav_lut[i][j].start_block = voice[j].start_block;
@@ -801,6 +803,7 @@ char* print_fs_json(){
     cJSON *j_pin_config = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"pinConfig");
     for(int j=0;j<NUM_VOICES;j++)
     {
+        feedLoopWDT();
         cJSON *voice = add_voice_json(j);
         cJSON_AddItemToArray(j_voices, voice);
     }
@@ -810,6 +813,7 @@ char* print_fs_json(){
     add_pin_config_json(j_pin_config);
 
     char* out = cJSON_PrintUnformatted(j_RESPONSE_ROOT);
+    feedLoopWDT();
     if(out == NULL){log_e("failed to print JSON");}
     cJSON_Delete(j_RESPONSE_ROOT);
     return out;
@@ -1083,7 +1087,9 @@ size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, si
 }
 
 void updateVoiceConfig(char *json){
+    feedLoopWDT();
     cJSON *vc_json = cJSON_Parse(json);
+    feedLoopWDT();
     cJSON *voice = NULL;
     cJSON *note = NULL;
     struct wav_file_t *voice_data = (struct wav_file_t*)ps_malloc(BLOCKS_PER_VOICE * SECTOR_SIZE);
@@ -1091,11 +1097,13 @@ void updateVoiceConfig(char *json){
     int num_voice = 0;
     cJSON_ArrayForEach(voice,vc_json)
     {
+        feedLoopWDT();
         size_t voice_start_block = WAV_LUT_START_BLOCK + (BLOCKS_PER_VOICE * num_voice);
         ESP_ERROR_CHECK(emmc_read(voice_data,voice_start_block,BLOCKS_PER_VOICE));
         int num_note = 0;
         cJSON_ArrayForEach(note,voice)
         {
+            feedLoopWDT();
             voice_data[num_note].play_back_mode = cJSON_GetObjectItemCaseSensitive(note, "mode")->valueint;
             voice_data[num_note].retrigger_mode = cJSON_GetObjectItemCaseSensitive(note, "retrigger")->valueint;
             voice_data[num_note].note_off_meaning = cJSON_GetObjectItemCaseSensitive(note, "noteOff")->valueint;
@@ -1108,11 +1116,14 @@ void updateVoiceConfig(char *json){
             }
             num_note++;
         }
+        feedLoopWDT();
         ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
+        feedLoopWDT();
         num_voice++;
     }
     wlog_i("done voice config update");
     read_wav_lut_from_disk();
+    feedLoopWDT();
     //cleanup
     cJSON_Delete(vc_json);
     free(voice_data);
@@ -1126,7 +1137,9 @@ void updateRackConfig(cJSON *note){
     // load up the rack file
     struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
     if(buf == NULL){log_i("malloc rack_file_t buf failed");}
+    feedLoopWDT();
     ESP_ERROR_CHECK(emmc_read(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+    feedLoopWDT();
     struct rack_file_t rack_file = buf[rack_num];
     // set the data in the rack file
     rack_file.free = 0;
@@ -1135,13 +1148,16 @@ void updateRackConfig(cJSON *note){
     int layer = 0;
     cJSON_ArrayForEach(point,break_points)
     {
+        feedLoopWDT();
         rack_file.break_points[layer] = point->valueint;
         layer++;
     }
     rack_file.num_layers = layer - 1;
     //write the rack file to disk
     buf[rack_num] = rack_file;
+    feedLoopWDT();
     ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+    feedLoopWDT();
     free(buf);
 }
 
@@ -1151,6 +1167,7 @@ void updatePinConfig(cJSON *config){
     int num_pin = 0;
     cJSON_ArrayForEach(pin,json)
     {
+        feedLoopWDT();
         pin_config_lut[num_pin].action = cJSON_GetObjectItemCaseSensitive(pin, "action")->valueint;
         pin_config_lut[num_pin].edge = cJSON_GetObjectItemCaseSensitive(pin, "edge")->valueint;
         pin_config_lut[num_pin].gpio_num = cJSON_GetObjectItemCaseSensitive(pin, "gpioNum")->valueint;
@@ -1160,7 +1177,9 @@ void updatePinConfig(cJSON *config){
         pin_config_lut[num_pin].debounce = cJSON_GetObjectItemCaseSensitive(pin, "debounce")->valueint;
         num_pin++;
     }
+    feedLoopWDT();
     ESP_ERROR_CHECK(emmc_write(pin_config_lut,PIN_CONFIG_START_BLOCK,PIN_CONFIG_BLOCKS));
+    feedLoopWDT();
     wlog_i("wrote pin config to disk");
     cJSON_Delete(json);
 }
@@ -1183,7 +1202,9 @@ void log_pin_config(void)
 }
 
 void updateMetadata(cJSON *config){
+    feedLoopWDT();
     cJSON *json = cJSON_Parse(config);
+    feedLoopWDT();
     metadata.global_volume = cJSON_GetObjectItemCaseSensitive(json, "globalVolume")->valueint;
     metadata.should_check_strapping_pin = cJSON_GetObjectItemCaseSensitive(json, "shouldCheckStrappingPin")->valueint;
     metadata.recovery_mode_straping_pin = cJSON_GetObjectItemCaseSensitive(json, "recoveryModeStrappingPin")->valueint;

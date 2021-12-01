@@ -3,6 +3,7 @@
 
 #include "defines.h"
 #include "Arduino.h"
+#include <esp_task_wdt.h>
 
 #include <WiFi.h>
 #include <AsyncTCP.h>
@@ -154,9 +155,10 @@ void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size
   if(index==0){
     //start
     //wav_player_pause();
+    log_i("handleUpdateVoiceConfig first loop");
     voice_config_json = (uint8_t*)ps_malloc(total + 1);
     if(!voice_config_json){
-      wlog_i("failed to malloc for json");
+      log_i("failed to malloc for json");
     }
   }
   //always
@@ -166,10 +168,18 @@ void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size
   feedLoopWDT();
   if(index + len == total){
     //done
+    log_i("handleUpdateVoiceConfig last loop");
     feedLoopWDT();
-    updateVoiceConfig((char *)voice_config_json);
-    free(voice_config_json);
+    esp_task_wdt_feed();
+    log_i("call updateVoiceConfig()");
     request->send(200, "text/plain", "all done voice config update");
+    updateVoiceConfig((char *)voice_config_json);
+    log_i("done updateVoiceConfig()");
+    free(voice_config_json);
+    log_i("done free");
+    // vTaskDelay(1000);
+    feedLoopWDT();
+    // log_i("request->send done");
     //wav_player_resume();
   }
 }
@@ -180,9 +190,10 @@ void handleUpdatePinConfig(AsyncWebServerRequest *request, uint8_t *data, size_t
   if(index==0){
     //start
     //wav_player_pause();
+    log_i("start handleUpdatePinConfig");
     pin_config_json = (uint8_t*)ps_malloc(total);
     if(!pin_config_json){
-      wlog_i("failed to malloc for json");
+      log_i("failed to malloc for json");
     }
   }
   //always
@@ -417,7 +428,10 @@ void handleNewGUI(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
 
 void handleFsjson(AsyncWebServerRequest *request){
   // //wav_player_pause();
+  log_i("print_fs_json()");
   char *json = print_fs_json();
+  log_i("done print_fs_json()");
+  feedLoopWDT();
   size_t size = strlen(json);
   // wlog_e("fs size is %d",size);
   AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {

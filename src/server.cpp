@@ -432,10 +432,12 @@ void handleFsjson(AsyncWebServerRequest *request){
   char *json = print_fs_json();
   log_i("done print_fs_json()");
   feedLoopWDT();
+  esp_task_wdt_feed();
   size_t size = strlen(json);
   // wlog_e("fs size is %d",size);
   AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
     feedLoopWDT();
+    esp_task_wdt_feed();
     size_t toWrite = min(size - index, maxLen);
     memcpy(buffer, json + index, toWrite);
     if(index + toWrite == size){
@@ -445,6 +447,49 @@ void handleFsjson(AsyncWebServerRequest *request){
   });
   response->addHeader("size",String(size));
   request->send(response);
+}
+
+void handleFetchLocalIP(AsyncWebServerRequest *request){
+  log_i("handleFetchLocalIP");
+  if(WiFi.status() == WL_CONNECTED)
+  {
+    request->send(200, "text/plain", WiFi.localIP().toString().c_str());
+  }
+  else if(WiFi.status() == WL_DISCONNECTED)
+  {
+    request->send(200, "text/plain", "trying to connect");
+  }
+  else if(WiFi.status() == WL_CONNECTION_LOST)
+  {
+    request->send(200, "text/plain", "connection lost");
+  }
+  else if(WiFi.status() == WL_CONNECT_FAILED)
+  {
+    request->send(200, "text/plain", "wrong password");
+  }
+  else if(WiFi.status() == WL_NO_SSID_AVAIL)
+  {
+    request->send(200, "text/plain", "wrong network name");
+  }
+  else
+  {
+    request->send(200, "text/plain", "unkown error");
+  }
+}
+
+void handleTryLogonLocalNetwork(AsyncWebServerRequest *request){
+  log_i("handleTryLogonLocalNetwork");
+  const char* ssid = request->getHeader("ssid")->value().c_str();
+  const char* password = request->getHeader("password")->value().c_str();
+  memcpy(&metadata->station_ssid, ssid, 20);
+  memcpy(&metadata->station_passphrase, password, 20);
+  log_i("headers: %s %s meta: %s %s",
+    ssid, password,
+    metadata->station_ssid,
+    metadata->station_passphrase
+  );
+  request->send(200, "text/plain", "trying to connect");
+  try_log_on_network();
 }
 
 void handleBackupEMMC(AsyncWebServerRequest *request){
@@ -557,10 +602,22 @@ void _server_pause(){
   WiFi.mode(WIFI_OFF);
 }
 
+void try_log_on_network()
+{
+  WiFi.begin(metadata->station_ssid, metadata->station_passphrase);
+  // WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
+  //       log_i("WiFi lost connection. Reason: %s", info.sta_disconnected.reason);
+  //   }, WiFiEvent_t::SYSTEM_EVENT_STA_DISCONNECTED);
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
+        log_i("WiFi connected. IP: %s", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
+    }, WiFiEvent_t::SYSTEM_EVENT_STA_GOT_IP);
+}
+
 void server_begin() {
   Serial.println("Configuring access point...");
 
-  WiFi.mode(WIFI_AP);
+  // WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_MODE_APSTA);
 
 
   IPAddress IP = IPAddress (192, 168, 5, 18);
@@ -706,6 +763,18 @@ void server_begin() {
     "/rpc",
     HTTP_GET,
     handleRPC
+  );
+
+  server.on(
+    "/fetchLocalIP",
+    HTTP_GET,
+    handleFetchLocalIP
+  );
+
+  server.on(
+    "/tryLogonLocalNetwork",
+    HTTP_GET,
+    handleTryLogonLocalNetwork
   );
 
   ws.onEvent(onWsEvent);

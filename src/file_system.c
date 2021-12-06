@@ -201,7 +201,10 @@ void init_metadata(void){
         .wlog_verbosity = 0,
         .wifi_starts_on = 1,
         .ssid = "WVR",
-        .passphrase = "12345678"
+        .passphrase = "12345678",
+        .do_station_mode = 0,
+        .station_ssid = "",
+        .station_passphrase = ""
     };
     memcpy(new_metadata.tag, waver_tag, METADATA_TAG_LENGTH);
     write_metadata(new_metadata);
@@ -906,6 +909,9 @@ void add_metadata_json(cJSON * RESPONSE_ROOT){
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiStartsOn",metadata.wifi_starts_on);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkName",metadata.ssid);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkPassword",metadata.passphrase);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"doStationMode",metadata.do_station_mode);
+    cJSON_AddStringToObject(RESPONSE_ROOT,"stationWifiNetworkName",metadata.station_ssid);
+    cJSON_AddStringToObject(RESPONSE_ROOT,"stationWifiNetworkPassword",metadata.station_passphrase);
 }
 
 void add_pin_config_json(cJSON *RESPONSE_ROOT){
@@ -1212,15 +1218,19 @@ void updateMetadata(cJSON *config){
     metadata.wlog_verbosity = cJSON_GetObjectItemCaseSensitive(json, "wLogVerbosity")->valueint;
     memcpy(&metadata.ssid,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring,20);
     memcpy(&metadata.passphrase,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring,20);
-    // metadata.ssid = cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring;
-    // metadata.passphrase = cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring;
+    metadata.do_station_mode = cJSON_GetObjectItemCaseSensitive(json, "doStationMode")->valueint;
+    memcpy(&metadata.station_ssid,cJSON_GetObjectItemCaseSensitive(json, "stationWifiNetworkName")->valuestring,20);
+    memcpy(&metadata.station_passphrase,cJSON_GetObjectItemCaseSensitive(json, "stationWifiNetworkPassword")->valuestring,20);
     write_metadata(metadata);
-    wlog_i("gv:%d scsp:%d rmsp:%d wso:%d wlv:%d",
+    log_i("glob-vol:%d check-strapping-pin:%d recovery-mode-pin:%d wifi-starts-on:%d wlog-verb:%d do-station:%d s-name:%s s-pass:%s",
         metadata.global_volume,
         metadata.should_check_strapping_pin,
         metadata.recovery_mode_straping_pin,
         metadata.wifi_starts_on,
-        metadata.wlog_verbosity
+        metadata.wlog_verbosity,
+        metadata.do_station_mode,
+        metadata.station_ssid,
+        metadata.station_passphrase
     );
     wlog_i("updated and saved metadata");
     cJSON_Delete(json);

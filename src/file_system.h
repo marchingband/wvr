@@ -102,6 +102,9 @@ struct metadata_t {
     uint8_t should_check_strapping_pin;
     char ssid[20];
     char passphrase[20];
+    uint8_t do_station_mode;
+    char station_ssid[20];
+    char station_passphrase[20];
 };
 
 // struct metadata_t metadata;

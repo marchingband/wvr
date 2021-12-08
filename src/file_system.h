@@ -327,9 +327,9 @@ size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, si
 void init_rack_lut(void);
 void write_frack_lut_to_disk(void);
 void read_rack_lut_from_disk(void);
-void add_rack_to_file_system(char *name, int voice, int note, size_t start_block, size_t size, int layer, cJSON *json);
+void add_rack_to_file_system(char *name, int voice, int note, size_t start_block, size_t size, int layer, const char *json);
 int get_empty_rack(void);
-void add_wav_to_rack(char* name, int rack_index, size_t start_block, size_t size, int layer, cJSON *json);
+void add_wav_to_rack(char* name, int rack_index, size_t start_block, size_t size, int layer, const char *json_string);
 struct wav_lu_t *get_all_wav_files(size_t *len);
 int sort_lut(const void * a, const void * b);
 size_t search_directory(struct wav_lu_t *_data,  size_t num_data_entries, size_t start, size_t end, size_t file_size);

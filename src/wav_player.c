@@ -20,6 +20,9 @@
 
 static const char* TAG = "wav_player";
 
+#define MAX_INT_16 32767
+#define MIN_INT_16 -32768
+
 #define wav_player_queue_SIZE 80
 #define BLOCK_SIZE 512
 
@@ -473,8 +476,12 @@ void wav_player_task(void* pvParameters)
           {
             tmp16 = scale_sample(tmp16, 127 - bufs[i].fade);
           }
-          // mix into master
-          output_buf[s] += ( tmp16 >> DAMPEN_BITS );
+          // mix into master 
+          // output_buf[s] += ( tmp16 >> DAMPEN_BITS );
+          // mix into master clamped
+          int next = output_buf[s] + ( tmp16 >> DAMPEN_BITS );
+          // int16_t next_16 = (int16_t)(next > MAX_INT_16 ? MAX_INT_16 : next < MIN_INT_16 ? MIN_INT_16 : next);
+          output_buf[s] = (next > MAX_INT_16) ? MAX_INT_16 : (next < MIN_INT_16) ? MIN_INT_16 : next;
           // fade
           if(bufs[i].fade > 0 && left && odd)
           {

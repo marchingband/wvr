@@ -540,7 +540,7 @@ void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,siz
     // log_i("done");
 }
 
-void add_rack_to_file_system(char *name, int voice, int note, size_t start_block, size_t size, int layer, cJSON *json)
+void add_rack_to_file_system(char *name, int voice, int note, size_t start_block, size_t size, int layer, const char *json)
 {
     log_i("adding rack layer:%u name:%s voice:%d, note:%d, start_block:%d, size:%d",
         layer,name,voice,note,start_block,size);
@@ -577,9 +577,10 @@ int get_empty_rack(void){
     return(-1);
 }
 
-void add_wav_to_rack(char* name, int rack_index, size_t start_block, size_t size, int layer, cJSON *json){
+void add_wav_to_rack(char* name, int rack_index, size_t start_block, size_t size, int layer, const char *json_string){
     log_i("name %s, start_block %u, size %u, layer %u",name,start_block,size,layer);
     // fill out the wav entry for that layer
+    const cJSON *json = cJSON_Parse(json_string);
     struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
     if(buf == NULL){log_i("malloc rack_file_t buf failed");}
     ESP_ERROR_CHECK(emmc_read(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
@@ -610,6 +611,7 @@ void add_wav_to_rack(char* name, int rack_index, size_t start_block, size_t size
     buf[rack_index] = rack;
     ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
     free(buf);
+    cJSON_Delete(json);
     // write_rack_lut_to_disk();
     // read_rack_lut_from_disk();
 }
@@ -1089,6 +1091,7 @@ size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, si
 void updateVoiceConfig(char *json){
     feedLoopWDT();
     cJSON *vc_json = cJSON_Parse(json);
+    // free(json); // ??
     feedLoopWDT();
     cJSON *voice = NULL;
     cJSON *note = NULL;
@@ -1143,7 +1146,7 @@ void updateRackConfig(cJSON *note){
     struct rack_file_t rack_file = buf[rack_num];
     // set the data in the rack file
     rack_file.free = 0;
-    memcpy(&rack_file.name,cJSON_GetObjectItemCaseSensitive(rack, "name")->valuestring,24);
+    memcpy(&rack_file.name, cJSON_GetObjectItemCaseSensitive(rack, "name")->valuestring,24);
     // update the breakpoints and layer count
     int layer = 0;
     cJSON_ArrayForEach(point,break_points)
@@ -1159,6 +1162,9 @@ void updateRackConfig(cJSON *note){
     ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
     feedLoopWDT();
     free(buf);
+    // cJSON_Delete(point);
+    // cJSON_Delete(break_points);
+    // cJSON_Delete(rack);
 }
 
 void updatePinConfig(cJSON *config){

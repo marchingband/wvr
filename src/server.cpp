@@ -273,7 +273,7 @@ char r_name[24];
 int r_voice;
 int r_note;
 int r_layer;
-cJSON *r_rack_json;
+const char *r_rack_json;
 size_t r_start_block;
 
 void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
@@ -284,8 +284,7 @@ void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_
     sscanf(request->getHeader("voice")->value().c_str(), "%d", &r_voice);
     sscanf(request->getHeader("note")->value().c_str(), "%d", &r_note);
     sscanf(request->getHeader("layer")->value().c_str(), "%d", &r_layer);
-    // log_i("\nNEW REQUEST %u %ubytes\n",r_layer, total);
-    r_rack_json = cJSON_Parse(request->getHeader("rack-json")->value().c_str());
+    r_rack_json = request->getHeader("rack-json")->value().c_str();
     r_start_block = find_gap_in_file_system(total);
   }
   //always
@@ -296,7 +295,6 @@ void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_
     //done
     close_wav_to_emmc();
     add_rack_to_file_system(&r_name[0],r_voice,r_note,r_start_block,total,r_layer,r_rack_json);
-    free(r_rack_json);
     //wav_player_resume();
   }
 }
@@ -349,12 +347,7 @@ void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len
 }
 
 int rf_bytes_read = 0;
-// char rf_firmware_slot;
-// size_t rf_gui_size;
 size_t rf_firmware_size;
-// char rf_gui_name[24];
-// char rf_firmware_name[24];
-
 
 void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   //once

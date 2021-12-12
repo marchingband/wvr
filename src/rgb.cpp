@@ -13,7 +13,7 @@ void rgb_init(uint16_t pin){
     rgb->clear();
 }
 
-void rgb_set_color(int red, int green, int blue)
+void rgb_set_color(uint8_t red, uint8_t green, uint8_t blue)
 {
     rgb->setPixelColor(0, rgb->Color(red, green, blue));
     rgb->show();

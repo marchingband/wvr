@@ -22,7 +22,7 @@
 #include "file_system.h"
 #include "server.h"
 
-extern "C" char* print_fs_json();
+// extern "C" char* print_fs_json();
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
 extern "C" esp_err_t close_wav_to_emmc(void);
@@ -177,9 +177,7 @@ void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size
     log_i("done updateVoiceConfig()");
     free(voice_config_json);
     log_i("done free");
-    // vTaskDelay(1000);
     feedLoopWDT();
-    // log_i("request->send done");
     //wav_player_resume();
   }
 }
@@ -379,54 +377,33 @@ void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, si
   }
 }
 
-void handleNewGUI(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
-  //once
-  if(index==0){
-    log_i("handle new GUI");
-    AsyncWebHeader* firmware_slot_string = request->getHeader("slot-index");
-    sscanf(firmware_slot_string->value().c_str(), "%d", &f_firmware_slot);
-    AsyncWebHeader* gui_size_string = request->getHeader("gui-size");
-    sscanf(gui_size_string->value().c_str(), "%d", &f_gui_size);
-    AsyncWebHeader* gui_name_string = request->getHeader("gui-name");
-    log_i("strcpy : %s",gui_name_string->value().c_str());
-    strcpy(&f_gui_name[0], gui_name_string->value().c_str());
-    log_i("gui %s is %u bytes",f_gui_name,f_gui_size);
-
-    struct website_t *w = get_website_slot(f_firmware_slot);
-    w->length = f_gui_size;
-    strcpy(w->name, gui_name_string->value().c_str());
-    feedLoopWDT();
-  }
-  //always
-  if((f_firmware_size > MAX_FIRMWARE_SIZE) || (f_gui_size > MAX_WEBSITE_SIZE)){
-    feedLoopWDT();
-    request->send(400, "text/plain", "FILES TOO LARGE");
-    return;
-  }
-
-  Serial.print(".");
-  write_website_to_emmc(f_firmware_slot, data, len);
-  f_bytes_read += len;
-
-  //done
-  if(index + len == total){
-    feedLoopWDT();
-    close_website_to_emmc(f_firmware_slot);
-    log_i("done");
-    log_i("wrote %u bytes",f_bytes_read);
-    f_bytes_read = 0;
-    request->send(200, "text/plain", "all done");
-  }
-}
-
-void handleFsjson(AsyncWebServerRequest *request){
-  // //wav_player_pause();
-  log_i("print_fs_json()");
-  char *json = print_fs_json();
-  log_i("done print_fs_json()");
+void handleVoiceJSON(AsyncWebServerRequest *request){
+  int numVoice;
+  AsyncWebHeader* voice_string = request->getHeader("voice");
+  sscanf(voice_string->value().c_str(), "%d", &numVoice);
+  char *json = print_voice_json(numVoice);
   feedLoopWDT();
   size_t size = strlen(json);
-  // wlog_e("fs size is %d",size);
+  AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+    feedLoopWDT();
+    size_t toWrite = min(size - index, maxLen);
+    memcpy(buffer, json + index, toWrite);
+    if(index + toWrite == size){
+      free(json);
+    }
+    return toWrite;
+  });
+  response->addHeader("size",String(size));
+  request->send(response);
+}
+
+void handleConfigJSON(AsyncWebServerRequest *request){
+  log_i("print_config_json()");
+  char *json = print_config_json();
+  log_i("done print_config_json");
+  feedLoopWDT();
+  size_t size = strlen(json);
+  log_i("config JSON size is %d",size);
   AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
     feedLoopWDT();
     size_t toWrite = min(size - index, maxLen);
@@ -517,6 +494,19 @@ void handleMain(AsyncWebServerRequest *request){
   });
 }
 
+// void handleDeleteNote(AsyncWebServerRequest *request){
+//   int numVoice;
+//   int numNote;
+//   AsyncWebHeader* voice_string = request->getHeader("voice");
+//   sscanf(voice_string->value().c_str(), "%d", &numVoice);
+//   AsyncWebHeader* note_string = request->getHeader("note");
+//   sscanf(note_string->value().c_str(), "%d", &numNote);
+
+//   deleteNote(numVoice, numNote);
+
+//   request->send(200, "text/plain", "all done delete");
+// }
+
 void handleRPC(AsyncWebServerRequest *request){
   cJSON* json = cJSON_Parse(request->getHeader("json")->value().c_str());
   on_rpc_in(json);
@@ -533,16 +523,16 @@ void handleBootFromEmmc(AsyncWebServerRequest *request){
   bootFromEmmc(index);
 }
 
-void handleMulti(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
-  if(!index){
-    log_i("UploadStart: %s",filename.c_str());
-  }
-  log_i("%s",filename.c_str());
-  if(final){
-    request->send(204);
-    log_i("done %s",filename.c_str());
-  }
-}
+// void handleMulti(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+//   if(!index){
+//     log_i("UploadStart: %s",filename.c_str());
+//   }
+//   log_i("%s",filename.c_str());
+//   if(final){
+//     request->send(204);
+//     log_i("done %s",filename.c_str());
+//   }
+// }
 
 void _server_pause(){
   ws.closeAll();
@@ -590,10 +580,22 @@ void server_begin() {
     handleEmmcGUI
   );
 
+  // server.on(
+  //   "/fsjson",
+  //   HTTP_GET,
+  //   handleFsjson
+  // );
+
   server.on(
-    "/fsjson",
+    "/voicejson",
     HTTP_GET,
-    handleFsjson
+    handleVoiceJSON
+  );
+
+  server.on(
+    "/configjson",
+    HTTP_GET,
+    handleConfigJSON
   );
 
   server.on(
@@ -667,25 +669,17 @@ void server_begin() {
   );
 
   server.on(
-    "/addgui",
-    HTTP_POST,
-    [](AsyncWebServerRequest * request){request->send(204);},
-    NULL,
-    handleNewGUI
-  );
-
-  server.on(
     "/bootFromEmmc",
     HTTP_GET,
     handleBootFromEmmc
   );
 
-  server.on(
-    "/multi",
-    HTTP_POST,
-    [](AsyncWebServerRequest *request){request->send(204);},
-    handleMulti
-  );
+  // server.on(
+  //   "/multi",
+  //   HTTP_POST,
+  //   [](AsyncWebServerRequest *request){request->send(204);},
+  //   handleMulti
+  // );
 
   server.on(
     "/addrack",

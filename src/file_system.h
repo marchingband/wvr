@@ -342,6 +342,9 @@ size_t getNumSectorsInEmmc(void);
 void getSector(size_t i, uint8_t *buf);
 void restore_emmc(uint8_t* source, size_t size);
 void close_restore_emmc();
+char *print_voice_json(int numVoice);
+char *print_config_json();
+// void deleteNote(int voice, int note);
 
 #ifdef __cplusplus
 }

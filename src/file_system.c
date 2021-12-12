@@ -37,9 +37,6 @@
 #define PIN_CONFIG_SIZE (NUM_PIN_CONFIGS * sizeof(struct pin_config_t))
 #define PIN_CONFIG_BLOCKS (PIN_CONFIG_SIZE / SECTOR_SIZE + (PIN_CONFIG_SIZE % SECTOR_SIZE !=0))
 
-// #define NUM_VOICES 16
-// #define NUM_NOTES 128
-
 #define NUM_WAV_LUT_ENTRIES ( NUM_VOICES * NUM_NOTES )
 #define WAV_LUT_START_BLOCK (PIN_CONFIG_START_BLOCK + PIN_CONFIG_BLOCKS)
 #define BYTES_PER_VOICE ( NUM_NOTES * sizeof(struct wav_file_t) )
@@ -535,9 +532,7 @@ void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,siz
     strcpy(voice_data[note].name,name);
     ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
     read_wav_lut_from_disk();
-    // read_rack_lut_from_disk();
     free(voice_data);
-    // log_i("done");
 }
 
 void add_rack_to_file_system(char *name, int voice, int note, size_t start_block, size_t size, int layer, const char *json)
@@ -571,6 +566,7 @@ void add_rack_to_file_system(char *name, int voice, int note, size_t start_block
 int get_empty_rack(void){
     for(int i=0;i<NUM_RACK_DIRECTORY_ENTRIES;i++){
         if(rack_lut[i].free){
+            log_i("got fresh rack %d", i);
             return(i);
         }
     }
@@ -796,22 +792,24 @@ size_t search_directory(struct wav_lu_t *data,  size_t num_used_entries, size_t 
     return(best_slot.start_block);
 }
 
-char* print_fs_json(){
+char *print_voice_json(int numVoice)
+{
+    cJSON *voice = add_voice_json(numVoice);
+    char* out = cJSON_PrintUnformatted(voice);
+    feedLoopWDT();
+    if(out == NULL){log_e("failed to print JSON");}
+    cJSON_Delete(voice);
+    return out;
+}
+
+char *print_config_json()
+{
     cJSON *j_RESPONSE_ROOT = cJSON_CreateObject();
     cJSON *j_metadata = cJSON_AddObjectToObject(j_RESPONSE_ROOT,"metadata");
-    cJSON *j_voices = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"voices");
     cJSON *j_firmwares = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"firmwares");
-    cJSON *j_websites = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"websites");
     cJSON *j_pin_config = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"pinConfig");
-    for(int j=0;j<NUM_VOICES;j++)
-    {
-        feedLoopWDT();
-        cJSON *voice = add_voice_json(j);
-        cJSON_AddItemToArray(j_voices, voice);
-    }
     add_metadata_json(j_metadata);
     add_firmware_json(j_firmwares);
-    add_website_json(j_websites);
     add_pin_config_json(j_pin_config);
 
     char* out = cJSON_PrintUnformatted(j_RESPONSE_ROOT);
@@ -820,6 +818,32 @@ char* print_fs_json(){
     cJSON_Delete(j_RESPONSE_ROOT);
     return out;
 }
+
+// char* print_fs_json(){
+//     cJSON *j_RESPONSE_ROOT = cJSON_CreateObject();
+//     cJSON *j_metadata = cJSON_AddObjectToObject(j_RESPONSE_ROOT,"metadata");
+//     cJSON *j_voices = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"voices");
+//     cJSON *j_firmwares = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"firmwares");
+//     cJSON *j_websites = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"websites");
+//     cJSON *j_pin_config = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"pinConfig");
+//     // for(int j=0;j<NUM_VOICES;j++)
+//     for(int j=0;j<1;j++)
+//     {
+//         feedLoopWDT();
+//         cJSON *voice = add_voice_json(j);
+//         cJSON_AddItemToArray(j_voices, voice);
+//     }
+//     add_metadata_json(j_metadata);
+//     add_firmware_json(j_firmwares);
+//     add_website_json(j_websites);
+//     add_pin_config_json(j_pin_config);
+
+//     char* out = cJSON_PrintUnformatted(j_RESPONSE_ROOT);
+//     feedLoopWDT();
+//     if(out == NULL){log_e("failed to print JSON");}
+//     cJSON_Delete(j_RESPONSE_ROOT);
+//     return out;
+// }
 
 cJSON* add_voice_json(uint8_t voice_num)
 {    
@@ -1091,7 +1115,6 @@ size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, si
 void updateVoiceConfig(char *json){
     feedLoopWDT();
     cJSON *vc_json = cJSON_Parse(json);
-    // free(json); // ??
     feedLoopWDT();
     cJSON *voice = NULL;
     cJSON *note = NULL;
@@ -1116,6 +1139,31 @@ void updateVoiceConfig(char *json){
             if(cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint >= 0)
             {
                 updateRackConfig(note);
+            } 
+            else if(cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint == -1)
+            {
+                if(voice_data[num_note].isRack > -1)
+                {
+                    // this is a non-rack overwritting a former rack
+                    clear_rack(voice_data[num_note].isRack);
+                    voice_data[num_note].isRack = -1;
+                }
+            }
+            if(voice_data[num_note].empty == 0 && cJSON_GetObjectItemCaseSensitive(note, "empty")->valueint == 1)
+            {
+                // this is a note that needs deleted
+                log_i("delete voice %d note %d", num_voice, num_note);
+                voice_data[num_note].empty = 1;
+                voice_data[num_note].length = 0;
+                voice_data[num_note].start_block = 0;
+                voice_data[num_note].isRack = -1;
+                voice_data[num_note].play_back_mode = ONE_SHOT;
+                voice_data[num_note].retrigger_mode = RETRIGGER;
+                voice_data[num_note].note_off_meaning = HALT;
+                voice_data[num_note].response_curve = RESPONSE_ROOT_SQUARE;
+                voice_data[num_note].priority = 0;
+                char *blank = "";
+                memcpy(voice_data[num_note].name, blank, 1);
             }
             num_note++;
         }
@@ -1162,9 +1210,19 @@ void updateRackConfig(cJSON *note){
     ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
     feedLoopWDT();
     free(buf);
-    // cJSON_Delete(point);
-    // cJSON_Delete(break_points);
-    // cJSON_Delete(rack);
+}
+
+void clear_rack(int isRack)
+{
+    log_i("clearing a rack that is being overwritten by a non-rack");
+    struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
+    if(buf == NULL){log_i("malloc rack_file_t buf failed");}
+    ESP_ERROR_CHECK(emmc_read(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+    buf[isRack].free = 1;
+    buf[isRack].num_layers = 0;
+    ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+    feedLoopWDT();
+    free(buf);
 }
 
 void updatePinConfig(cJSON *config){
@@ -1189,6 +1247,31 @@ void updatePinConfig(cJSON *config){
     wlog_i("wrote pin config to disk");
     cJSON_Delete(json);
 }
+
+// void deleteNote(int voice, int note)
+// {
+//     struct wav_file_t *voice_data = (struct wav_file_t*)ps_malloc(BLOCKS_PER_VOICE * SECTOR_SIZE);
+//     if(voice_data==NULL){log_e("not enough ram to alloc voice_data");}
+
+//     size_t voice_start_block = WAV_LUT_START_BLOCK + (BLOCKS_PER_VOICE * voice);
+//     ESP_ERROR_CHECK(emmc_read(voice_data, voice_start_block, BLOCKS_PER_VOICE));
+//     voice_data[note].empty = 1;
+//     ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
+//     if(voice_data[note].isRack > -1)
+//     {
+//         //its a rack so clear the rack data too
+//         struct rack_file_t *rack_data = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
+//         if(buf == NULL){log_i("malloc rack_file_t buf failed");}
+//         ESP_ERROR_CHECK(emmc_read(rack_data, RACK_DIRECTORY_START_BLOCK, RACK_DIRECTORY_BLOCKS));
+//         rack_data[voice_data[note].isRack].num_layers = 0;
+//         rack_data[voice_data[note].isRack].free = 1;
+//         char *blank = "";
+//         memcpy(rack_data[voice_data[note].isRack].name, blank, 1);
+//         ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+//         free(rack_data);
+//     };
+//     free(voice_data);
+// }
 
 void log_pin_config(void)
 {
@@ -1218,8 +1301,6 @@ void updateMetadata(cJSON *config){
     metadata.wlog_verbosity = cJSON_GetObjectItemCaseSensitive(json, "wLogVerbosity")->valueint;
     memcpy(&metadata.ssid,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring,20);
     memcpy(&metadata.passphrase,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring,20);
-    // metadata.ssid = cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring;
-    // metadata.passphrase = cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring;
     write_metadata(metadata);
     wlog_i("gv:%d scsp:%d rmsp:%d wso:%d wlv:%d",
         metadata.global_volume,
@@ -1277,42 +1358,5 @@ size_t getNumSectorsInEmmc(void)
 
 void getSector(size_t i, uint8_t *buf)
 {
-    // uint8_t *sector = (uint8_t*)ps_malloc(SECTOR_SIZE);
     emmc_read(buf, i, 1);
-    // return sector;
 }
-
-/**
- * file system starts empty.
- * when browser starts up, it receives JSON of the file system.
- * browser sorts the system into its order on disk.
- * when a file is added, browser takes its info and finds a spot for the file 
- * (trying not to overwrite files slated for deletion in this pass)
- * and modifys the file system accordingly.
- * when user hits UPLOAD, the browser sends the files one at a time, passing the start block as a header.
- * Waver writes the files to disk
- * the browser receives comfirmation that each file was uploaded successfully.
- * If all the files are successfully uploaded, then the browser sends the new filesystem as JSON.
- * WAVER receives, and decodes the JSON into its array of array of wav_file_t structs.
- * It writes this new fileSystem into memory at the location given by the system_metadata,
- * then it changes a flag in the metadata to indicate the current file_system location, 
- * which will be one of 2 possile locations,
- * which are fixed, dedicated memory blocks. It alternates back and forth each time.
- * then it send an OK response to the browser, and the browser reports that the upload was completed.
- * Now the browser marks the new file_system as the defacto one, and erases the old record.
-*/
-
-/**
- * FOR MIDI START SIGS
- * the midi task receives uart data, and parses the midi.
- * it then sends the midi_event_t(plus bank) struct via queue to the filesystem task.
- * the filesystem task finds the file to play, and sends the file info and the midi_event_t(plus bank) struct
- * to the wav_player task, indicating that it should start playing that file.
- * the wav_player task finds a free buffer and starts the playback, taking note of the midi_event_t (plus bank) struct,
- * and keeping a record that assiciates that file, buffer, and struct.
- * 
- * FOR MIDI STOP SIGS
- * the midi task receives uart data, and parses the midi.
- * it then sends the midi_event_t(plus bank) struct via queue directly to the wav_player task. ???
- * the wav_player task looks up the buffer that is running that file, and flags it to be cleared at the next pass.
-*/

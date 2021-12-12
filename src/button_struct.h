@@ -3,8 +3,6 @@
 #ifndef BUTTON_STRUCT_H
 #define BUTTON_STRUCT_H
 
-// #include "button.h"
-
 class Button;
 
 typedef struct {

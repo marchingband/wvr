@@ -42,7 +42,6 @@ static void gpioTask(void* x) {
     };
 }
 
-// void IRAM_ATTR isr(void *e){
 void isr(void *e){
     button_event_t *event = (button_event_t*)e;
     event->val = digitalRead(event->pin);
@@ -50,7 +49,6 @@ void isr(void *e){
     xQueueSendFromISR(gpio_queue_handle, &event, NULL);
 }
 
-// void IRAM_ATTR touch_isr(void *e){
 void touch_isr(void *e){
     button_event_t *event = (button_event_t*)e;
     uint32_t pad_intr = touch_pad_get_status();
@@ -71,7 +69,6 @@ Button::Button(int pin, int mode, int dbnc){
     this->pressed = false;
     event.pin = pin;
     event.button = this;
-    // gpio_reset_pin(gpioNumToGpioNum_T(pin));
 }
 
 Button::Button(int pin, int mode, int dbnc, bool touch){
@@ -85,7 +82,6 @@ Button::Button(int pin, int mode, int dbnc, bool touch){
     this->handleRelease = NULL;
     event.pin = pin;
     event.button = this;
-    // gpio_reset_pin(gpioNumToGpioNum_T(pin));
 }
 
 Button::~Button(){

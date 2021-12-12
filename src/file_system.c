@@ -467,27 +467,6 @@ struct wav_lu_t null_wav_file = {
     .length=0,
 };
 
-// struct wav_lu_t get_file_t_from_lookup_table(struct midi_event_t midi_event, int current_bank)
-// {
-//     struct wav_lu_t file = wav_lut[current_bank][midi_event.note];
-//     if(file.isRack == -1){
-//     // it is not a rack
-//         return(file);
-//     }
-//     struct rack_lu_t rack = rack_lut[file.isRack];
-//     if(midi_event.velocity < rack.break_points[0]){
-//     // is below the bottom threshold
-//         return(null_wav_file);
-//     }
-//     for(int i=1; i<rack.num_layers; i++){
-//         if(midi_event.velocity < rack.break_points[i]){
-//             return(rack.layers[i-1]);
-//         }
-//     }
-//     // its above the top threshold
-//     return(null_wav_file);
-// }
-
 struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_t velocity)
 {
     struct wav_lu_t file = wav_lut[voice][note];
@@ -819,32 +798,6 @@ char *print_config_json()
     return out;
 }
 
-// char* print_fs_json(){
-//     cJSON *j_RESPONSE_ROOT = cJSON_CreateObject();
-//     cJSON *j_metadata = cJSON_AddObjectToObject(j_RESPONSE_ROOT,"metadata");
-//     cJSON *j_voices = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"voices");
-//     cJSON *j_firmwares = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"firmwares");
-//     cJSON *j_websites = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"websites");
-//     cJSON *j_pin_config = cJSON_AddArrayToObject(j_RESPONSE_ROOT,"pinConfig");
-//     // for(int j=0;j<NUM_VOICES;j++)
-//     for(int j=0;j<1;j++)
-//     {
-//         feedLoopWDT();
-//         cJSON *voice = add_voice_json(j);
-//         cJSON_AddItemToArray(j_voices, voice);
-//     }
-//     add_metadata_json(j_metadata);
-//     add_firmware_json(j_firmwares);
-//     add_website_json(j_websites);
-//     add_pin_config_json(j_pin_config);
-
-//     char* out = cJSON_PrintUnformatted(j_RESPONSE_ROOT);
-//     feedLoopWDT();
-//     if(out == NULL){log_e("failed to print JSON");}
-//     cJSON_Delete(j_RESPONSE_ROOT);
-//     return out;
-// }
-
 cJSON* add_voice_json(uint8_t voice_num)
 {    
     struct wav_file_t *voice = (struct wav_file_t *)ps_malloc(NUM_NOTES * sizeof(struct wav_file_t));
@@ -866,8 +819,8 @@ cJSON* add_voice_json(uint8_t voice_num)
         if(ret==NULL){log_e("failed to make json isRack");continue;}
         ret = cJSON_AddNumberToObject(note, "empty", voice[j].empty);
         if(ret==NULL){log_e("failed to make json empty");continue;}
-        ret = cJSON_AddNumberToObject(note, "start_block", voice[j].start_block);
-        if(ret==NULL){log_e("failed to make json start block");continue;}
+        // ret = cJSON_AddNumberToObject(note, "start_block", voice[j].start_block);
+        // if(ret==NULL){log_e("failed to make json start block");continue;}
         ret = cJSON_AddNumberToObject(note, "size", voice[j].length);
         if(ret==NULL){log_e("failed to make json size");continue;}
         ret = cJSON_AddNumberToObject(note, "mode", voice[j].play_back_mode);
@@ -880,8 +833,9 @@ cJSON* add_voice_json(uint8_t voice_num)
         if(ret==NULL){log_e("failed to make json responseCurve");continue;}
         ret = cJSON_AddNumberToObject(note, "priority", voice[j].priority);
         if(ret==NULL){log_e("failed to make json priority");continue;}
-        if(voice[j].isRack != -1){
+        if(voice[j].isRack > -1){
             // its a rack
+            // log_i("rack %d",voice[j].isRack);
             struct rack_file_t rack_item = rack_files[voice[j].isRack];
             cJSON *rack = cJSON_CreateObject();
             if(rack==NULL){log_e("failed to make rack");continue;}
@@ -895,12 +849,12 @@ cJSON* add_voice_json(uint8_t voice_num)
                 if(note == NULL){log_e("unable to make note");continue;}
                 ret = cJSON_AddStringToObject(wav,"name",wav_file.name);
                 if(ret==NULL){log_e("failed to make json name");continue;}
-                ret = cJSON_AddNumberToObject(wav, "isRack", wav_file.isRack);
-                if(ret==NULL){log_e("failed to make json isRack");continue;}
+                // ret = cJSON_AddNumberToObject(wav, "isRack", wav_file.isRack);
+                // if(ret==NULL){log_e("failed to make json isRack");continue;}
                 ret = cJSON_AddNumberToObject(wav, "empty", wav_file.empty);
                 if(ret==NULL){log_e("failed to make json empty");continue;}
-                ret = cJSON_AddNumberToObject(wav, "start_block", wav_file.start_block);
-                if(ret==NULL){log_e("failed to make json start block");continue;}
+                // ret = cJSON_AddNumberToObject(wav, "start_block", wav_file.start_block);
+                // if(ret==NULL){log_e("failed to make json start block");continue;}
                 ret = cJSON_AddNumberToObject(wav, "size", wav_file.length);
                 if(ret==NULL){log_e("failed to make json size");continue;}
                 cJSON_AddItemToArray(layers,wav);
@@ -1079,13 +1033,13 @@ void close_website_to_emmc(char index){
     write_website_lut_to_disk();
 }
 
-uint8_t *buf;
-size_t bytes_read = 0;
-size_t sector;
-size_t bytes_left_in_sector;
-size_t pointer;
 
 size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, size_t total){
+    uint8_t *buf;
+    size_t bytes_read = 0;
+    size_t sector;
+    size_t bytes_left_in_sector;
+    size_t pointer;
     if(bytes_read==0){
         buf = (uint8_t *)ps_malloc(SECTOR_SIZE);
         sector = start_block;
@@ -1221,7 +1175,6 @@ void clear_rack(int isRack)
     buf[isRack].free = 1;
     buf[isRack].num_layers = 0;
     ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
-    feedLoopWDT();
     free(buf);
 }
 
@@ -1248,30 +1201,38 @@ void updatePinConfig(cJSON *config){
     cJSON_Delete(json);
 }
 
-// void deleteNote(int voice, int note)
-// {
-//     struct wav_file_t *voice_data = (struct wav_file_t*)ps_malloc(BLOCKS_PER_VOICE * SECTOR_SIZE);
-//     if(voice_data==NULL){log_e("not enough ram to alloc voice_data");}
-
-//     size_t voice_start_block = WAV_LUT_START_BLOCK + (BLOCKS_PER_VOICE * voice);
-//     ESP_ERROR_CHECK(emmc_read(voice_data, voice_start_block, BLOCKS_PER_VOICE));
-//     voice_data[note].empty = 1;
-//     ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
-//     if(voice_data[note].isRack > -1)
-//     {
-//         //its a rack so clear the rack data too
-//         struct rack_file_t *rack_data = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-//         if(buf == NULL){log_i("malloc rack_file_t buf failed");}
-//         ESP_ERROR_CHECK(emmc_read(rack_data, RACK_DIRECTORY_START_BLOCK, RACK_DIRECTORY_BLOCKS));
-//         rack_data[voice_data[note].isRack].num_layers = 0;
-//         rack_data[voice_data[note].isRack].free = 1;
-//         char *blank = "";
-//         memcpy(rack_data[voice_data[note].isRack].name, blank, 1);
-//         ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
-//         free(rack_data);
-//     };
-//     free(voice_data);
-// }
+void clean_up_rack_directory(void)
+{
+    bool used[128] = {false};
+    bool should_init_rack_lut = false;
+    for(int i=0; i<NUM_VOICES; i++)
+    {
+        for(int j=0; j<NUM_NOTES; j++)
+        {
+            if(wav_lut[i][j].empty == 0 && wav_lut[i][j].isRack > -1)
+            {
+                used[wav_lut[i][j].isRack] = true;
+            }
+        }
+    }
+    for(int i=0; i<128; i++)
+    {
+        if(used[i] == false)
+        {
+            if(rack_lut[i].free == false)
+            {
+                // it's unused but marked as not free
+                log_i("recovering rack %d", i);
+                clear_rack(i);
+                should_init_rack_lut = true;
+            }
+        }
+    }
+    if(should_init_rack_lut)
+    {
+        read_rack_lut_from_disk();
+    }
+}
 
 void log_pin_config(void)
 {

@@ -1,4 +1,3 @@
-#include "defines.h"
 #include "cJSON.h"
 #include "esp32-hal-log.h"
 #include "esp32-hal-cpu.h"
@@ -90,6 +89,8 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
 
   file_system_init();
   logSize("file system");
+
+  clean_up_rack_directory();
 
   int ret = check_for_recovery_mode();
   if(!ret && checkRecoveryModePin)

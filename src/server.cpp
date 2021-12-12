@@ -1,10 +1,5 @@
-// #define CONFIG_ASYNC_TCP_RUNNING_CORE 0
-// #define CONFIG_ASYNC_TCP_USE_WDT 0
-
-#include "defines.h"
 #include "Arduino.h"
 #include <esp_task_wdt.h>
-
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -12,7 +7,8 @@
 #include "esp_ota_ops.h"
 #include "esp_image_format.h"
 #include "driver/sdmmc_host.h"
-#include "wvr_ui.h"
+#include "html.h"
+#include "bundle.h"
 #include <string>
 #include "soc/rtc_wdt.h"
 #include "cJSON.h"
@@ -22,7 +18,6 @@
 #include "file_system.h"
 #include "server.h"
 
-// extern "C" char* print_fs_json();
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
 extern "C" esp_err_t close_wav_to_emmc(void);
@@ -87,18 +82,6 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       ws_root = cJSON_Parse((char *)data);
       on_rpc_in(ws_root);
     }
-  }
-}
-
-void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
-  if(!index){
-    Serial.println("UploadStart: " + filename);
-  }
-  for(size_t i=0; i<len; i++){
-    Serial.write(data[i]);
-  }
-  if(final){
-    Serial.println("UploadEnd: " + filename + "," + index+len);
   }
 }
 
@@ -378,6 +361,7 @@ void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, si
 }
 
 void handleVoiceJSON(AsyncWebServerRequest *request){
+  // wav_player_pause();
   int numVoice;
   AsyncWebHeader* voice_string = request->getHeader("voice");
   sscanf(voice_string->value().c_str(), "%d", &numVoice);
@@ -398,6 +382,7 @@ void handleVoiceJSON(AsyncWebServerRequest *request){
 }
 
 void handleConfigJSON(AsyncWebServerRequest *request){
+  // wav_player_resume();
   log_i("print_config_json()");
   char *json = print_config_json();
   log_i("done print_config_json");
@@ -485,27 +470,30 @@ void handleEmmcGUI(AsyncWebServerRequest *request){
 }
 
 void handleMain(AsyncWebServerRequest *request){
-  size_t size = sizeof(MAIN_page) / sizeof(char);
+  size_t size = sizeof(HTML) / sizeof(char);
   request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
     feedLoopWDT();
     size_t toWrite = min(size - index, maxLen);
-    memcpy(buffer, MAIN_page + index, toWrite);
+    memcpy(buffer, HTML + index, toWrite);
     return toWrite;
   });
 }
 
-// void handleDeleteNote(AsyncWebServerRequest *request){
-//   int numVoice;
-//   int numNote;
-//   AsyncWebHeader* voice_string = request->getHeader("voice");
-//   sscanf(voice_string->value().c_str(), "%d", &numVoice);
-//   AsyncWebHeader* note_string = request->getHeader("note");
-//   sscanf(note_string->value().c_str(), "%d", &numNote);
+void handleBundle(AsyncWebServerRequest *request){
 
-//   deleteNote(numVoice, numNote);
-
-//   request->send(200, "text/plain", "all done delete");
-// }
+  // size_t size = sizeof(BUNDLE) / sizeof(char);
+  // response->addHeader("Content-Encoding", "br");
+  // request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+  //   feedLoopWDT();
+  //   size_t toWrite = min(size - index, maxLen);
+  //   memcpy(buffer, BUNDLE + index, toWrite);
+  //   return toWrite;
+  // });
+  const char *type = "text/javascript";
+  AsyncWebServerResponse *response = request->beginResponse_P(200, type, BUNDLE, BUNDLE_LEN);
+  response->addHeader("Content-Encoding", "gzip");
+  request->send(response);
+}
 
 void handleRPC(AsyncWebServerRequest *request){
   cJSON* json = cJSON_Parse(request->getHeader("json")->value().c_str());
@@ -523,17 +511,6 @@ void handleBootFromEmmc(AsyncWebServerRequest *request){
   bootFromEmmc(index);
 }
 
-// void handleMulti(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
-//   if(!index){
-//     log_i("UploadStart: %s",filename.c_str());
-//   }
-//   log_i("%s",filename.c_str());
-//   if(final){
-//     request->send(204);
-//     log_i("done %s",filename.c_str());
-//   }
-// }
-
 void _server_pause(){
   ws.closeAll();
   server.end();
@@ -544,7 +521,6 @@ void server_begin() {
   Serial.println("Configuring access point...");
 
   WiFi.mode(WIFI_AP);
-
 
   IPAddress IP = IPAddress (192, 168, 5, 18);
   IPAddress gateway = IPAddress (192, 168, 5, 20);
@@ -566,6 +542,12 @@ void server_begin() {
     "/",
     HTTP_GET,
     handleMain
+  );
+
+  server.on(
+    "/bundle",
+    HTTP_GET,
+    handleBundle
   );
 
   server.on(
@@ -674,13 +656,6 @@ void server_begin() {
     handleBootFromEmmc
   );
 
-  // server.on(
-  //   "/multi",
-  //   HTTP_POST,
-  //   [](AsyncWebServerRequest *request){request->send(204);},
-  //   handleMulti
-  // );
-
   server.on(
     "/addrack",
     HTTP_POST,
@@ -710,13 +685,11 @@ bool get_wifi_is_on()
 }
 
 void server_pause(void){
-  // _server_pause();
   WiFi.mode(WIFI_OFF);
   wifi_is_on = false;
 }
 
 void server_resume(void){
-  // server_begin();
   WiFi.mode(WIFI_AP);
   wifi_is_on = true;
 }

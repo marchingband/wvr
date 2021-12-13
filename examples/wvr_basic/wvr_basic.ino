@@ -1,7 +1,6 @@
 #include <wvr_pins.h>
 #include <button_struct.h>
 #include <ws_log.h>
-#include <wvr_ui.h>
 #include <WVR.h>
 #include <midiXparser.h>
 #include <midi_in.h>

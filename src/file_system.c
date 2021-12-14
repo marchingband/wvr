@@ -1068,7 +1068,10 @@ size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, si
 
 void updateVoiceConfig(char *json){
     feedLoopWDT();
-    cJSON *vc_json = cJSON_Parse(json);
+    const cJSON *vc_json = cJSON_Parse(json);
+    if(vc_json == NULL){
+        log_i("voice json too big :(");
+    }
     feedLoopWDT();
     cJSON *voice = NULL;
     cJSON *note = NULL;
@@ -1099,6 +1102,7 @@ void updateVoiceConfig(char *json){
                 if(voice_data[num_note].isRack > -1)
                 {
                     // this is a non-rack overwritting a former rack
+                    log_i("deleting rack %d", voice_data[num_note].isRack);
                     clear_rack(voice_data[num_note].isRack);
                     voice_data[num_note].isRack = -1;
                 }

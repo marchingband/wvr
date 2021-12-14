@@ -320,6 +320,7 @@ int write_website_to_emmc(char slot, uint8_t *source, size_t size);
 void close_website_to_emmc(char index);
 cJSON* add_voice_json(uint8_t voice_num);
 void updateVoiceConfig(char *json);
+void updateSingleVoiceConfig(char *json, int num_voice);
 void add_metadata_json(cJSON * root);
 void add_firmware_json(cJSON * root);
 void add_website_json(cJSON * root);

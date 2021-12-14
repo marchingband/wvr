@@ -134,6 +134,7 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
 
 uint8_t *voice_config_json = NULL;
 
+
 void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(index==0){
     //start
@@ -160,6 +161,34 @@ void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size
     log_i("done updateVoiceConfig()");
     free(voice_config_json);
     log_i("done free");
+    feedLoopWDT();
+    //wav_player_resume();
+  }
+}
+
+void handleUpdateSingleVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+  static int num_voice = 0;
+  if(index==0){
+    //start
+    AsyncWebHeader* num_voice_string = request->getHeader("numVoice");
+    sscanf(num_voice_string->value().c_str(), "%d", &num_voice);
+    voice_config_json = (uint8_t*)ps_malloc(total + 1);
+    if(!voice_config_json){
+      log_i("failed to malloc for json");
+    }
+  }
+  //always
+  for(int i=0;i<len;i++){
+    voice_config_json[i + index] = data[i];
+  }
+  feedLoopWDT();
+  if(index + len == total){
+    //done
+    feedLoopWDT();
+    esp_task_wdt_feed();
+    request->send(200, "text/plain", "all done voice config update");
+    updateSingleVoiceConfig((char *)voice_config_json, num_voice);
+    free(voice_config_json);
     feedLoopWDT();
     //wav_player_resume();
   }
@@ -616,6 +645,14 @@ void server_begin() {
     [](AsyncWebServerRequest * request){request->send(204);},
     NULL,
     handleUpdateVoiceConfig
+  );
+
+  server.on(
+    "/updateSingleVoiceConfig",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleUpdateSingleVoiceConfig
   );
 
   server.on(

@@ -1067,6 +1067,7 @@ size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, si
     return will_write;
 }
 
+// depreciated
 void updateVoiceConfig(char *json){
     feedLoopWDT();
     const cJSON *vc_json = cJSON_Parse(json);
@@ -1176,8 +1177,9 @@ void updateSingleVoiceConfig(char *json, int num_voice){
             {
                 // this is a non-rack overwritting a former rack
                 log_i("deleting rack %d", voice_data[num_note].isRack);
-                clear_rack(voice_data[num_note].isRack);
                 voice_data[num_note].isRack = -1;
+                rack_data[voice_data[num_note].isRack].free = 1;
+                rack_data[voice_data[num_note].isRack].num_layers = 0;
             }
         }
         if(voice_data[num_note].empty == 0 && cJSON_GetObjectItemCaseSensitive(note, "empty")->valueint == 1)

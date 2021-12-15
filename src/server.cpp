@@ -187,7 +187,7 @@ void handleUpdateSingleVoiceConfig(AsyncWebServerRequest *request, uint8_t *data
     //done
     feedLoopWDT();
     // esp_task_wdt_feed();
-    request->send(200, "text/plain", "all done voice config update");
+    // request->send(200, "text/plain", "all done voice config update");
     updateSingleVoiceConfig((char *)voice_config_json, num_voice);
     free(voice_config_json);
     // feedLoopWDT();

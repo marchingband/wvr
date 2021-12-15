@@ -1150,9 +1150,12 @@ void updateSingleVoiceConfig(char *json, int num_voice){
     cJSON *note = NULL;
     struct wav_file_t *voice_data = (struct wav_file_t*)ps_malloc(BLOCKS_PER_VOICE * SECTOR_SIZE);
     if(voice_data==NULL){log_e("not enough ram to alloc voice_data");}
-    feedLoopWDT();
     size_t voice_start_block = WAV_LUT_START_BLOCK + (BLOCKS_PER_VOICE * num_voice);
     ESP_ERROR_CHECK(emmc_read(voice_data,voice_start_block,BLOCKS_PER_VOICE));
+    // read the rack data
+    struct rack_file_t *rack_data = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
+    if(rack_data == NULL){log_i("malloc rack_file_t buf failed");}
+    ESP_ERROR_CHECK(emmc_read(rack_data,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
     int num_note = 0;
     cJSON_ArrayForEach(note,vc_json)
     {
@@ -1165,7 +1168,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
         // is a rack, and not a new rack (would be -2)
         if(cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint >= 0)
         {
-            updateRackConfig(note);
+            updateRackConfig(note, rack_data);
         } 
         else if(cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint == -1)
         {
@@ -1198,25 +1201,27 @@ void updateSingleVoiceConfig(char *json, int num_voice){
     }
     feedLoopWDT();
     ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
+    ESP_ERROR_CHECK(emmc_write(rack_data,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
     feedLoopWDT();
     read_wav_lut_from_disk();
     feedLoopWDT();
     //cleanup
     cJSON_Delete(vc_json);
     free(voice_data);
+    free(rack_data);
 }
 
-void updateRackConfig(cJSON *note){
+void updateRackConfig(cJSON *note, struct rack_file_t *buf){
     int rack_num = cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint;
     cJSON *rack = cJSON_GetObjectItemCaseSensitive(note, "rack");
     cJSON *break_points = cJSON_GetObjectItemCaseSensitive(rack, "break_points");
     cJSON *point = NULL;
     // load up the rack file
-    struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-    if(buf == NULL){log_i("malloc rack_file_t buf failed");}
-    feedLoopWDT();
-    ESP_ERROR_CHECK(emmc_read(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
-    feedLoopWDT();
+    // struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
+    // if(buf == NULL){log_i("malloc rack_file_t buf failed");}
+    // feedLoopWDT();
+    // ESP_ERROR_CHECK(emmc_read(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+    // feedLoopWDT();
     struct rack_file_t rack_file = buf[rack_num];
     // set the data in the rack file
     rack_file.free = 0;
@@ -1234,9 +1239,6 @@ void updateRackConfig(cJSON *note){
     //write the rack file to disk
     buf[rack_num] = rack_file;
     feedLoopWDT();
-    ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
-    feedLoopWDT();
-    free(buf);
 }
 
 void clear_rack(int isRack)

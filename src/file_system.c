@@ -507,8 +507,8 @@ void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,siz
     voice_data[note].start_block = start_block;
     voice_data[note].length = size;
     voice_data[note].empty = 0;
-    bzero(voice_data[note].name,24);
-    strcpy(voice_data[note].name,name);
+    bzero(voice_data[note].name, 24);
+    strncpy(voice_data[note].name, name, 23);
     ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
     read_wav_lut_from_disk();
     free(voice_data);
@@ -564,13 +564,15 @@ void add_wav_to_rack(char* name, int rack_index, size_t start_block, size_t size
     wav_entry->start_block = start_block;
     wav_entry->length = size;
     wav_entry->isRack = -2; // is a rack member
-    memcpy(wav_entry->name,name,24);
+    bzero(wav_entry->name, 24);
+    strncpy(wav_entry->name, name, 23);
 
     // set all the config data for the rack even if its redundant
     struct rack_file_t rack = buf[rack_index];
     rack.free = 0;
     const cJSON *rack_name = cJSON_GetObjectItemCaseSensitive(json, "name");
-    memcpy(&rack.name,rack_name->valuestring,24);
+    bzero(&rack.name, 24);
+    strncpy(&rack.name, rack_name->valuestring, 23);
     const cJSON *break_points = cJSON_GetObjectItemCaseSensitive(json, "breakPoints");
     const cJSON *point = NULL;
     int layers = 0;
@@ -924,42 +926,42 @@ void add_website_json(cJSON *RESPONSE_ROOT){
 }
 
 // depreciated
-void get_voice_json(char *voice_json, uint8_t voice_num)
-{    
-    struct wav_file_t *voice = (struct wav_file_t *)ps_malloc(NUM_NOTES * sizeof(struct wav_file_t));
-    if(voice == NULL){log_e("failed to alloc for voice from file_system");}
-    ESP_ERROR_CHECK(emmc_read(
-            voice, 
-            WAV_LUT_START_BLOCK + (voice_num * BLOCKS_PER_VOICE), 
-            BLOCKS_PER_VOICE
-        ));
-    // log_i("making json");
-    cJSON *RESPONSE_ROOT = cJSON_CreateArray();
-    cJSON *ret;
-    if(RESPONSE_ROOT == NULL){log_e("unable to make RESPONSE_ROOT");}
-    for(int j=0;j<NUM_NOTES;j++)
-    {
-        cJSON *note = cJSON_CreateObject();
-        if(note == NULL){log_e("unable to make note");continue;}
-        ret = cJSON_AddStringToObject(note,"name",voice[j].name);
-        if(ret==NULL){log_e("failed to make json name");continue;}
-        ret = cJSON_AddNumberToObject(note, "isRack", voice[j].isRack);
-        if(ret==NULL){log_e("failed to make json isRack");continue;}
-        ret = cJSON_AddNumberToObject(note, "empty", voice[j].empty);
-        if(ret==NULL){log_e("failed to make json empty");continue;}
-        ret = cJSON_AddNumberToObject(note, "start_block", voice[j].start_block);
-        if(ret==NULL){log_e("failed to make json start block");continue;}
-        ret = cJSON_AddNumberToObject(note, "size", voice[j].length);
-        if(ret==NULL){log_e("failed to make json size");continue;}
-        cJSON_AddItemToArray(RESPONSE_ROOT, note);
-    }
-    char* out = cJSON_PrintUnformatted(RESPONSE_ROOT);
-    if(out == NULL){log_e("failed to print JSON");}
-    memcpy(voice_json,out,strnlen(out,10999)+1);
-    cJSON_Delete(RESPONSE_ROOT);
-    free(voice);
-    free(out);
-}
+// void get_voice_json(char *voice_json, uint8_t voice_num)
+// {    
+//     struct wav_file_t *voice = (struct wav_file_t *)ps_malloc(NUM_NOTES * sizeof(struct wav_file_t));
+//     if(voice == NULL){log_e("failed to alloc for voice from file_system");}
+//     ESP_ERROR_CHECK(emmc_read(
+//             voice, 
+//             WAV_LUT_START_BLOCK + (voice_num * BLOCKS_PER_VOICE), 
+//             BLOCKS_PER_VOICE
+//         ));
+//     // log_i("making json");
+//     cJSON *RESPONSE_ROOT = cJSON_CreateArray();
+//     cJSON *ret;
+//     if(RESPONSE_ROOT == NULL){log_e("unable to make RESPONSE_ROOT");}
+//     for(int j=0;j<NUM_NOTES;j++)
+//     {
+//         cJSON *note = cJSON_CreateObject();
+//         if(note == NULL){log_e("unable to make note");continue;}
+//         ret = cJSON_AddStringToObject(note,"name",voice[j].name);
+//         if(ret==NULL){log_e("failed to make json name");continue;}
+//         ret = cJSON_AddNumberToObject(note, "isRack", voice[j].isRack);
+//         if(ret==NULL){log_e("failed to make json isRack");continue;}
+//         ret = cJSON_AddNumberToObject(note, "empty", voice[j].empty);
+//         if(ret==NULL){log_e("failed to make json empty");continue;}
+//         ret = cJSON_AddNumberToObject(note, "start_block", voice[j].start_block);
+//         if(ret==NULL){log_e("failed to make json start block");continue;}
+//         ret = cJSON_AddNumberToObject(note, "size", voice[j].length);
+//         if(ret==NULL){log_e("failed to make json size");continue;}
+//         cJSON_AddItemToArray(RESPONSE_ROOT, note);
+//     }
+//     char* out = cJSON_PrintUnformatted(RESPONSE_ROOT);
+//     if(out == NULL){log_e("failed to print JSON");}
+//     memcpy(voice_json, out, strnlen(out,10999)+1);
+//     cJSON_Delete(RESPONSE_ROOT);
+//     free(voice);
+//     free(out);
+// }
 
 struct firmware_t recovery_firmware;
 
@@ -1032,7 +1034,6 @@ void close_website_to_emmc(char index){
     website_lut[index].corrupt = 0;
     write_website_lut_to_disk();
 }
-
 
 size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, size_t total){
     uint8_t *buf;
@@ -1218,7 +1219,8 @@ void updateRackConfig(cJSON *note){
     struct rack_file_t rack_file = buf[rack_num];
     // set the data in the rack file
     rack_file.free = 0;
-    memcpy(&rack_file.name, cJSON_GetObjectItemCaseSensitive(rack, "name")->valuestring,24);
+    bzero(&rack_file.name, 24);
+    strncpy(&rack_file.name, cJSON_GetObjectItemCaseSensitive(rack, "name")->valuestring, 23);
     // update the breakpoints and layer count
     int layer = 0;
     cJSON_ArrayForEach(point,break_points)

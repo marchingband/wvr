@@ -404,13 +404,15 @@ void handleVoiceJSON(AsyncWebServerRequest *request){
     feedLoopWDT();
     size_t toWrite = min(size - index, maxLen);
     memcpy(buffer, json + index, toWrite);
-    if(index + toWrite == size){
-      free(json);
-    }
+    // if(index + toWrite == size){
+    // }
     return toWrite;
   });
   response->addHeader("size",String(size));
+  feedLoopWDT();
   request->send(response);
+  free(json);
+  feedLoopWDT();
   // log_i("end : %d", ESP.getFreeHeap());
 }
 

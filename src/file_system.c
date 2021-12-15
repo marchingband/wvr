@@ -1081,9 +1081,11 @@ void updateSingleVoiceConfig(char *json, int num_voice){
     size_t voice_start_block = WAV_LUT_START_BLOCK + (BLOCKS_PER_VOICE * num_voice);
     ESP_ERROR_CHECK(emmc_read(voice_data,voice_start_block,BLOCKS_PER_VOICE));
     // read the rack data
-    struct rack_file_t *rack_data = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-    if(rack_data == NULL){log_i("malloc rack_file_t buf failed");}
-    ESP_ERROR_CHECK(emmc_read(rack_data,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+    struct rack_file_t *rack_data = NULL;
+    bool should_write_rack_lut = false;
+    // struct rack_file_t *rack_data = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
+    // if(rack_data == NULL){log_i("malloc rack_file_t buf failed");}
+    // ESP_ERROR_CHECK(emmc_read(rack_data,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
     int num_note = 0;
     cJSON_ArrayForEach(note,vc_json)
     {
@@ -1096,6 +1098,13 @@ void updateSingleVoiceConfig(char *json, int num_voice){
         // is a rack, and not a new rack (would be -2)
         if(cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint >= 0)
         {
+            if(rack_data == NULL)
+            {
+                rack_data = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
+                if(rack_data == NULL){log_i("malloc rack_file_t buf failed");}
+                ESP_ERROR_CHECK(emmc_read(rack_data,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+                should_write_rack_lut = true;
+            }
             updateRackConfig(note, rack_data);
         } 
         else if(cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint == -1)
@@ -1103,6 +1112,13 @@ void updateSingleVoiceConfig(char *json, int num_voice){
             if(voice_data[num_note].isRack > -1)
             {
                 // this is a non-rack overwritting a former rack
+                if(rack_data == NULL)
+                {
+                    rack_data = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
+                    if(rack_data == NULL){log_i("malloc rack_file_t buf failed");}
+                    ESP_ERROR_CHECK(emmc_read(rack_data,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+                    should_write_rack_lut = true;
+                }
                 log_i("deleting rack %d", voice_data[num_note].isRack);
                 rack_data[voice_data[num_note].isRack].free = 1;
                 rack_data[voice_data[num_note].isRack].num_layers = 0;
@@ -1130,14 +1146,18 @@ void updateSingleVoiceConfig(char *json, int num_voice){
     }
     feedLoopWDT();
     ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
-    ESP_ERROR_CHECK(emmc_write(rack_data,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+    if(should_write_rack_lut)
+    {
+        ESP_ERROR_CHECK(emmc_write(rack_data,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
+        free(rack_data);
+    }
     feedLoopWDT();
     read_wav_lut_from_disk();
     feedLoopWDT();
     //cleanup
     cJSON_Delete(vc_json);
     free(voice_data);
-    free(rack_data);
+    // free(rack_data);
 }
 
 void updateRackConfig(cJSON *note, struct rack_file_t *buf){

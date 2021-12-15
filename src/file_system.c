@@ -1067,81 +1067,8 @@ size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, si
     return will_write;
 }
 
-// depreciated
-void updateVoiceConfig(char *json){
-    feedLoopWDT();
-    const cJSON *vc_json = cJSON_Parse(json);
-    if(vc_json == NULL){
-        log_i("voice json too big :(");
-    }
-    feedLoopWDT();
-    cJSON *voice = NULL;
-    cJSON *note = NULL;
-    struct wav_file_t *voice_data = (struct wav_file_t*)ps_malloc(BLOCKS_PER_VOICE * SECTOR_SIZE);
-    if(voice_data==NULL){log_e("not enough ram to alloc voice_data");}
-    int num_voice = 0;
-    cJSON_ArrayForEach(voice,vc_json)
-    {
-        feedLoopWDT();
-        size_t voice_start_block = WAV_LUT_START_BLOCK + (BLOCKS_PER_VOICE * num_voice);
-        ESP_ERROR_CHECK(emmc_read(voice_data,voice_start_block,BLOCKS_PER_VOICE));
-        int num_note = 0;
-        cJSON_ArrayForEach(note,voice)
-        {
-            feedLoopWDT();
-            voice_data[num_note].play_back_mode = cJSON_GetObjectItemCaseSensitive(note, "mode")->valueint;
-            voice_data[num_note].retrigger_mode = cJSON_GetObjectItemCaseSensitive(note, "retrigger")->valueint;
-            voice_data[num_note].note_off_meaning = cJSON_GetObjectItemCaseSensitive(note, "noteOff")->valueint;
-            voice_data[num_note].response_curve = cJSON_GetObjectItemCaseSensitive(note, "responseCurve")->valueint;
-            voice_data[num_note].priority = cJSON_GetObjectItemCaseSensitive(note, "priority")->valueint;
-            // is a rack, and not a new rack (would be -2)
-            if(cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint >= 0)
-            {
-                updateRackConfig(note);
-            } 
-            else if(cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint == -1)
-            {
-                if(voice_data[num_note].isRack > -1)
-                {
-                    // this is a non-rack overwritting a former rack
-                    log_i("deleting rack %d", voice_data[num_note].isRack);
-                    clear_rack(voice_data[num_note].isRack);
-                    voice_data[num_note].isRack = -1;
-                }
-            }
-            if(voice_data[num_note].empty == 0 && cJSON_GetObjectItemCaseSensitive(note, "empty")->valueint == 1)
-            {
-                // this is a note that needs deleted
-                log_i("delete voice %d note %d", num_voice, num_note);
-                voice_data[num_note].empty = 1;
-                voice_data[num_note].length = 0;
-                voice_data[num_note].start_block = 0;
-                voice_data[num_note].isRack = -1;
-                voice_data[num_note].play_back_mode = ONE_SHOT;
-                voice_data[num_note].retrigger_mode = RETRIGGER;
-                voice_data[num_note].note_off_meaning = HALT;
-                voice_data[num_note].response_curve = RESPONSE_ROOT_SQUARE;
-                voice_data[num_note].priority = 0;
-                char *blank = "";
-                memcpy(voice_data[num_note].name, blank, 1);
-            }
-            num_note++;
-        }
-        feedLoopWDT();
-        ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
-        feedLoopWDT();
-        num_voice++;
-    }
-    wlog_i("done voice config update");
-    read_wav_lut_from_disk();
-    feedLoopWDT();
-    //cleanup
-    cJSON_Delete(vc_json);
-    free(voice_data);
-}
-
 void updateSingleVoiceConfig(char *json, int num_voice){
-    log_i("start update num_voice %d", num_voice);
+    //todo only read/write the rack_lut from eMMC if needed
     feedLoopWDT();
     const cJSON *vc_json = cJSON_Parse(json);
     if(vc_json == NULL){
@@ -1218,12 +1145,6 @@ void updateRackConfig(cJSON *note, struct rack_file_t *buf){
     cJSON *rack = cJSON_GetObjectItemCaseSensitive(note, "rack");
     cJSON *break_points = cJSON_GetObjectItemCaseSensitive(rack, "break_points");
     cJSON *point = NULL;
-    // load up the rack file
-    // struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-    // if(buf == NULL){log_i("malloc rack_file_t buf failed");}
-    // feedLoopWDT();
-    // ESP_ERROR_CHECK(emmc_read(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
-    // feedLoopWDT();
     struct rack_file_t rack_file = buf[rack_num];
     // set the data in the rack file
     rack_file.free = 0;
@@ -1238,7 +1159,6 @@ void updateRackConfig(cJSON *note, struct rack_file_t *buf){
         layer++;
     }
     rack_file.num_layers = layer - 1;
-    //write the rack file to disk
     buf[rack_num] = rack_file;
     feedLoopWDT();
 }

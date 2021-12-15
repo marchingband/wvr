@@ -156,7 +156,7 @@ void handleUpdateVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size
     feedLoopWDT();
     esp_task_wdt_feed();
     log_i("call updateVoiceConfig()");
-    request->send(200, "text/plain", "all done voice config update");
+    // request->send(200, "text/plain", "all done voice config update");
     updateVoiceConfig((char *)voice_config_json);
     log_i("done updateVoiceConfig()");
     free(voice_config_json);
@@ -187,7 +187,7 @@ void handleUpdateSingleVoiceConfig(AsyncWebServerRequest *request, uint8_t *data
     //done
     feedLoopWDT();
     esp_task_wdt_feed();
-    request->send(200, "text/plain", "all done voice config update");
+    // request->send(200, "text/plain", "all done voice config update");
     updateSingleVoiceConfig((char *)voice_config_json, num_voice);
     free(voice_config_json);
     feedLoopWDT();
@@ -217,7 +217,7 @@ void handleUpdatePinConfig(AsyncWebServerRequest *request, uint8_t *data, size_t
     //done
     updatePinConfig((char *)pin_config_json);
     free(pin_config_json);
-    request->send(200, "text/plain", "all done pin config update");
+    // request->send(200, "text/plain", "all done pin config update");
     //wav_player_resume();
   }
 }
@@ -242,7 +242,7 @@ void handleUpdateMetadata(AsyncWebServerRequest *request, uint8_t *data, size_t 
     //done
     updateMetadata((char *)metadata_json);
     free(metadata_json);
-    request->send(200, "text/plain", "all done pin config update");
+    // request->send(200, "text/plain", "all done pin config update");
     //wav_player_resume();
   }
 }
@@ -276,7 +276,7 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     //done
     close_wav_to_emmc();
     add_wav_to_file_system(&w_name[0],w_voice,w_note,w_start_block,total);
-    request->send(200, "text/plain", "done upload wav");
+    // request->send(200, "text/plain", "done upload wav");
     //wav_player_resume();
   }
 }
@@ -353,7 +353,7 @@ void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len
     log_i("done");
     log_i("wrote %u bytes",f_bytes_read);
     f_bytes_read = 0;
-    request->send(200, "text/plain", "all done firmware");
+    // request->send(200, "text/plain", "all done firmware");
     //wav_player_resume();
   }
 }
@@ -386,7 +386,7 @@ void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, si
     log_i("done");
     log_i("wrote %u bytes",rf_bytes_read);
     rf_bytes_read = 0;
-    request->send(200, "text/plain", "all done recovery firmware");
+    // request->send(200, "text/plain", "all done recovery firmware");
     //wav_player_resume();
   }
 }

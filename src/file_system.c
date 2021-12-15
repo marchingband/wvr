@@ -1192,6 +1192,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
             voice_data[num_note].priority = 0;
             char *blank = "";
             memcpy(voice_data[num_note].name, blank, 1);
+            feedLoopWDT();
         }
         num_note++;
     }

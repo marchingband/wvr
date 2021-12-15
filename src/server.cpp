@@ -170,6 +170,7 @@ void handleUpdateSingleVoiceConfig(AsyncWebServerRequest *request, uint8_t *data
   static int num_voice = 0;
   if(index==0){
     //start
+    // log_i("start free ram : %d",ESP.getFreeHeap());
     AsyncWebHeader* num_voice_string = request->getHeader("numVoice");
     sscanf(num_voice_string->value().c_str(), "%d", &num_voice);
     voice_config_json = (uint8_t*)ps_malloc(total + 1);
@@ -190,6 +191,7 @@ void handleUpdateSingleVoiceConfig(AsyncWebServerRequest *request, uint8_t *data
     updateSingleVoiceConfig((char *)voice_config_json, num_voice);
     free(voice_config_json);
     feedLoopWDT();
+    // log_i("end free ram : %d",ESP.getFreeHeap());
     //wav_player_resume();
   }
 }
@@ -392,6 +394,7 @@ void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, si
 void handleVoiceJSON(AsyncWebServerRequest *request){
   // wav_player_pause();
   int numVoice;
+  // log_i("start : %d", ESP.getFreeHeap());
   AsyncWebHeader* voice_string = request->getHeader("voice");
   sscanf(voice_string->value().c_str(), "%d", &numVoice);
   char *json = print_voice_json(numVoice);
@@ -408,6 +411,7 @@ void handleVoiceJSON(AsyncWebServerRequest *request){
   });
   response->addHeader("size",String(size));
   request->send(response);
+  // log_i("end : %d", ESP.getFreeHeap());
 }
 
 void handleConfigJSON(AsyncWebServerRequest *request){

@@ -1083,9 +1083,6 @@ void updateSingleVoiceConfig(char *json, int num_voice){
     // read the rack data
     struct rack_file_t *rack_data = NULL;
     bool should_write_rack_lut = false;
-    // struct rack_file_t *rack_data = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-    // if(rack_data == NULL){log_i("malloc rack_file_t buf failed");}
-    // ESP_ERROR_CHECK(emmc_read(rack_data,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
     int num_note = 0;
     cJSON_ArrayForEach(note,vc_json)
     {

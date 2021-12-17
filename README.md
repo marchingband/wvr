@@ -1,7 +1,7 @@
 # welcome to wvr
 
 Join us on the WVR Forum : https://groups.google.com/g/wvr-audio  
-Download the WVR schematics :  https://github.com/marchingband/wvr_hardware  
+Find the Pinnouts and Download the schematics for WVR :  https://github.com/marchingband/wvr_hardware  
 Binaries for all the WVR boards are here : https://github.com/marchingband/wvr_binaries  
 Code for the Web UI is here : https://github.com/marchingband/wvr_ui  
 Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_backpack  
@@ -14,6 +14,9 @@ Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_
 * * [understanding retrigger mode](#understanding-retrigger-mode)
 * * [understanding note off](#understanding-note-off)
 * [using racks](#using-racks)
+* [bulk uploading](#bulk-uploading)
+* [bulk uploading racks](#bulk-uploading-racks)
+* [pitch interpolation](#pitch-interpolation)
 * [using fx](#using-fx)
 * [global settings](#global-settings)
 * [firmware manager](#firmware-manager)
@@ -33,11 +36,11 @@ If you are going to upload custom firmware, please follow these steps to setup a
 * Create a folder on your computer where you will store firmwares for your WVR
 * download your firmwares, saving them to this new folder
 * first the safemode firmware, which is the same for all boards:
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.5/wvr_safemode.ino.bin  
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.9/wvr_safemode.ino.bin  
 * second the board specific firmware. navigate to :
 https://github.com/marchingband/wvr_binaries
 and find the folder for your board, download the .ino.bin file, which will be a link like:
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.5/wvr_basic.ino.bin  
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.9/wvr_basic.ino.bin  
 
 * Apply power to your WVR using a usb cable.
 * On a computer, join the wifi network **WVR**, using the password **12345678**
@@ -90,6 +93,15 @@ When a key is lifted on a piano, and likewise, when a pin on the WVR moves from 
 # using racks
 The term "rack" is our word for multi-sample functionality. With a traditional midi instrument, the sound engine responds to velocity data by modulating the **volume** of the sounds it produces. In a multi-sampled instrument, instead, the engine responds to velocity by playing a different sample, presumably a sample that reflects a lighter or heavier touch. In the case of a drum sample, the engine should have samples of the same drum being struck with various amounts of force, for example. To create a rack for a given note, click **create rack** in the UI. Next it's a good idea to name this rack, so hit **name rack** and enter a name. You should have all your samples prepared in advance, so next, hit **number of layers** and let WVR know how many samples you have for this rack. Be careful because changing this number in the future clears the data. The UI will automatically set "break points" evenly for each sample, but you can click any layer, and modify the break point if you like. The formula "< 50" you see in the UI indicates that this is the sample that will be triggered if the velocity is below 50, but above the break point for the previous layer. In other words this number sets the upper bound for this layer. You can still use FX while in Rack mode, but the same FX will be applied to all the layers.
 
+# bulk uploading files
+You can use **shift-click** and **command-click** to select regions of notes (and regions of racks). If you click **select files** while a range is selected, then the file dialog that comes up will allow you to select multiple files. The files you select will be sorted alphanumerically, and placed in order into the notes you have selected.
+
+# bulk uploading racks 
+If you **shift-click** on **select files** while a region of notes are selected, a special file upload dialog will appear, which allows you to select a **directory**. This function allows you to bulk upload some racks. The structure of the folder that you select must be organized in a very specific way. It must be a folder of sub-folders. Each subfolder represents a rack, and contains all the files for that rack. It will use the name of the subfolder for the name of the rack, and it will create as many slots as there are files. It will then sort all the folders, and all the files in all the folders alphanumerically, and place them into racks in the notes that you have selected.
+
+# pitch interpolation
+If you select a range of notes, and then **shift-command-click** a note, the note will turn red, and it becomes the **pitch interpolation target**. Click **select file** and select one file from the dialog. The selected file will be pitch interpolated across the range you have selected. The **pitch interpolation target** will maintain its pitch, and all the other notes you selected will be pitched up or down in relation to it. You can look at the **FX** tab to see how the algorithm has decided to pitch your notes.
+
 # using fx
 WVR uses the web browsers built-in audio engine to do a lot of work preparing samples before it sends audio data to the WVR. It converts any sample that you choose to a standard audio format of 44.1k 16bit stereo PCM. It also adds FX. Currently the WVR UI impliments Distortion, Reverb, Pitch Shift, Panning and Volume. These FX are rendered before being sent to WVR, so the processor on WVR doesn't need to do any extra signal processing. This does mean that the reverb and it's tail are hard coded into the sample. If you have a sample with reverb, you must set up the note to ignore note-off events, otherwise there will not be a reverb tail if the note off event occurs before the sound is finished playing. You cannot return to the UI later and modify the FX settings, after you have SYNC'd the data to WVR. To change the FX you would need to select the original sound file again from your computer, apply the FX in a new way, and hit SYNC again. Click **audition** to hear how the FX sound. Depending on your computer and web browser, this rendering process is sometimes buggy, it may freeze for a moment (or a few seconds) before playback begins.
 
@@ -109,7 +121,7 @@ Click **select binary** for the slot you want to use, and find the compiled bina
 * install the latest Arduino IDE
 * follow instructions online to install the ESP32 stuff : https://github.com/espressif/arduino-esp32
 * In the Arduino Boards manager, when you install the ESP32 board, please select version 1.0.6, which is **not** the default version. Versions 2.0.0 and 2.0.1 will not work with WVR currently.
-* donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.8
+* donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.9
 * create a folder called **libries** in your Arduino sketch folder and unzip the **WVR Arduno library** into that folder, so it should be Arduino/libraries/WVR/...
 * using the Arduino library manager, install **ADAFRUIT NEOPIXEL**
 * download https://github.com/me-no-dev/ESPAsyncWebServer and https://github.com/me-no-dev/AsyncTCP (click **CODE** -> **download zip**) and then unzip them into the **libraries** folder as well.

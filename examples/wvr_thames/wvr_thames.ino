@@ -31,7 +31,7 @@
 #define MIDI_PEDAL_HIHAT 44
 
 #define LED_FREQ 5000
-#define ENABLE_FTDI false
+#define ENABLE_FTDI true
 
 void setButtonFuncs(void);
 void setMidiFilter(void);
@@ -353,7 +353,7 @@ void setMidiFilter()
 
 void setup() {
   wvr.useFTDI = ENABLE_FTDI;
-  wvr.useUsbMidi = true;
+  wvr.useUsbMidi = false;
   // wvr.checkRecoveryModePin = false;
   wvr.begin();
 

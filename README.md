@@ -14,7 +14,7 @@ Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_
 * * [understanding retrigger mode](#understanding-retrigger-mode)
 * * [understanding note off](#understanding-note-off)
 * [using racks](#using-racks)
-* [bulk uploading](#bulk-uploading)
+* [bulk uploading files](#bulk-uploading-files)
 * [bulk uploading racks](#bulk-uploading-racks)
 * [pitch interpolation](#pitch-interpolation)
 * [using fx](#using-fx)

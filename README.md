@@ -1,7 +1,7 @@
 # welcome to wvr
 
 Join us on the WVR Forum : https://groups.google.com/g/wvr-audio  
-Find the Pinnouts and Download the schematics for WVR :  https://github.com/marchingband/wvr_hardware  
+Find the Pinouts and download the schematics for WVR :  https://github.com/marchingband/wvr_hardware  
 Binaries for all the WVR boards are here : https://github.com/marchingband/wvr_binaries  
 Code for the Web UI is here : https://github.com/marchingband/wvr_ui  
 Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_backpack  
@@ -40,7 +40,8 @@ https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.9/wvr_sa
 * second the board specific firmware. navigate to :
 https://github.com/marchingband/wvr_binaries
 and find the folder for your board, download the .ino.bin file, which will be a link like:
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.9/wvr_basic.ino.bin  
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.9/wvr_basic.ino.bin
+Choose the newest binary (currently v1.0.9)
 
 * Apply power to your WVR using a usb cable.
 * On a computer, join the wifi network **WVR**, using the password **12345678**
@@ -73,7 +74,7 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR,
 * if you click on **action** you can see all the possible ways to use these pin events. It can trigger a sound, but it can also do many other things.
 * **velocity** is the Midi term for volume, so, set this to the playback volume that you would like to result from events on this pin.
 * when you have everything set up the way you want, click on **sync**. this will upload your sounds to the WVR, and it will also send the configuration information. Nothing will actually change on the WVR untill you hit **sync**
-* wait for the sync to complete, you will get a popup uffering to refresh the browser. First reset the WVR by pressing the reset button on the WVR, then click **yes** and the browser will refresh. You will see your pin configs have updated, and your sounds are displayed in the sounds menu. Now when you press **audition** the sound will not play in the browser, it will play on the WVR.
+* wait for the sync to complete. You will see your pin configs have updated, and your sounds are displayed in the sounds menu. Now when you press **audition** the sound will not play in the browser, it will play on the WVR.
 * connect headphones or some line out to the WVR
 * using a wire (or a female jumper cable) connect the **GND** pin on the WVR to pin **D2**, and your sound should play.
 * Changes to the Pin Configuration will not take effect until you reset the WVR, so get in the habit of reseting your WVR as you make changes, after perforing a SYNC. WVR only takes a few seconds to boot and present WIFI, so it is not a real bottle neck in your workflow, your computer will not even notice that the network has been reset.

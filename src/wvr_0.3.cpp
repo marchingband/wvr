@@ -23,6 +23,7 @@ struct wav_lu_t **wav_lut;
 
 void server_begin(void);
 void server_pause(void);
+void recovery_server_begin(void);
 extern "C" void emmc_init(void);
 extern "C" void dac_init(void);
 extern "C" void midi_init(bool useUsbMidi);
@@ -72,7 +73,7 @@ void logRam(){
 
 struct metadata_t metadata;
 
-void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
+void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin, bool doRecoveryMode) {
   Serial.begin(115200);
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
@@ -83,6 +84,13 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
 	memoryHook.free_fn = free;
 	cJSON_InitHooks(&memoryHook);
   logSize("begin");
+
+  if(doRecoveryMode)
+  {
+      recovery_server_begin();
+      log_i("! WVR is in recovery mode !");
+      return;
+  }
 
   emmc_init();
   logSize("emmc");

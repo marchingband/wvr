@@ -8,6 +8,7 @@
 #include "esp_image_format.h"
 #include "driver/sdmmc_host.h"
 #include "html.h"
+#include "recovery_html.h"
 #include "bundle.h"
 #include <string>
 #include "soc/rtc_wdt.h"
@@ -482,6 +483,16 @@ void handleMain(AsyncWebServerRequest *request){
   });
 }
 
+void handleRecovery(AsyncWebServerRequest *request){
+  size_t size = sizeof(RECOVERY_HTML) / sizeof(char);
+  request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+    feedLoopWDT();
+    size_t toWrite = min(size - index, maxLen);
+    memcpy(buffer, RECOVERY_HTML + index, toWrite);
+    return toWrite;
+  });
+}
+
 void handleBundle(AsyncWebServerRequest *request){
 
   // size_t size = sizeof(BUNDLE) / sizeof(char);
@@ -683,6 +694,45 @@ void server_begin() {
 
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
+
+  server.begin();
+  Serial.println("Server started");
+}
+
+void recovery_server_begin() {
+  Serial.println("Configuring access point...");
+
+  WiFi.mode(WIFI_AP);
+
+  IPAddress IP = IPAddress (192, 168, 5, 18);
+  IPAddress gateway = IPAddress (192, 168, 5, 20);
+  IPAddress NMask = IPAddress (255, 255, 255, 0);
+
+  WiFi.softAPConfig(IP, gateway, NMask);
+
+  WiFi.softAP(metadata->ssid, metadata->passphrase);
+  log_i("set ssid :%s, set passphrase: %s",metadata->ssid, metadata->passphrase);
+ 
+  //  again??
+  WiFi.softAPConfig(IP, gateway, NMask);
+
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+
+  server.on(
+    "/",
+    HTTP_GET,
+    handleRecovery
+  );
+
+  server.on(
+    "/update",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleUpdate
+  );
 
   server.begin();
   Serial.println("Server started");

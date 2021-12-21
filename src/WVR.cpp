@@ -12,12 +12,13 @@ WVR::WVR()
     this->useFTDI = false;
     this->useUsbMidi = false;
     this->forceWifiOn = false;
+    this->doRecoveryMode = false;
     this->checkRecoveryModePin = true;
 }
 
 void WVR::begin()
 {
-    wvr_init(useFTDI, useUsbMidi, checkRecoveryModePin);
+    wvr_init(useFTDI, useUsbMidi, checkRecoveryModePin, doRecoveryMode);
 }
 
 void WVR::play(uint8_t voice, uint8_t note, uint8_t velocity)

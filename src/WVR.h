@@ -32,6 +32,7 @@ class WVR {
         bool useFTDI;
         bool useUsbMidi;
         bool forceWifiOn;
+        bool doRecoveryMode;
         bool checkRecoveryModePin;
 };
 

@@ -8,7 +8,6 @@
 #include "esp_image_format.h"
 #include "driver/sdmmc_host.h"
 #include "html.h"
-#include "recovery_html.h"
 #include "bundle.h"
 #include <string>
 #include "soc/rtc_wdt.h"
@@ -504,15 +503,15 @@ void handleMain(AsyncWebServerRequest *request){
   });
 }
 
-void handleRecovery(AsyncWebServerRequest *request){
-  size_t size = sizeof(RECOVERY_HTML) / sizeof(char);
-  request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-    feedLoopWDT();
-    size_t toWrite = min(size - index, maxLen);
-    memcpy(buffer, RECOVERY_HTML + index, toWrite);
-    return toWrite;
-  });
-}
+// void handleRecovery(AsyncWebServerRequest *request){
+//   size_t size = sizeof(RECOVERY_HTML) / sizeof(char);
+//   request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+//     feedLoopWDT();
+//     size_t toWrite = min(size - index, maxLen);
+//     memcpy(buffer, RECOVERY_HTML + index, toWrite);
+//     return toWrite;
+//   });
+// }
 
 void handleBundle(AsyncWebServerRequest *request){
 

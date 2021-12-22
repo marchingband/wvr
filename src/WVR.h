@@ -33,7 +33,6 @@ class WVR {
         bool useUsbMidi;
         bool forceWifiOn;
         bool checkRecoveryModePin;
-        bool doRecoveryMode;
 };
 
 #endif

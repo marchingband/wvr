@@ -47,7 +47,6 @@ void on_ws_connect(void){
   if(!done){
     done = 1;
     wlog_n("firmware version %s", VERSION_CODE);
-
     wlog_n("wlog_n");
     wlog_e("wlog_e");
     wlog_w("wlog_w");
@@ -72,7 +71,7 @@ void logRam(){
 
 struct metadata_t metadata;
 
-void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin, bool doRecoveryMode) {
+void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   Serial.begin(115200);
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
@@ -90,26 +89,16 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin, bool doR
   file_system_init();
   logSize("file system");
 
-  // if(doRecoveryMode)
-  // {
-  //     recovery_server_begin();
-  //     log_i("! WVR is in recovery mode !");
-  //     return;
-  // }
-
-  // int ret = check_for_recovery_mode();
-  // if(!ret)
-  // {
-  //     boot_into_recovery_mode();
-  // }
-
-  int ret = check_for_recovery_mode();
-  if(!ret)
+  if(checkRecoveryModePin)
   {
-      recovery_server_begin();
-      log_i("! WVR is in recovery mode !");
-      vTaskDelete(NULL);
-      return;
+    int ret = check_for_recovery_mode();
+    if(!ret)
+    {
+        recovery_server_begin();
+        log_i("! WVR is in recovery mode !");
+        vTaskDelete(NULL);
+        return;
+    }
   }
 
   clean_up_rack_directory();
@@ -143,19 +132,6 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin, bool doR
     server_pause();
   }
 
-  // encoder_init();
-  // pot_init();
-  // rgb_init();
-  // neopixel_test();
-
-
   log_pin_config();
-
-  // if(wvr->autoConfigPins)
-  // {
-  //   log_i("auto config pins");
-  // wvr_gpio_init();
-  // }
-
   logRam();
 }

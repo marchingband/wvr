@@ -9,6 +9,7 @@
 #include "driver/sdmmc_host.h"
 #include "html.h"
 #include "bundle.h"
+#include "favicon.h"
 #include <string>
 #include "soc/rtc_wdt.h"
 #include "cJSON.h"
@@ -514,18 +515,16 @@ void handleMain(AsyncWebServerRequest *request){
 // }
 
 void handleBundle(AsyncWebServerRequest *request){
-
-  // size_t size = sizeof(BUNDLE) / sizeof(char);
-  // response->addHeader("Content-Encoding", "br");
-  // request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-  //   feedLoopWDT();
-  //   size_t toWrite = min(size - index, maxLen);
-  //   memcpy(buffer, BUNDLE + index, toWrite);
-  //   return toWrite;
-  // });
   const char *type = "text/javascript";
   AsyncWebServerResponse *response = request->beginResponse_P(200, type, BUNDLE, BUNDLE_LEN);
   response->addHeader("Content-Encoding", "gzip");
+  request->send(response);
+}
+
+void handleFavicon(AsyncWebServerRequest *request){
+  const char *type = "image/x-icon";
+  AsyncWebServerResponse *response = request->beginResponse_P(200, type, FAVICON, sizeof(FAVICON));
+  // response->addHeader("Content-Encoding", "gzip");
   request->send(response);
 }
 
@@ -588,6 +587,12 @@ void server_begin() {
     "/bundle",
     HTTP_GET,
     handleBundle
+  );
+
+  server.on(
+    "/favicon.ico",
+    HTTP_GET,
+    handleFavicon
   );
 
   server.on(

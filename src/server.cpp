@@ -386,6 +386,26 @@ void handleVoiceJSON(AsyncWebServerRequest *request){
   // log_i("end : %d", ESP.getFreeHeap());
 }
 
+void handleRecoveryVoiceJSON(AsyncWebServerRequest *request){
+  char *json = "[]";
+  feedLoopWDT();
+  size_t size = strlen(json);
+  AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+    feedLoopWDT();
+    size_t toWrite = min(size - index, maxLen);
+    memcpy(buffer, json + index, toWrite);
+    // if(index + toWrite == size){
+    // }
+    return toWrite;
+  });
+  response->addHeader("size",String(size));
+  feedLoopWDT();
+  request->send(response);
+  // free(json);
+  feedLoopWDT();
+  // log_i("end : %d", ESP.getFreeHeap());
+}
+
 void handleConfigJSON(AsyncWebServerRequest *request){
   // wav_player_resume();
   log_i("print_config_json()");
@@ -727,10 +747,22 @@ void recovery_server_begin() {
   Serial.print("AP IP address: ");
   Serial.println(myIP);
 
+  // server.on(
+  //   "/",
+  //   HTTP_GET,
+  //   handleRecovery
+  // );
+
   server.on(
     "/",
     HTTP_GET,
-    handleRecovery
+    handleMain
+  );
+
+  server.on(
+    "/bundle",
+    HTTP_GET,
+    handleBundle
   );
 
   server.on(
@@ -745,6 +777,70 @@ void recovery_server_begin() {
     "/emmcReset",
     HTTP_GET,
     handleEmmcReset
+  );
+
+  server.on(
+    "/updatePinConfig",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleUpdatePinConfig
+  );
+
+  server.on(
+    "/updateMetadata",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleUpdateMetadata
+  );
+
+  server.on(
+    "/addfirmware",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleNewFirmware
+  );
+
+  server.on(
+    "/updaterecoveryfirmware",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleNewRecoveryFirmware
+  );
+
+  server.on(
+    "/bootFromEmmc",
+    HTTP_GET,
+    handleBootFromEmmc
+  );
+
+  server.on(
+    "/configjson",
+    HTTP_GET,
+    handleConfigJSON
+  );
+
+  server.on(
+    "/backupEMMC",
+    HTTP_GET,
+    handleBackupEMMC
+  );
+
+  server.on(
+    "/restoreEMMC",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleRestoreEMMC
+  );
+
+  server.on(
+    "/voicejson",
+    HTTP_GET,
+    handleRecoveryVoiceJSON
   );
 
   server.begin();

@@ -90,18 +90,26 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin, bool doR
   file_system_init();
   logSize("file system");
 
-  if(doRecoveryMode)
-  {
-      recovery_server_begin();
-      log_i("! WVR is in recovery mode !");
-      return;
-  }
+  // if(doRecoveryMode)
+  // {
+  //     recovery_server_begin();
+  //     log_i("! WVR is in recovery mode !");
+  //     return;
+  // }
 
+  // int ret = check_for_recovery_mode();
+  // if(!ret)
+  // {
+  //     boot_into_recovery_mode();
+  // }
 
   int ret = check_for_recovery_mode();
   if(!ret)
   {
-      boot_into_recovery_mode();
+      recovery_server_begin();
+      log_i("! WVR is in recovery mode !");
+      vTaskDelete(NULL);
+      return;
   }
 
   clean_up_rack_directory();

@@ -28,13 +28,12 @@ extern "C" void emmc_init(void);
 extern "C" void dac_init(void);
 extern "C" void midi_init(bool useUsbMidi);
 extern "C" void wav_player_start(void);
-// extern "C" void encoder_init(void);
 extern "C" void touch_test(void);
 extern "C" void pot_init(void);
 extern "C" void rpc_init(void);
 void bootFromEmmc(int index);
 void boot_into_recovery_mode(void);
-int check_for_recovery_mode(void);
+int check_for_recovery_mode();
 void dev_board_init();
 void rgb_init(void);
 void neopixel_test(void);
@@ -85,6 +84,12 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin, bool doR
 	cJSON_InitHooks(&memoryHook);
   logSize("begin");
 
+  emmc_init();
+  logSize("emmc");
+
+  file_system_init();
+  logSize("file system");
+
   if(doRecoveryMode)
   {
       recovery_server_begin();
@@ -92,23 +97,14 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin, bool doR
       return;
   }
 
-  emmc_init();
-  logSize("emmc");
-
-  file_system_init();
-  logSize("file system");
-
-  clean_up_rack_directory();
 
   int ret = check_for_recovery_mode();
-  if(!ret && checkRecoveryModePin)
+  if(!ret)
   {
-    boot_into_recovery_mode();
-    return;
+      boot_into_recovery_mode();
   }
 
-  // wvr->globalVolume = metadata.global_volume;
-  // log_i("set global volume : %d", wvr->globalVolume);
+  clean_up_rack_directory();
 
   dac_init();
   logSize("dac");

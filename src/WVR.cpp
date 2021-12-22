@@ -12,8 +12,8 @@ WVR::WVR()
     this->useFTDI = false;
     this->useUsbMidi = false;
     this->forceWifiOn = false;
-    this->doRecoveryMode = false;
     this->checkRecoveryModePin = true;
+    this->doRecoveryMode = false;
 }
 
 void WVR::begin()

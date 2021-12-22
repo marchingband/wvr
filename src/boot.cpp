@@ -122,7 +122,7 @@ void boot_into_recovery_mode(void)
     free(buf);
 }
 
-int check_for_recovery_mode(void)
+int check_for_recovery_mode()
 {
     metadata_t *new_metadata = get_metadata();
     if(!new_metadata->should_check_strapping_pin)

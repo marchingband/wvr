@@ -346,6 +346,7 @@ void close_restore_emmc();
 char *print_voice_json(int numVoice);
 char *print_config_json();
 void clean_up_rack_directory(void);
+void reset_emmc(void);
 
 #ifdef __cplusplus
 }

@@ -27,6 +27,7 @@ extern "C" size_t place_wav(struct lut_t *_data,  size_t num_data_entries, size_
 // extern "C" void updateVoiceConfig(char* json);
 extern "C" void updatePinConfig(char* json);
 extern "C" void updateMetadata(char* json);
+extern "C" void reset_emmc(void);
 extern "C" char* on_rpc_in(cJSON* json);
 extern "C" char* write_recovery_firmware_to_emmc(uint8_t* source, size_t size);
 extern "C" char* close_recovery_firmware_to_emmc(size_t recovery_firmware_size);
@@ -525,6 +526,12 @@ void handleBootFromEmmc(AsyncWebServerRequest *request){
   bootFromEmmc(index);
 }
 
+void handleEmmcReset(AsyncWebServerRequest *request){
+  //wav_player_pause();
+  reset_emmc();
+  request->send(204);
+}
+
 void _server_pause(){
   ws.closeAll();
   server.end();
@@ -732,6 +739,12 @@ void recovery_server_begin() {
     [](AsyncWebServerRequest * request){request->send(204);},
     NULL,
     handleUpdate
+  );
+
+  server.on(
+    "/emmcReset",
+    HTTP_GET,
+    handleEmmcReset
   );
 
   server.begin();

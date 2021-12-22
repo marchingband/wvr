@@ -1335,3 +1335,13 @@ void getSector(size_t i, uint8_t *buf)
 {
     emmc_read(buf, i, 1);
 }
+
+void reset_emmc(void)
+{
+    init_metadata();
+    init_wav_lut();
+    init_firmware_lut();
+    init_website_lut();
+    init_rack_lut();
+    init_pin_config_lut();
+}

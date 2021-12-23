@@ -237,6 +237,16 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     AsyncWebHeader* note_string = request->getHeader("note");
     sscanf(note_string->value().c_str(), "%d", &w_note);
     w_start_block = find_gap_in_file_system(w_size);
+    if(w_start_block == 0)
+    {
+      // error no mem
+      request->send(507);
+    }
+  }
+  if(w_start_block == 0)
+  {
+    feedLoopWDT();
+    return;
   }
   //always
   feedLoopWDT();
@@ -268,6 +278,16 @@ void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_
     sscanf(request->getHeader("layer")->value().c_str(), "%d", &r_layer);
     r_rack_json = request->getHeader("rack-json")->value().c_str();
     r_start_block = find_gap_in_file_system(total);
+    if(r_start_block == 0)
+    {
+      //error no mem
+      request->send(507);
+    }
+  }
+  if(r_start_block == 0)
+  {
+    feedLoopWDT();
+    return;
   }
   //always
   feedLoopWDT();
@@ -721,6 +741,12 @@ void server_begin() {
     "/rpc",
     HTTP_GET,
     handleRPC
+  );
+
+  server.on(
+    "/emmcReset",
+    HTTP_GET,
+    handleEmmcReset
   );
 
   ws.onEvent(onWsEvent);

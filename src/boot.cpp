@@ -25,6 +25,7 @@ void bootFromEmmc(int index)
     uint8_t *buf = (uint8_t *)ps_malloc(SECTOR_SIZE);
 
     log_i("starting update");
+    int loop_num = 0;
     for(int i=0;i<num_sectors;i++){
         feedLoopWDT();
         ESP_ERROR_CHECK(emmc_read(buf,sector++,1));
@@ -34,7 +35,10 @@ void bootFromEmmc(int index)
             Update.abort();
             break;
         } else {
-            printf(".");
+            if(loop_num++ % 20 == 0)
+            {
+                Serial.print(".");
+            }
         }
     }
     ESP_ERROR_CHECK(emmc_read(buf,sector++,1));
@@ -83,6 +87,7 @@ void boot_into_recovery_mode(void)
     uint8_t *buf = (uint8_t *)ps_malloc(SECTOR_SIZE);
 
     log_i("starting update");
+    int loop_num = 0;
     for(int i=0;i<num_sectors;i++){
         ESP_ERROR_CHECK(emmc_read(buf,sector++,1));
         size_t written = Update.write(buf, SECTOR_SIZE);
@@ -91,7 +96,10 @@ void boot_into_recovery_mode(void)
             Update.abort();
             break;
         } else {
-            printf(".");
+            if(loop_num++ % 20 == 0)
+            {
+                Serial.print(".");
+            }
         }
     }
     ESP_ERROR_CHECK(emmc_read(buf,sector++,1));

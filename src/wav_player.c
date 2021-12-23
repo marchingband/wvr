@@ -34,7 +34,7 @@ static const char* TAG = "wav_player";
 #define DAC_BUFFER_SIZE_IN_BYTES ( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t) ) 
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
 
-#define NUM_BUFFERS 18
+#define NUM_BUFFERS 19
 // #define NUM_BUFFERS 20
 
 #define DAMPEN_BITS 1
@@ -83,12 +83,14 @@ esp_err_t emmc_read(void *dst, size_t start_sector, size_t sector_count);
 
 // declare function prototypes from dac.c
 esp_err_t dac_write(const void *src, size_t size, size_t *bytes_written);
+esp_err_t dac_write_int(const void *src, size_t size, size_t *bytes_written);
 void dac_pause(void);
 void dac_resume(void);
 
 
 struct buf_t bufs[NUM_BUFFERS];
-int16_t *output_buf;
+int *output_buf;
+int16_t *output_buf_16;
 struct wav_player_event_t wav_player_event;
 int new_midi = 0;
 int new_midi_buf = -1;
@@ -102,10 +104,15 @@ int16_t tmp16;
 
 void init_buffs(void)
 {
-  output_buf = (int16_t *)malloc( DAC_BUFFER_SIZE_IN_BYTES );
+  output_buf = (int *)ps_malloc( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int) );
   if(output_buf==NULL)
   {
       log_e("failed to alloc output buf");
+  }
+  output_buf_16 = (int16_t *)malloc( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t) );
+  if(output_buf_16==NULL)
+  {
+      log_e("failed to alloc output buf 16");
   }
   for(uint8_t i=0; i<NUM_BUFFERS; i++)
   {
@@ -133,6 +140,7 @@ void init_buffs(void)
   for(int i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
   {
     output_buf[i]=0;
+    output_buf_16[i]=0;
   }
   log_i("%d buffers were initialized", NUM_BUFFERS);
 }
@@ -163,6 +171,12 @@ void init_float_lut(void)
 int16_t IRAM_ATTR scale_sample (int16_t in, uint8_t volume)
 {
   return (int16_t)(in * float_lut[volume]);
+}
+
+int16_t IRAM_ATTR scale_sample_clamped_16(int in, uint8_t volume)
+{
+  int16_t out = (in > MAX_INT_16) ? MAX_INT_16 : (in < MIN_INT_16) ? MIN_INT_16 : in;
+  return (int16_t)(out * float_lut[volume]);
 }
 
 int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t volume)
@@ -477,11 +491,13 @@ void wav_player_task(void* pvParameters)
             tmp16 = scale_sample(tmp16, 127 - bufs[i].fade);
           }
           // mix into master 
-          // output_buf[s] += ( tmp16 >> DAMPEN_BITS );
+          output_buf[s] += ( tmp16 >> DAMPEN_BITS );
           // mix into master clamped
-          int next = output_buf[s] + ( tmp16 >> DAMPEN_BITS );
-          // int16_t next_16 = (int16_t)(next > MAX_INT_16 ? MAX_INT_16 : next < MIN_INT_16 ? MIN_INT_16 : next);
-          output_buf[s] = (next > MAX_INT_16) ? MAX_INT_16 : (next < MIN_INT_16) ? MIN_INT_16 : next;
+
+          // int next = output_buf[s] + ( tmp16 >> DAMPEN_BITS );
+
+          // output_buf[s] = (next > MAX_INT_16) ? MAX_INT_16 : (next < MIN_INT_16) ? MIN_INT_16 : next;
+
           // fade
           if(bufs[i].fade > 0 && left && odd)
           {
@@ -540,27 +556,22 @@ void wav_player_task(void* pvParameters)
     }
 
     // apply the global volume and EQ
-    bool left = false; 
     for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
     {
-      left = !left;
-      output_buf[i] = scale_sample(output_buf[i], metadata.global_volume);
-      if(USE_EQ )
-      {
-        output_buf[i] = apply_EQ(output_buf[i], left);
-      }
+      output_buf_16[i] = scale_sample_clamped_16(output_buf[i], metadata.global_volume);
     }
     // apply the mute
     if(mute)
     {
       for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
       {
-        output_buf[i] = 0;
+        output_buf_16[i] = 0;
       }
     }
 
     // send to the DAC
-    ret = dac_write((int16_t *)output_buf, DAC_BUFFER_SIZE_IN_BYTES, &bytes_to_dma);
+    // ret = dac_write_int(output_buf, DAC_BUFFER_SIZE_IN_SAMPLES, &bytes_to_dma);
+    ret = dac_write(output_buf_16, DAC_BUFFER_SIZE_IN_BYTES, &bytes_to_dma);
     if(ret != ESP_OK){
       log_i("i2s write error %s", esp_err_to_name(ret));
     }
@@ -569,6 +580,7 @@ void wav_player_task(void* pvParameters)
     for(int i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
     {
       output_buf[i]=0;
+      output_buf_16[i]=0;
     }
 
     // clean up the finished buffers

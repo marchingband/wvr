@@ -27,6 +27,18 @@ esp_err_t dac_write(const void *src, size_t size, size_t *bytes_written)
   return(ret);
 }
 
+esp_err_t dac_write_int(int *src, size_t size, size_t *bytes_written)
+{
+  int16_t *out = (int16_t *)malloc(size * sizeof(int16_t));
+  for(int i=0;i<size;i++)
+  {
+    out[i] = (int16_t)src[i];
+  }
+  ret = i2s_write((i2s_port_t)i2s_num, (const void *)out,(size_t)(size * (sizeof(int16_t))), (size_t *)bytes_written, portMAX_DELAY);
+  free(out);
+  return(ret);
+}
+
 
 void dac_queue_handler_task(void* pvParameters)
 {

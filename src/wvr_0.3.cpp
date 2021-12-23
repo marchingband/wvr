@@ -75,6 +75,7 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   Serial.begin(115200);
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
+  log_i("cpu speed %d", ESP.getCpuFreqMHz());
   log_i("\nwvr starting up \n\n*** VERSION %s ***\n\n",VERSION_CODE);
 
   cJSON_Hooks memoryHook;

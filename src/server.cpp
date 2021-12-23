@@ -751,12 +751,6 @@ void recovery_server_begin() {
   Serial.print("AP IP address: ");
   Serial.println(myIP);
 
-  // server.on(
-  //   "/",
-  //   HTTP_GET,
-  //   handleRecovery
-  // );
-
   server.on(
     "/",
     HTTP_GET,
@@ -767,6 +761,12 @@ void recovery_server_begin() {
     "/bundle",
     HTTP_GET,
     handleBundle
+  );
+
+  server.on(
+    "/favicon.ico",
+    HTTP_GET,
+    handleFavicon
   );
 
   server.on(

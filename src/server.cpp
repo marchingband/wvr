@@ -18,6 +18,7 @@
 #include "server.h"
 #include "file_system.h"
 #include "server.h"
+#include "esp_wifi.h"
 
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
@@ -597,6 +598,13 @@ void server_begin() {
   Serial.print("AP IP address: ");
   Serial.println(myIP);
 
+  // set low power WiFi
+  ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(8));
+  int8_t power;
+  ESP_ERROR_CHECK(esp_wifi_get_max_tx_power(&power));
+  log_i("wifi power is %d", power);
+
+
   server.on(
     "/",
     HTTP_GET,
@@ -776,6 +784,12 @@ void recovery_server_begin() {
   IPAddress myIP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(myIP);
+
+  // set low power WiFi
+  ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(8));
+  int8_t power;
+  ESP_ERROR_CHECK(esp_wifi_get_max_tx_power(&power));
+  log_i("wifi power is %d", power);
 
   server.on(
     "/",

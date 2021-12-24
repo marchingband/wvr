@@ -35,7 +35,7 @@ static const char* TAG = "wav_player";
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
 
 #define NUM_BUFFERS 18
-// #define NUM_BUFFERS 20
+// #define NUM_BUFFERS 10
 
 #define DAMPEN_BITS 1
 #define LOG_PERFORMANCE 0
@@ -499,11 +499,14 @@ void wav_player_task(void* pvParameters)
           // output_buf[s] = (next > MAX_INT_16) ? MAX_INT_16 : (next < MIN_INT_16) ? MIN_INT_16 : next;
 
           // fade
+          // if(bufs[i].fade > 0)
           if(bufs[i].fade > 0 && left && odd)
           {
+            // if(bufs[i].fade < 126)
             if(bufs[i].fade < 127)
             {
               bufs[i].fade++;
+              // bufs[i].fade+=2;
             }
             else
             {
@@ -570,7 +573,6 @@ void wav_player_task(void* pvParameters)
     }
 
     // send to the DAC
-    // ret = dac_write_int(output_buf, DAC_BUFFER_SIZE_IN_SAMPLES, &bytes_to_dma);
     ret = dac_write(output_buf_16, DAC_BUFFER_SIZE_IN_BYTES, &bytes_to_dma);
     if(ret != ESP_OK){
       log_i("i2s write error %s", esp_err_to_name(ret));

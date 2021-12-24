@@ -488,7 +488,7 @@ struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_
             wav.retrigger_mode = wav_lut[voice][note].retrigger_mode;
             wav.note_off_meaning = wav_lut[voice][note].note_off_meaning;
             wav.response_curve = wav_lut[voice][note].response_curve;
-            // return(rack.layers[i-1]);
+            wav.priority = wav_lut[voice][note].priority;
             return wav;
         }
     }

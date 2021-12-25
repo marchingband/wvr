@@ -97,7 +97,7 @@ struct wav_player_event_t wav_player_event;
 int new_midi = 0;
 int new_midi_buf = -1;
 
-int16_t sqrtLUT[128];
+// int16_t sqrtLUT[128];
 float sqrt_float_LUT[128];
 float float_lut[128];
 
@@ -177,17 +177,18 @@ int16_t IRAM_ATTR scale_sample (int16_t in, uint8_t volume)
   return (int16_t)(in * float_lut[volume]);
 }
 
+int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t volume)
+{
+  // volume = volume < 0 ? 0 : volume;
+  return (int16_t)(in * sqrt_float_LUT[volume]);
+}
+
 int16_t IRAM_ATTR scale_sample_clamped_16(int in, uint8_t volume)
 {
   int16_t out = (in > MAX_INT_16) ? MAX_INT_16 : (in < MIN_INT_16) ? MIN_INT_16 : in;
   return (int16_t)(out * float_lut[volume]);
 }
 
-int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t volume)
-{
-  // volume = volume < 0 ? 0 : volume;
-  return (int16_t)(in * sqrt_float_LUT[volume]);
-}
 
 float eq_high = 1;
 float eq_low = 0;
@@ -500,10 +501,10 @@ void wav_player_task(void* pvParameters)
             tmp16 = scale_sample(buf_pointer[base_index + s], bufs[i].volume);
           }
           // apply PAN
-          if(USE_PAN)
-          {
-            tmp16 = scale_sample(tmp16, left ? left_vol : right_vol);
-          }
+          // if(USE_PAN)
+          // {
+          //   tmp16 = scale_sample(tmp16, left ? left_vol : right_vol);
+          // }
           // if(bufs[i].fade > 0)
           // {
           //   tmp16 = scale_sample(tmp16, 127 - bufs[i].fade);
@@ -522,12 +523,10 @@ void wav_player_task(void* pvParameters)
           if(bufs[i].fade > 0 && left && odd)
           {
             // if(bufs[i].fade < 127)
-            // if(bufs[i].fade < bufs[i].volume)
             if(bufs[i].volume > 0)
             {
               bufs[i].volume--;
               // bufs[i].fade++;
-              // bufs[i].fade+=2;
             }
             else
             {

@@ -53,7 +53,8 @@ enum edge {
 
 enum response_curve {
     RESPONSE_LINEAR,
-    RESPONSE_ROOT_SQUARE,
+    RESPONSE_SQUARE_ROOT,
+    RESPONSE_INV_SQUARE_ROOT,
     RESPONSE_FIXED
 };
 

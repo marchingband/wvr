@@ -96,10 +96,14 @@ struct wav_player_event_t wav_player_event;
 int new_midi = 0;
 int new_midi_buf = -1;
 
-float sqrt_float_lut[128];
-// uint8_t sqrt_lut[128];
-uint8_t nears[128];
-float float_lut[128];
+struct response_curve_t {
+  float val;
+  uint8_t fade_val;
+};
+
+struct response_curve_t lin_float_lut[128];
+struct response_curve_t sqrt_float_lut[128];
+struct response_curve_t inv_sqrt_float_lut[128];
 
 uint32_t tmp32;
 int16_t tmp16;
@@ -157,97 +161,91 @@ void free_bufs(void)
   }
 }
 
-void init_float_lut(void)
+void init_response_lut_fade_pair(struct response_curve_t *dest, struct response_curve_t *pair)
 {
   for(int i=0;i<128;i++)
   {
-    // float_lut
-    float num = (float)i/127.0;
-    float_lut[i] = num;
-    // sqrt_lut[i] = (uint8_t)sqrt(i * 128);
-    // sqrt_float_lut
-    float a = (float)sqrt(i * 127.0);
-    float b = a / 127;
-    sqrt_float_lut[i] = b;
-  }
-  // calculate the closest smaller float in the linear table for every sqrt, so we can linear fade starting from it.
-}
-
-void init_nearest_lut(void)
-{
-  for(int j=0;j<128;j++)
-  {
-    for(int k=0;k<127;k++)
+    for(int j=0;j<128;j++)
     {
-      if(float_lut[k+1] > sqrt_float_lut[j])
+      if(pair[j+1].val > dest[i].val)
       {
-        nears[j] = k;
+        dest[i].fade_val = j;
         break;
       }
+      if(j == 127)
+      {
+        dest[i].fade_val = j;
+      }
     }
-    nears[127] = 127;
-    // log_i("vol:%d sqr:%f lin:%f nearest:%d", j, sqrt_float_lut[j], float_lut[nears[j]], nears[j]);
   }
 }
+
+void convert_buf_linear(int num_buf)
+{
+  switch(bufs[num_buf].wav_data.response_curve){
+    case RESPONSE_SQUARE_ROOT:
+      bufs[num_buf].volume = sqrt_float_lut[bufs[num_buf].volume].fade_val;
+      break;
+    case RESPONSE_INV_SQUARE_ROOT:
+      bufs[num_buf].volume = inv_sqrt_float_lut[bufs[num_buf].volume].fade_val;
+      break;
+    default:
+      break;
+  }
+  bufs[num_buf].wav_data.response_curve = RESPONSE_LINEAR;
+}
+
+void init_linear_response_lut(void)
+{
+  for(int i=0;i<128;i++)
+  {
+    lin_float_lut[i].val = i/127.0;
+    lin_float_lut[i].fade_val = i;
+  }
+}
+
+void init_root_response_lut(void)
+{
+  for(int i=0;i<128;i++)
+  {
+    sqrt_float_lut[i].val = sqrt(i * 127.0)/127;
+  }
+  init_response_lut_fade_pair(sqrt_float_lut, lin_float_lut);
+}
+
+void init_inverse_root_response_lut(void)
+{
+  for(int i=0;i<128;i++)
+  {
+    inv_sqrt_float_lut[i].val = pow(i / 127.0, 2);
+  }
+  init_response_lut_fade_pair(inv_sqrt_float_lut, lin_float_lut);
+}
+
+// int16_t IRAM_ATTR scale_sample (int16_t in, float vol)
+// {
+//   return (int16_t)(in * vol);
+// }
 
 int16_t IRAM_ATTR scale_sample (int16_t in, uint8_t vol)
 {
-  return (int16_t)(in * float_lut[vol]);
+  return (int16_t)(in * lin_float_lut[vol].val);
 }
 
 int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t vol)
 {
-  return (int16_t)(in * sqrt_float_lut[vol]);
+  return (int16_t)(in * sqrt_float_lut[vol].val);
+}
+
+int16_t IRAM_ATTR scale_sample_inv_sqrt (int16_t in, uint8_t vol)
+{
+  return (int16_t)(in * inv_sqrt_float_lut[vol].val);
 }
 
 int16_t IRAM_ATTR scale_sample_clamped_16(int in, uint8_t volume)
 {
   int16_t out = (in > MAX_INT_16) ? MAX_INT_16 : (in < MIN_INT_16) ? MIN_INT_16 : in;
-  return (int16_t)(out * float_lut[volume]);
-}
-
-
-float eq_high = 1;
-float eq_low = 0;
-
-static float temp_low_L;
-static float temp_high_L;
-static float temp_low_R;
-static float temp_high_R;
-static float distanceToGo;
-static float trebleOnly;
-
-int16_t IRAM_ATTR apply_EQ(int16_t in, bool left)
-{
-  if(left)
-  {
-    // Treble calculations
-    distanceToGo = in - temp_low_L;
-    temp_low_L += distanceToGo * 0.125; // Number controls treble frequency
-    trebleOnly = in - temp_low_L;
-
-    // Bass calculations
-    distanceToGo = temp_low_L - temp_high_L;
-    temp_high_L += distanceToGo * 0.125; // Number controls bass frequency
-
-    return (int16_t)(temp_low_L + trebleOnly * eq_high + temp_high_L * eq_low);
-  }
-  else
-  {
-    // Treble calculations
-    distanceToGo = in - temp_low_R;
-    temp_low_R += distanceToGo * 0.125; // Number controls treble frequency
-    trebleOnly = in - temp_low_R;
-
-    // Bass calculations
-    distanceToGo = temp_low_R - temp_high_R;
-    temp_high_R += distanceToGo * 0.125; // Number controls bass frequency
-
-    return (int16_t)(temp_low_R + trebleOnly * eq_high + temp_high_R * eq_low);
-  }
-  // return (int16_t)(temp_low_R + trebleOnly * 1 + temp_high_R * 0);
-  // The "1" controls treble. 0 = none; 1 = untouched; 2 = +6db
-  // The "0" controls bass. -1 = none; 0 = untouched; 1 = +6db
+  return (int16_t)(out * lin_float_lut[volume].val);
 }
 
 void stop_wav(uint8_t voice, uint8_t note)
@@ -422,7 +420,6 @@ void wav_player_task(void* pvParameters)
             else
             {
               // its not a rack member or a fixed volume file
-              // bufs[i].volume = (new_wav.response_curve == RESPONSE_ROOT_SQUARE) ? sqrt_lut[wav_player_event.velocity] : wav_player_event.velocity;
               bufs[i].volume = wav_player_event.velocity;
               log_d("playing a non-rack memeber");
             }
@@ -492,25 +489,29 @@ void wav_player_task(void* pvParameters)
         for(int s=0; s<to_write; s++)
         {
           // apply volume
-          if(bufs[i].wav_data.response_curve == RESPONSE_ROOT_SQUARE)
-          {
-            tmp16 = scale_sample_sqrt(buf_pointer[base_index + s], bufs[i].volume);
-          }
-          else
-          {
-            tmp16 = scale_sample(buf_pointer[base_index + s], bufs[i].volume);
+          switch(bufs[i].wav_data.response_curve){
+            case RESPONSE_LINEAR:
+              tmp16 = scale_sample(buf_pointer[base_index + s], bufs[i].volume);
+              break;
+            case RESPONSE_SQUARE_ROOT:
+              tmp16 = scale_sample_sqrt(buf_pointer[base_index + s], bufs[i].volume);
+              break;
+            case RESPONSE_INV_SQUARE_ROOT:
+              tmp16 = scale_sample_inv_sqrt(buf_pointer[base_index + s], bufs[i].volume);
+              break;
+            default:
+              tmp16 = scale_sample(buf_pointer[base_index + s], bufs[i].volume);
+              break;
           }
           // mix into master 
           output_buf[s] += ( tmp16 >> DAMPEN_BITS );
           // do fading
           if( bufs[i].fade > 0 && ( s % 4 == 0 ))
           {
-            // look for new sqrt fades
-            if(bufs[i].wav_data.response_curve == RESPONSE_ROOT_SQUARE)
+            // look for new non-linear ones that are about to fade
+            if(bufs[i].wav_data.response_curve != RESPONSE_LINEAR)
             {
-              // switch it to a linear response for the fade, and set it to the nearest lower linear neighbor volume
-              bufs[i].wav_data.response_curve = RESPONSE_LINEAR;
-              bufs[i].volume = nears[bufs[i].volume];
+              convert_buf_linear(i);
             }
             else if(bufs[i].volume > 0)
             {
@@ -607,8 +608,9 @@ BaseType_t task_return;
 void wav_player_start(void)
 {
   init_buffs();
-  init_float_lut();
-  init_nearest_lut();
+  init_linear_response_lut();
+  init_root_response_lut();
+  init_inverse_root_response_lut();
   bool dmaablebuf = esp_ptr_dma_capable(output_buf_16);
   log_i( "dma capable output buf : %s", dmaablebuf ? "true" : "false");
   // task_return = xTaskCreatePinnedToCore(&wav_player_task, "wav_player_task", 1024 * 4, NULL, 10, &wav_player_task_handle, 0);

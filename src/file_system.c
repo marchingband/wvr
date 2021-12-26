@@ -227,7 +227,7 @@ void init_wav_lut(void){
             wav_lut[i][j].length=0;
             wav_lut[i][j].play_back_mode = ONE_SHOT;
             wav_lut[i][j].retrigger_mode = RETRIGGER;
-            wav_lut[i][j].response_curve = RESPONSE_ROOT_SQUARE;
+            wav_lut[i][j].response_curve = RESPONSE_SQUARE_ROOT;
             wav_lut[i][j].priority = 0;
             // wav_lut[i][j].edge=0;
         }
@@ -244,7 +244,7 @@ void init_wav_lut(void){
             voice[j].length=0;
             voice[j].play_back_mode = ONE_SHOT;
             voice[j].retrigger_mode = RETRIGGER;
-            voice[j].response_curve = RESPONSE_ROOT_SQUARE;
+            voice[j].response_curve = RESPONSE_SQUARE_ROOT;
             voice[j].priority = 0;
             memcpy(voice[j].name, blank, 1);
         }
@@ -1133,7 +1133,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
             voice_data[num_note].play_back_mode = ONE_SHOT;
             voice_data[num_note].retrigger_mode = RETRIGGER;
             voice_data[num_note].note_off_meaning = HALT;
-            voice_data[num_note].response_curve = RESPONSE_ROOT_SQUARE;
+            voice_data[num_note].response_curve = RESPONSE_SQUARE_ROOT;
             voice_data[num_note].priority = 0;
             char *blank = "";
             memcpy(voice_data[num_note].name, blank, 1);

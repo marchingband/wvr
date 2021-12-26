@@ -5,6 +5,7 @@
 #include "server.h"
 #include "file_system.h"
 #include "encoder.h"
+#include "midi_in.h"
 
 WVR::WVR()
 {
@@ -84,13 +85,13 @@ void WVR::resetPin(int pin)
     gpio_reset_pin(gpioNumToGpioNum_T(pin));
 }
 
-void WVR::getVoice(int channel)
+uint8_t WVR::getVoice(int channel)
 {
-    return channel_lut[channel];
+    return get_channel_lut()[channel];
 }
 
 void WVR::setVoice(int channel, int voice)
 {
-    channel_lut[channel] = (voice & 0b00001111);
+    get_channel_lut()[channel] = (voice & 0b00001111);
 }
 

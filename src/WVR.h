@@ -25,6 +25,8 @@ class WVR {
         void encoderInit(int encA, int encB);
         void onEncoder(void (*handleEncoder)(bool up));
         void resetPin(int pin);
+        uint8_t getVoice(int channel);
+        void setVoice(int channel, int voice);
         // int globalVolume;
         // bool mute;
         // bool autoConfigPins;

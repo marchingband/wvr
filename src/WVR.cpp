@@ -83,3 +83,14 @@ void WVR::resetPin(int pin)
 {
     gpio_reset_pin(gpioNumToGpioNum_T(pin));
 }
+
+void WVR::getVoice(int channel)
+{
+    return channel_lut[channel];
+}
+
+void WVR::setVoice(int channel, int voice)
+{
+    channel_lut[channel] = (voice & 0b00001111);
+}
+

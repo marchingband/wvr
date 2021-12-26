@@ -34,8 +34,8 @@ static const char* TAG = "wav_player";
 #define DAC_BUFFER_SIZE_IN_BYTES ( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t) ) 
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
 
-// #define NUM_BUFFERS 18
-#define NUM_BUFFERS 3
+#define NUM_BUFFERS 18
+// #define NUM_BUFFERS 3
 
 #define DAMPEN_BITS 1
 #define LOG_PERFORMANCE 0

@@ -487,7 +487,10 @@ void handleBackupEMMC(AsyncWebServerRequest *request){
     }
     return toWrite;
   });
-  response->addHeader("size",String(numBytes));
+  // response->addHeader("size",String(numBytes));
+  // response->addHeader("Content-Type","application/octet-stream");
+  // response->addHeader("Content-Disposition","attachment");
+  // response->addHeader("filename","picture.png");
   request->send(response);
 }
 
@@ -654,7 +657,7 @@ void server_begin() {
   );
 
   server.on(
-    "/backupEMMC",
+    "/wvr_emmc_backup.bin",
     HTTP_GET,
     handleBackupEMMC
   );

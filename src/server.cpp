@@ -778,8 +778,9 @@ void recovery_server_begin() {
 
   WiFi.softAPConfig(IP, gateway, NMask);
 
-  WiFi.softAP(metadata->ssid, metadata->passphrase);
-  log_i("set ssid :%s, set passphrase: %s",metadata->ssid, metadata->passphrase);
+  WiFi.softAP("WVR", "12345678");
+  log_i("recovery mode ssid :WVR, passphrase: 12345678");
+  log_i("normal mode wifi ssid is :%s, passphrase is: %s",metadata->ssid, metadata->passphrase);
  
   //  again??
   WiFi.softAPConfig(IP, gateway, NMask);

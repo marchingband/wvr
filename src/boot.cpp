@@ -141,6 +141,6 @@ int check_for_recovery_mode()
     gpio_reset_pin(gpio_pins[new_metadata->recovery_mode_straping_pin]);
     pinMode(wvr_pins[new_metadata->recovery_mode_straping_pin], INPUT_PULLUP);
     int res = digitalRead(wvr_pins[new_metadata->recovery_mode_straping_pin]);
-    log_i("strapping pin %d reads %d",new_metadata->recovery_mode_straping_pin,res);
+    log_i("recovery mode pin %d reads %s",new_metadata->recovery_mode_straping_pin, res ? "high" : "low");
     return res;
 }

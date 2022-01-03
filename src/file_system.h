@@ -104,8 +104,6 @@ struct metadata_t {
     uint8_t wifi_power;
 };
 
-// struct metadata_t metadata;
-
 struct wav_lu_t {
     size_t length;
     size_t start_block;
@@ -139,7 +137,6 @@ struct firmware_t {
     size_t length;
     size_t start_block;
     size_t index;
-    // size_t website_slot;
     uint8_t free;
     uint8_t corrupt;
 };
@@ -299,7 +296,6 @@ static struct pin_config_t default_pin_config_array[14] = {
 
 void file_system_init(void);
 void read_wav_lut_from_disk(void);
-// struct wav_lu_t get_file_t_from_lookup_table(struct midi_event_t midi_event, int current_bank);
 struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_t velocity);
 int try_read_metadata(void);
 void write_metadata(struct metadata_t m);
@@ -319,7 +315,6 @@ void close_firmware_to_emmc(char index);
 int write_website_to_emmc(char slot, uint8_t *source, size_t size);
 void close_website_to_emmc(char index);
 cJSON* add_voice_json(uint8_t voice_num);
-// void updateVoiceConfig(char *json);
 void updateSingleVoiceConfig(char *json, int num_voice);
 void add_metadata_json(cJSON * root);
 void add_firmware_json(cJSON * root);

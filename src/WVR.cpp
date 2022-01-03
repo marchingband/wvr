@@ -33,13 +33,17 @@ void WVR::stop(uint8_t voice, uint8_t note)
 
 void WVR::wifiOff()
 {
-    server_pause();
+    if(get_wifi_is_on() == 1){
+        server_pause();
+    }
     this->wifiIsOn = get_wifi_is_on();
 }
 
 void WVR::wifiOn()
 {
-    server_resume();
+    if(get_wifi_is_on() == 0){
+        server_resume();
+    }
     this->wifiIsOn = get_wifi_is_on();
 }
 

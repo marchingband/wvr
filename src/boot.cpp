@@ -60,7 +60,8 @@ void bootFromEmmc(int index)
             write_metadata(*new_metadata);
             sdmmc_host_deinit();
             feedLoopWDT();
-            // delay(1000);
+            delay(1000);
+            feedLoopWDT();
             ESP.restart();
         } else {
             log_e("Update.isFinished() : false");

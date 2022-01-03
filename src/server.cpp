@@ -118,9 +118,14 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
     if(Update.end()){
       if(Update.isFinished()){
         Serial.println("success\n\n");
+        metadata_t *new_metadata = get_metadata();
+        new_metadata->current_firmware_index = -1;
+        write_metadata(*new_metadata);
+        feedLoopWDT();
         request->send(204);
         sdmmc_host_deinit();
         delay(1000);
+        feedLoopWDT();
         ESP.restart();
       } else {
         request->send(500);
@@ -568,6 +573,14 @@ void handleBootFromEmmc(AsyncWebServerRequest *request){
   bootFromEmmc(index);
 }
 
+void handleDeleteFirmware(AsyncWebServerRequest *request){
+  char index = 0;
+  AsyncWebHeader* firmware_slot_string = request->getHeader("index");
+  sscanf(firmware_slot_string->value().c_str(), "%d", &index);
+  request->send(204);
+  delete_firmware(index);
+}
+
 void handleEmmcReset(AsyncWebServerRequest *request){
   //wav_player_pause();
   reset_emmc();
@@ -601,10 +614,11 @@ void server_begin() {
   Serial.print("AP IP address: ");
   Serial.println(myIP);
 
-  // set low power WiFi
-  ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(8));
-  int8_t power;
-  ESP_ERROR_CHECK(esp_wifi_get_max_tx_power(&power));
+  // set WiFi power
+  log_i("metadata wifiPower is %d",metadata->wifi_power);
+  int8_t power = metadata->wifi_power < 8 ? 8 : metadata->wifi_power;
+  esp_wifi_set_max_tx_power(power);
+  esp_wifi_get_max_tx_power(&power);
   log_i("wifi power is %d", power);
 
 
@@ -760,6 +774,13 @@ void server_begin() {
     handleEmmcReset
   );
 
+  server.on(
+    "/deleteFirmware",
+    HTTP_GET,
+    handleDeleteFirmware
+  );
+
+
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
 
@@ -883,6 +904,12 @@ void recovery_server_begin() {
     [](AsyncWebServerRequest * request){request->send(204);},
     NULL,
     handleRestoreEMMC
+  );
+
+  server.on(
+    "/deleteFirmware",
+    HTTP_GET,
+    handleDeleteFirmware
   );
 
   server.on(

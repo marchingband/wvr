@@ -196,6 +196,7 @@ void init_metadata(void){
         .should_check_strapping_pin = 1, // default to should check
         .global_volume = 127,
         .wlog_verbosity = 0,
+        .wifi_power = 8,
         .wifi_starts_on = 1,
         .ssid = "WVR",
         .passphrase = "12345678"
@@ -885,6 +886,7 @@ void add_metadata_json(cJSON * RESPONSE_ROOT){
     cJSON_AddNumberToObject(RESPONSE_ROOT,"recoveryModeStrappingPin",metadata.recovery_mode_straping_pin);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"globalVolume",metadata.global_volume);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wLogVerbosity",metadata.wlog_verbosity);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiPower",metadata.wifi_power);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiStartsOn",metadata.wifi_starts_on);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkName",metadata.ssid);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkPassword",metadata.passphrase);
@@ -1274,6 +1276,7 @@ void updateMetadata(cJSON *config){
     metadata.recovery_mode_straping_pin = cJSON_GetObjectItemCaseSensitive(json, "recoveryModeStrappingPin")->valueint;
     metadata.wifi_starts_on = cJSON_GetObjectItemCaseSensitive(json, "wifiStartsOn")->valueint;
     metadata.wlog_verbosity = cJSON_GetObjectItemCaseSensitive(json, "wLogVerbosity")->valueint;
+    metadata.wifi_power = cJSON_GetObjectItemCaseSensitive(json, "wifiPower")->valueint;
     memcpy(&metadata.ssid,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring,20);
     memcpy(&metadata.passphrase,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring,20);
     write_metadata(metadata);
@@ -1282,7 +1285,8 @@ void updateMetadata(cJSON *config){
         metadata.should_check_strapping_pin,
         metadata.recovery_mode_straping_pin,
         metadata.wifi_starts_on,
-        metadata.wlog_verbosity
+        metadata.wlog_verbosity,
+        metadata.wifi_power
     );
     wlog_i("updated and saved metadata");
     cJSON_Delete(json);
@@ -1344,4 +1348,18 @@ void reset_emmc(void)
     init_website_lut();
     init_rack_lut();
     init_pin_config_lut();
+}
+
+void delete_firmware(char index)
+{
+    firmware_lut[index].free = 1;
+    firmware_lut[index].length = 0;
+    bzero(firmware_lut[index].name, 24);
+    write_firmware_lut_to_disk(); 
+    log_i("deleted firmware in slot %d", index);
+    if(metadata.current_firmware_index == index)
+    {
+        metadata.current_firmware_index = -1;
+        write_metadata(metadata);
+    }
 }

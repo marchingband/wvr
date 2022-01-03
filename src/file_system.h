@@ -93,8 +93,6 @@ struct metadata_t {
     size_t num_websites;
     int current_firmware_index;
     int current_website_index;
-    // struct pin_config_t pin_config[14];
-    ///new
     size_t recovery_firmware_size;
     int recovery_mode_straping_pin;
     uint8_t global_volume;
@@ -103,6 +101,7 @@ struct metadata_t {
     uint8_t should_check_strapping_pin;
     char ssid[20];
     char passphrase[20];
+    uint8_t wifi_power;
 };
 
 // struct metadata_t metadata;
@@ -348,6 +347,7 @@ char *print_voice_json(int numVoice);
 char *print_config_json();
 void clean_up_rack_directory(void);
 void reset_emmc(void);
+void delete_firmware(char index);
 
 #ifdef __cplusplus
 }

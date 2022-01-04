@@ -59,6 +59,11 @@ void WVR::setGlobalVolume(uint8_t volume)
     set_global_volume(volume);
 }
 
+uint8_t WVR::getGlobalVolume(void)
+{
+    return get_global_volume();
+}
+
 void WVR::mute(void)
 {
     set_mute(true);
@@ -69,7 +74,7 @@ void WVR::unmute(void)
     set_mute(false);
 }
 
-void WVR::setMidiHook(uint8_t*(*fn)(uint8_t *in))
+void WVR::setMidiHook(void(*fn)(uint8_t *in))
 {
     set_midi_hook(fn);
 }

@@ -36,9 +36,9 @@ Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_
 # powering wvr
 
 * **wvr basic** : plug in usb, or apply 5v and ground, or 3.3v and ground, to the power pins
-* **wvr makers board** : plug in usb (will not power amp), use a center-negative 9v PSU (boss style) or apply somewhere between 5v and 9v and ground to the VIN pins
-* **wvr dev board** : plug in usb, use a center-negative 9v PSU (boss style) or apply somewhere between 5v and 9v and ground to the VIN pins
-* **thames** : use a center-negative 9v PSU (boss style)
+* **wvr makers board** : plug in usb (will not power amp), use a center-negative 9v PSU (Boss style) or apply somewhere between 6v and 9v (and ground) to the VIN pins
+* **wvr dev board** : plug in usb, use a center-negative 9v PSU (Boss style) or apply somewhere between 6v and 9v and ground to the VIN pins
+* **thames** : use a center-negative 9v PSU (Boss style)
 * **usb host backpack** : The backpack is powered by the WVR, so if WVR is on, the backpack is also on. When updating firmware on the backpack, plug in the usb micro port on the backpack **instead of** powering the WVR. It has its 5v line connected to the WVR 5v pin. WVR takes this 5v line, passes it to the LDO, and passes 3.3v back to power the backpack. The 5v pin on the USB host port is also connected to the WVR 5v pin, so it can power whatever is plugged into it, adding some capacitance to meet the USB spec.
 
 # updating firmware

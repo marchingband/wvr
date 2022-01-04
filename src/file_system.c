@@ -175,6 +175,11 @@ void set_global_volume(uint8_t vol)
     metadata.global_volume = vol;
 }
 
+uint8_t get_global_volume(void)
+{
+    return metadata.global_volume;
+}
+
 void write_metadata(struct metadata_t m){
     struct metadata_t *buf = (struct metadata_t *)ps_malloc(SECTOR_SIZE * METADATA_SIZE_IN_BLOCKS);
     buf[0] = m;

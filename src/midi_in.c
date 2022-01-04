@@ -34,7 +34,7 @@ struct wav_player_event_t wav_player_event;
 uint8_t *msg;
 uint8_t *usb_msg;
 
-uint8_t*(*midi_hook)(uint8_t *in);
+void(*midi_hook)(uint8_t *in);
 
 void init_gpio()
 {
@@ -126,7 +126,7 @@ static void read_uart_task()
                     if(msg)
                     {
                         // send it through the midi filter hook
-                        msg = midi_hook(msg);
+                        midi_hook(msg);
                     }
                     if(msg)
                     {
@@ -267,7 +267,7 @@ static void read_usb_uart_task()
                     if(usb_msg)
                     {
                         // send it through the midi filter hook
-                        usb_msg = midi_hook(usb_msg);
+                        midi_hook(usb_msg);
                     }
                     if(usb_msg)
                     {
@@ -398,12 +398,12 @@ void midi_init(bool useUsbMidi)
     // xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", 4096, NULL, 3, NULL, 1);
 }
 
-uint8_t* midi_hook_default(uint8_t* in)
+void midi_hook_default(uint8_t* in)
 {
-    return in;
+    return;
 }
 
-void set_midi_hook(uint8_t*(*fn)(uint8_t *in))
+void set_midi_hook(void(*fn)(uint8_t *in))
 {
     midi_hook = fn;
 }

@@ -5,10 +5,23 @@
 #include "esp_system.h"
 #include "file_system.h"
 #include "wvr_pins.h"
+#include <esp_task_wdt.h>
+#include "soc/rtc_wdt.h"
+
 
 extern "C" esp_err_t emmc_read(void *dst, size_t start_sector, size_t sector_count);
 extern "C" struct metadata_t *get_metadata(void);
 extern "C" void write_metadata(struct metadata_t m);
+
+void force_reset(void)
+{
+// use the watchdog timer to do a hard restart
+// It sets the wdt to 1 second, adds the current process and then starts an
+// infinite loop.
+  esp_task_wdt_init(1, true);
+  esp_task_wdt_add(NULL);
+  while(true);  // wait for watchdog timer to be triggered
+}
 
 void bootFromEmmc(int index)
 {
@@ -63,6 +76,7 @@ void bootFromEmmc(int index)
             delay(1000);
             feedLoopWDT();
             ESP.restart();
+            force_reset();
         } else {
             log_e("Update.isFinished() : false");
         }

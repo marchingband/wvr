@@ -126,6 +126,7 @@ static void read_uart_task()
                     if(msg)
                     {
                         // send it through the midi filter hook
+                        log_i("midi %d %d %d",msg[0],msg[1],msg[2]);
                         midi_hook(msg);
                     }
                     if(msg)
@@ -144,14 +145,14 @@ static void read_uart_task()
                                 wav_player_event.velocity = msg[2]  & 0b01111111;
                                 wav_player_event.channel = channel;
                                 xQueueSendToBack(wav_player_queue,(void *) &wav_player_event, portMAX_DELAY);                  
-                                // log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
-                                //     i,
-                                //     wav_player_event.note,
-                                //     wav_player_event.velocity,
-                                //     wav_player_event.channel,
-                                //     wav_player_event.voice,
-                                //     wav_player_event.code
-                                // );
+                                log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
+                                    i,
+                                    wav_player_event.note,
+                                    wav_player_event.velocity,
+                                    wav_player_event.channel,
+                                    wav_player_event.voice,
+                                    wav_player_event.code
+                                );
                             }
                             break;
                         case MIDI_PROGRAM_CHANGE:

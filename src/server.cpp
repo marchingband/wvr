@@ -19,6 +19,7 @@
 #include "file_system.h"
 #include "server.h"
 #include "esp_wifi.h"
+#include "boot.h"
 
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
@@ -127,6 +128,7 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
         delay(1000);
         feedLoopWDT();
         ESP.restart();
+        force_reset();
       } else {
         request->send(500);
         Serial.println("not finished");

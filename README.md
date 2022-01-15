@@ -5,6 +5,7 @@ Find the Pinouts and download the schematics for WVR :  https://github.com/march
 Binaries for all the WVR boards are here : https://github.com/marchingband/wvr_binaries  
 Code for the Web UI is here : https://github.com/marchingband/wvr_ui  
 Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_backpack  
+If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/wvr_thames
 
 * [getting started](#getting-started)
 * [playing sounds](#playing-sounds)

@@ -1,7 +1,10 @@
+#include "Arduino.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <wvr_pins.h>
 #include <button_struct.h>
 #include <ws_log.h>
-#include <WVR.h>
+#include <wvr.h>
 #include <midiXparser.h>
 #include <midi_in.h>
 #include <wav_player.h>
@@ -12,26 +15,26 @@
 #include <gpio.h>
 #include "rgb.h"
 
-#define KICK 35
-#define SNARE 38
-#define LOW_TOM 41
-#define HIHAT_CLOSED 42
-#define HIHAT_PEDAL 44
-#define HIHAT_OPEN 46
-#define CRASH 49
-#define HI_TOM 50
-#define RIDE 51
+#define KICK 40
+#define SNARE 41
+#define HI_TOM 42
+#define LOW_TOM 43
+#define RIDE 44
+#define BELL 45
+#define CRASH 46
+#define HIHAT_CLOSED 47
+#define HIHAT_OPEN 48
+#define HIHAT_PEDAL 49
+#define SNARE_CROSS 49
 
 #define LED1 D3
 #define LED2 D11
 #define LED3 D1
 #define LED4 D0
 
-#define MIDI_KICK 35
-#define MIDI_PEDAL_HIHAT 44
-
 #define LED_FREQ 5000
-#define ENABLE_FTDI true
+#define ENABLE_FTDI false
+// #define ENABLE_FTDI true
 
 void setButtonFuncs(void);
 void setMidiFilter(void);
@@ -43,16 +46,12 @@ Button *StompB;
 Button *EncButton;
 
 bool encPushed = false;
-uint8_t volume = 127;
-uint8_t voice = 0;
-
 bool hold = false;
 bool held[127] = {false};
 bool damp = false;
 bool hihatOpen = false;
 
-void gpioInit(void)
-{
+void gpioInit(void){
   wvr.resetPin(D4);
   wvr.resetPin(D5);
   wvr.resetPin(D6);
@@ -86,16 +85,15 @@ void gpioInit(void)
   ledcAttachPin(LED4, 3);
 }
 
-void writeBinaryToLEDs(uint8_t num)
-{
+void writeBinaryToLEDs(uint8_t num){
   ledcWrite(0, (num & (0x01 << 0)) ? 255 : 0);
   ledcWrite(1, (num & (0x01 << 1)) ? 255 : 0);
   ledcWrite(2, (num & (0x01 << 2)) ? 255 : 0);
   ledcWrite(3, (num & (0x01 << 3)) ? 255 : 0);
 }
 
-void writeVolumeToLEDs(void)
-{
+void writeVolumeToLEDs(void){
+  int volume = wvr.getGlobalVolume();
   int led_1 = (volume > 32) ? 255 : (volume * 8);
   int led_2 = (volume > 64) ? 255 : (volume < 32) ? 0 : ((volume - 32) * 8);
   int led_3 = (volume > 96) ? 255 : (volume < 64) ? 0 : ((volume - 64) * 8);
@@ -106,33 +104,28 @@ void writeVolumeToLEDs(void)
   ledcWrite(3, led_4);
 }
 
-void onEncoderThames(bool down)
-{
-  if(down)
-  {
-    if(encPushed)
-    {
+void onEncoderThames(bool down){
+  int volume = wvr.getGlobalVolume();
+  if(down){
+    if(encPushed){
+      int voice = wvr.getVoice(0);
       voice -= (voice > 0);
+      wvr.setVoice(0, voice);
       writeBinaryToLEDs(voice);
       setButtonFuncs();
       setMidiFilter();
-    }
-    else
-    {
+    } else {
       volume -= (volume > 0);
       wvr.setGlobalVolume(volume);
       writeVolumeToLEDs();
     }
-  } 
-  else
-  {
-    if(encPushed)
-    {
+  } else {
+    if(encPushed){
+      int voice = wvr.getVoice(0);
       voice += (voice < 15);
-      writeBinaryToLEDs(encPushed ? voice : (volume / 8));
-    }
-    else
-    {
+      wvr.setVoice(0, voice);
+      writeBinaryToLEDs(voice);
+    } else {
       volume += (volume < 126);
       wvr.setGlobalVolume(volume);
       writeVolumeToLEDs();
@@ -140,82 +133,59 @@ void onEncoderThames(bool down)
   }
   setButtonFuncs();
   setMidiFilter();
-  // writeBinaryToLEDs(encPushed ? voice : (volume / 8));
-  // wlog_i("%d", down ? --cnt : ++cnt);
 }
 
-void handleReleaseStompADrums(void)
-{
+void handleReleaseStompADrums(void){
   hihatOpen = true;
 }
 
-void handlePressStompADrums(void)
-{
-  // wvr.play(voice, MIDI_PEDAL_HIHAT, 127);
-  wvr.stop(0, HIHAT_OPEN);
-  wvr.play(0, HIHAT_PEDAL, 127);
+void handlePressStompADrums(void){
+  wvr.stop(1, HIHAT_OPEN);
+  wvr.play(1, HIHAT_PEDAL, 127);
   hihatOpen = false;
 }
 
-void handlePressStompBDrums(void)
-{
-  // wvr.play(voice, KICK, 127);
-  wvr.play(0, KICK, 80);
+void handlePressStompBDrums(void){
+  wvr.play(1, KICK, 80);
 }
 
-void handleReleaseStompAKeyboard(void)
-{
-  for(int i=0;i<127;i++)
-  {
-    if(held[i])
-    {
-      // log_i("release %d", i);
-      wvr.stop(voice, i);
+void handleReleaseStompAKeyboard(void){
+  damp = false;
+}
+
+void handlePressStompAKeyboard(void){
+  damp = true;
+}
+
+void handleReleaseStompBKeyboard(void){
+  for(int i=0;i<127;i++){
+    if(held[i]){
+      wvr.stop(0, i);
       held[i] = false;
     }
   }
   hold = false;
 }
 
-void handlePressStompAKeyboard(void)
-{
-  // log_i("switch one down");
+void handlePressStompBKeyboard(void){
   hold = true;
 }
 
-void handleReleaseStompBKeyboard(void)
-{
-  // log_i("switch two up");
-  damp = false;
-}
-
-void handlePressStompBKeyboard(void)
-{
-  // log_i("switch two down");
-  damp = true;
-}
-
-void encButtonUp(void)
-{
-  // wlog_i("EncButton up");
+void encButtonUp(void){
   encPushed = false;
   writeVolumeToLEDs();
 }
 
-void encButtonDown(void)
-{
-  // wlog_i("EncButton down");
+void encButtonDown(void){
   encPushed = true;
-  writeBinaryToLEDs(voice);
+  writeBinaryToLEDs(wvr.getVoice(0));
 }
 
-
-uint8_t* shells(uint8_t * msg)
-{
-  if(!msg)return msg; // guard against NULL notes
+void shells(uint8_t * msg){ 
+  // this is a custom hook for my own personal electric drum kit
+  if (!msg) return; // guard against NULL notes
   uint8_t code = (msg[0] >> 4) & 0b00001111;
-  if(code == MIDI_NOTE_ON)
-  {
+  if(code == MIDI_NOTE_ON){
     uint8_t note = msg[1] & 0b01111111;
     note = 
       note == 45 ? SNARE :
@@ -227,66 +197,52 @@ uint8_t* shells(uint8_t * msg)
       note;
     msg[1] = note & 0b01111111;
   }
-  return msg;
 }
 
-uint8_t* sustain(uint8_t * msg)
-{
+void sustain(uint8_t * msg){
+  if (!msg) return;
   uint8_t channel = msg[0] & 0b00001111;
   uint8_t code = (msg[0] >> 4) & 0b00001111;
-  log_i("ch: %d code %d", channel, code);
-  if((code == MIDI_NOTE_OFF) && hold)
-  {
+  if((code == MIDI_NOTE_OFF) && hold){
     uint8_t note = msg[1] & 0b01111111;
     // remember that its being held
     held[note] = true;
-    // don't pass it on
-    return NULL;
-  }
-  else if((code == MIDI_NOTE_ON) && hold)
-  {
+    *msg = NULL; // erase the message
+  }else if((code == MIDI_NOTE_ON) && hold){
     // remove potential note off event from hold
     uint8_t note = msg[1] & 0b01111111;
     held[note] = false;
   }
-  return msg;
 }
 
-uint8_t* soft(uint8_t * msg)
-{
+void soft(uint8_t * msg){
   // pass on NULL pointer immidiately
-  if(!msg)return msg;
+  if (!msg) return;
   uint8_t channel = msg[0] & 0b00001111;
   uint8_t code = (msg[0] >> 4) & 0b00001111;
-  log_i("ch: %d code %d", channel, code);
-  if((code == MIDI_NOTE_ON) && damp)
-  {
+  if((code == MIDI_NOTE_ON) && damp){
     uint8_t velocity = msg[2] & 0b01111111;
     velocity *= 0.4;
     msg[2] = velocity & 0b01111111; 
   }
-  return msg;
 }
 
-uint8_t* midiHookKeyboard(uint8_t * msg)
-{
-  msg = sustain(msg);
-  msg = soft(msg);
-  return msg;
+void midiHookKeyboard(uint8_t * msg){
+  sustain(msg);
+  soft(msg);
 }
 
-uint8_t* midiHookDrums(uint8_t * msg)
-{
-  if(!msg)return msg; // guard against NULL notes
+void midiHookDrums(uint8_t * msg){
+  if (!msg) return; // guard against NULL notes
   uint8_t code = (msg[0] >> 4) & 0b00001111;
   // ignore all note-offs
-  if(code == MIDI_NOTE_OFF)
-  {
-    // return NULL;
-  }
-  else if(code == MIDI_NOTE_ON)
-  {
-    msg = shells(msg);
+  if(code == MIDI_NOTE_OFF){
+    uint8_t note = msg[1] & 0b01111111;
+    if(note == HIHAT_OPEN){
+      *msg = NULL; // erase the message
+    }
+  }else if(code == MIDI_NOTE_ON){
+    // msg = shells(msg); // this is a custom hook for my own personal electric drum kit
     uint8_t note = msg[1] & 0b01111111;
     // hihat
     if(note == HIHAT_CLOSED && hihatOpen){
@@ -294,96 +250,101 @@ uint8_t* midiHookDrums(uint8_t * msg)
     }
     msg[1] = note & 0b01111111;
   }
-  return msg;
 }
 
-uint8_t* midiHookNone(uint8_t * msg)
-{
-  return msg;
+void midiHookNone(uint8_t * msg){
+  return;
 }
 
-// uint8_t* midiFilter(uint8_t * msg)
-// {
-//   msg = sustain(msg);
-//   msg = soft(msg);
-//   return msg;
-// }
-
-void setButtonFuncs()
-{
-  switch (voice)
-  {
-  case 0:
-    StompA->onPress(handlePressStompAKeyboard);
-    StompA->onRelease(handleReleaseStompAKeyboard);
-    StompB->onPress(handlePressStompBKeyboard);
-    StompB->onRelease(handleReleaseStompBKeyboard);
-    break;
-  case 1:
-    StompA->onPress(handlePressStompADrums);
-    StompA->onRelease(handleReleaseStompADrums);
-    StompB->onPress(handlePressStompBDrums);
-    StompB->onRelease(NULL);
-    break; 
-  default:
-    StompA->onPress(NULL);
-    StompA->onRelease(NULL);
-    StompB->onPress(NULL);
-    StompB->onRelease(NULL);
-    break;
+void setButtonFuncs(){
+  switch (wvr.getVoice(0)){
+    case 0:
+      StompA->onPress(handlePressStompAKeyboard);
+      StompA->onRelease(handleReleaseStompAKeyboard);
+      StompB->onPress(handlePressStompBKeyboard);
+      StompB->onRelease(handleReleaseStompBKeyboard);
+      break;
+    case 1:
+      StompA->onPress(handlePressStompADrums);
+      StompA->onRelease(handleReleaseStompADrums);
+      StompB->onPress(handlePressStompBDrums);
+      StompB->onRelease(NULL);
+      break; 
+    default:
+      StompA->onPress(NULL);
+      StompA->onRelease(NULL);
+      StompB->onPress(NULL);
+      StompB->onRelease(NULL);
+      break;
   }
 }
 
-void setMidiFilter()
-{
-  wlog_i("set filter %d", voice);
-  switch (voice)
-  {
-  case 0:
-    wvr.setMidiHook(midiHookKeyboard);
-    break;
-  case 1:
-    wvr.setMidiHook(midiHookDrums);
-    break;
-  default:
-    wvr.setMidiHook(midiHookNone);
-    break;
+void setMidiFilter(){
+  switch (wvr.getVoice(0)){
+    case 0:
+      wvr.setMidiHook(midiHookKeyboard);
+      break;
+    case 1:
+      wvr.setMidiHook(midiHookDrums);
+      break;
+    default:
+      wvr.setMidiHook(midiHookNone);
+      break;
   }
 }
 
-void setup() {
+void flashWifiOn(void* pvParameters){
+  bool state = true;
+  int cnt = 0;
+  unsigned long last = millis();
+  for(;;){
+    unsigned long time = millis();
+    if(time - last > 100){
+      last = time;
+      writeBinaryToLEDs(state ? 255 : 0);
+      state = !state;
+      if (++cnt == 10){
+        writeVolumeToLEDs();
+        break;
+      } 
+    }
+  }
+  vTaskDelete(NULL); // delete this task once the loop is exited
+}
+
+void checkForWifiOn(void){
+  if(digitalRead(D12) == 0){
+    wvr.wifiOn();
+    // if a function takes a long time, it must run inside a FreerRTOS task
+    BaseType_t ret = xTaskCreatePinnedToCore(&flashWifiOn, "flashWifiOn task", 1024, NULL, 1 , NULL, 0);
+    if (ret != pdPASS) log_e("failed to create flashWifiOn task");
+  }
+}
+
+void setup(){
   wvr.useFTDI = ENABLE_FTDI;
-  wvr.useUsbMidi = false;
-  // wvr.checkRecoveryModePin = false;
+  wvr.useUsbMidi = true;
   wvr.begin();
-
-  // wvr.setMidiHook(midiHookKeyboard);
-  // wvr.setMidiHook(midiFilter);
+  
   gpioInit();
   wvr.encoderInit(D6, D5);
+
+  checkForWifiOn();
 
   StompA = new Button(D12, FALLING, 60);
   StompB = new Button(D13, FALLING, 60);
   EncButton = new Button(D4, FALLING, 60);
 
-  // StompA->onPress(handlePressStompAKeyboard);
-  // StompA->onRelease(handleReleaseStompAKeyboard);
-  // StompB->onPress(handlePressStompBKeyboard);
-  // StompB->onRelease(handleReleaseStompBKeyboard);
   setMidiFilter();
   setButtonFuncs();
   EncButton->onPress(encButtonDown);
   EncButton->onRelease(encButtonUp);
 
-  wvr.wifiIsOn = get_metadata()->wifi_starts_on;
-  log_i("wifi is %s", wvr.wifiIsOn ? "on" : "off");
-
   wvr.onEncoder(onEncoderThames);
-
   writeVolumeToLEDs();
 }
 
-void loop() {
+void loop(){
   // vTaskDelay(portMAX_DELAY);
   vTaskDelete(NULL);
 }

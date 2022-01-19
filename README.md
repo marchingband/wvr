@@ -8,6 +8,8 @@ Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_
 If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/wvr_thames
 
 * [getting started](#getting-started)
+* [powering wvr](#powering-wvr)
+* [updating firmware](#updating-firmware)
 * [playing sounds](#playing-sounds)
 * sound settings
 * * [understanding priority](#understanding-priority)
@@ -32,32 +34,35 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * On a computer, join the wifi network **WVR**, using the password **12345678**
 * Open Google Chrome (or another browser which [impliments the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open
 
-If you are going to upload custom firmware, please follow these steps to setup a recovery firmware, and load up the most recent firmware for your specific WVR Board.
+# powering wvr
+
+* **wvr basic** : plug in usb, or apply 5v and ground, or 3.3v and ground, to the power pins
+* **wvr makers board** : plug in usb (will not power amp), use a center-negative 9v PSU (Boss style) or apply somewhere between 6v and 9v (and ground) to the VIN pins
+* **wvr dev board** : plug in usb, use a center-negative 9v PSU (Boss style) or apply somewhere between 6v and 9v and ground to the VIN pins
+* **thames** : use a center-negative 9v PSU (Boss style)
+* **usb host backpack** : The backpack is powered by the WVR, so if WVR is on, the backpack is also on. When updating firmware on the backpack, plug in the usb micro port on the backpack **instead of** powering the WVR. It has its 5v line connected to the WVR 5v pin. WVR takes this 5v line, passes it to the LDO, and passes 3.3v back to power the backpack. The 5v pin on the USB host port is also connected to the WVR 5v pin, so it can power whatever is plugged into it, adding some capacitance to meet the USB spec.
+
+# updating firmware
 
 * Create a folder on your computer where you will store firmwares for your WVR
 * download your firmwares, saving them to this new folder
-* first the safemode firmware, which is the same for all boards:
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_safemode/1.0.9/wvr_safemode.ino.bin  
-* second the board specific firmware. navigate to :
+* navigate to :
 https://github.com/marchingband/wvr_binaries
 and find the folder for your board, download the .ino.bin file, which will be a link like:
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.9/wvr_basic.ino.bin
-Choose the newest binary (currently v1.0.9)
-
-* Apply power to your WVR using a usb cable.
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.10/wvr_basic.ino.bin
+Choose the newest binary (currently v1.0.10)
+* Apply power to your WVR.
 * On a computer, join the wifi network **WVR**, using the password **12345678**
 * Open Google Chrome (or another browser which [impliments the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open
-* Click on the blue **WVR** link at the top of the screen
-* Click on **select recovery firmware** and choose wvr_safemode.ino.bin in the file upload dialog
-* Click on **update recovery firmware** and wait for the upload to complete
 * Click on **firmware** menu item at the top of the page
-* Click **select binary** for **slot 0**, and select the firmware that you downloaded earlier in the file upload dialog
+* Click **select binary** for **slot 0**, and in the file upload dialog select the firmware that you downloaded earlier
+* To give the ninary a custom name, click the name of the binary at the left.
 * Click **upload** for **slot 0**, and wait for the upload to complete
 * Click **boot** for **slot 0**, and wait for the boot to complete. 
-* Reset the WVR, then reload the webpage.
+* Reset the WVR, rejoin the WVR wifi network, then reload the webpage.
 * if you have a WVR with USB Host Backpack, you can follow these instructions to update the firmware on that : https://github.com/marchingband/wvr_usb_backpack
 
-Congradulations! You now have the most up-to-date firmware loaded onto your WVR, and in case something goes wrong, you can boot into a safe-mode firmware by holding D5 to ground when you press reset on the WVR
+Congradulations! You now have the most up-to-date firmware loaded onto your WVR
 
 # playing sounds
 
@@ -109,11 +114,16 @@ WVR uses the web browsers built-in audio engine to do a lot of work preparing sa
 
 # global settings
 In the UI, click the blue **WVR** button top and center of the screen. This is the **Global Settings** menu.
-* WVR has a **recovery mode** functionality that you can set up here. If you hold the **recovery pin** to ground and push reset on WVR, it will boot a special **recovery firmware**. This means that you can experiment with firmwares, and always have a fallback incase there is an error in your code that may prevent you from accessing the UI.
+* **global volume** sets the overall volume of the WVR output. A value of 127 mean full volume, and 0 means mute.
+* WVR has a **recovery mode** functionality that you can set up here. If you hold the **recovery pin** to ground and push reset on WVR, code will stop executing, and a special **recovery mode** UI will be served. This means that you can experiment with firmwares, and always have a fallback incase there is an error in your code that may prevent you from accessing the UI. Just make sure that wvr.begin() is called before your custom code.
 * If you open the javascript console in your web browser, you will see some logs coming from the WVR. You can set the **log verbosity**. If you don't need logs, leave it set to **none**. Verbose logs can cause little glitches in the audio engine.
-* **wifi on at boot** determines weather your WVR will turn on its wifi antenna at boot. Setting this to **false** is risky. Make sure that you have a pin action set to turn it on, and have tested that pin, because if you don't, its possible you will be unable to access the UI to change this setting back! The solution could be to boot from the recovery firmware, of course, should that occur.
+* **wifi on at boot** determines weather your WVR will turn on its wifi antenna at boot. Setting this to **false** is risky. Make sure that you have a pin action set to turn it on, and have tested that pin, because if you don't, its possible you will be unable to access the UI to change this setting back! The solution could be to boot into recovery mode, of course, should that occur.
 * you can also change the WIFI network name and password here.
+* **wifi power** allows you to change how strong the wifi signal is. Higher numbers mean more range, which also draws more power, creating more heat. At **8** the range should fill a room.
+* WVR has memory dedicated to store up to 128 racks. **rack slots remaining** lets you keep track of how many are free.
 * Backing up and restoring your eMMC (onboard memory on the WVR) is meant for cloning your WVR, in the case where you have a product that you want to quickly clone, and not have to set up all the configuration and sounds every time. **backup eMMC** will upload a binary file to your computer. On the receiving device, open this same menu and **select eMMC recovery file** then **restore eMMC**. This process may take a long time, depending on how many sounds you have in memory. Note this process will clone everything *except* the firmware running on your WVR, so make sure you have the same (or compatible) firmwares running on both devices. All the note configurations, all the sounds, the backup firmware, your stored firmwares, the global settings, and everything else will be cloned to the new WVR!
+* If you want to reset the memory on your WVR, you can click **reset eMMC**. All sounds, configuration, and firmwares will be deleted, but the firmware currently loaded will remain in flash, and will continue to run.
+* You can upload a firmware directly to the ESP32 flash, and boot it, without using the **firmware** menu, by clicking **select firmware**, choosing a binary, and then clicking **force uplad**. This binary will not be stored in eMMC memory, so it will not appear in the **firmware** menu. It will stay in flash, and continue to run untill a new firmware is force-uploaded, or untill another firmware is selected from the **firmware** tab.
 
 # firmware manager
 WVR can store up to 10 different firmwares, and the UI allows you to boot from any of them.

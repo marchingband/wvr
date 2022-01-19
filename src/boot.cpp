@@ -5,10 +5,23 @@
 #include "esp_system.h"
 #include "file_system.h"
 #include "wvr_pins.h"
+#include <esp_task_wdt.h>
+#include "soc/rtc_wdt.h"
+
 
 extern "C" esp_err_t emmc_read(void *dst, size_t start_sector, size_t sector_count);
 extern "C" struct metadata_t *get_metadata(void);
 extern "C" void write_metadata(struct metadata_t m);
+
+void force_reset(void)
+{
+// use the watchdog timer to do a hard restart
+// It sets the wdt to 1 second, adds the current process and then starts an
+// infinite loop.
+  esp_task_wdt_init(1, true);
+  esp_task_wdt_add(NULL);
+  while(true);  // wait for watchdog timer to be triggered
+}
 
 void bootFromEmmc(int index)
 {
@@ -25,6 +38,7 @@ void bootFromEmmc(int index)
     uint8_t *buf = (uint8_t *)ps_malloc(SECTOR_SIZE);
 
     log_i("starting update");
+    int loop_num = 0;
     for(int i=0;i<num_sectors;i++){
         feedLoopWDT();
         ESP_ERROR_CHECK(emmc_read(buf,sector++,1));
@@ -34,7 +48,10 @@ void bootFromEmmc(int index)
             Update.abort();
             break;
         } else {
-            printf(".");
+            if(loop_num++ % 20 == 0)
+            {
+                Serial.print(".");
+            }
         }
     }
     ESP_ERROR_CHECK(emmc_read(buf,sector++,1));
@@ -56,8 +73,10 @@ void bootFromEmmc(int index)
             write_metadata(*new_metadata);
             sdmmc_host_deinit();
             feedLoopWDT();
-            // delay(1000);
+            delay(1000);
+            feedLoopWDT();
             ESP.restart();
+            force_reset();
         } else {
             log_e("Update.isFinished() : false");
         }
@@ -83,6 +102,7 @@ void boot_into_recovery_mode(void)
     uint8_t *buf = (uint8_t *)ps_malloc(SECTOR_SIZE);
 
     log_i("starting update");
+    int loop_num = 0;
     for(int i=0;i<num_sectors;i++){
         ESP_ERROR_CHECK(emmc_read(buf,sector++,1));
         size_t written = Update.write(buf, SECTOR_SIZE);
@@ -91,7 +111,10 @@ void boot_into_recovery_mode(void)
             Update.abort();
             break;
         } else {
-            printf(".");
+            if(loop_num++ % 20 == 0)
+            {
+                Serial.print(".");
+            }
         }
     }
     ESP_ERROR_CHECK(emmc_read(buf,sector++,1));
@@ -122,7 +145,7 @@ void boot_into_recovery_mode(void)
     free(buf);
 }
 
-int check_for_recovery_mode(void)
+int check_for_recovery_mode()
 {
     metadata_t *new_metadata = get_metadata();
     if(!new_metadata->should_check_strapping_pin)
@@ -133,6 +156,6 @@ int check_for_recovery_mode(void)
     gpio_reset_pin(gpio_pins[new_metadata->recovery_mode_straping_pin]);
     pinMode(wvr_pins[new_metadata->recovery_mode_straping_pin], INPUT_PULLUP);
     int res = digitalRead(wvr_pins[new_metadata->recovery_mode_straping_pin]);
-    log_i("strapping pin %d reads %d",new_metadata->recovery_mode_straping_pin,res);
+    log_i("recovery mode pin %d reads %s",new_metadata->recovery_mode_straping_pin, res ? "high" : "low");
     return res;
 }

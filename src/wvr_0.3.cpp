@@ -23,17 +23,17 @@ struct wav_lu_t **wav_lut;
 
 void server_begin(void);
 void server_pause(void);
+void recovery_server_begin(void);
 extern "C" void emmc_init(void);
 extern "C" void dac_init(void);
 extern "C" void midi_init(bool useUsbMidi);
 extern "C" void wav_player_start(void);
-// extern "C" void encoder_init(void);
 extern "C" void touch_test(void);
 extern "C" void pot_init(void);
 extern "C" void rpc_init(void);
 void bootFromEmmc(int index);
 void boot_into_recovery_mode(void);
-int check_for_recovery_mode(void);
+int check_for_recovery_mode();
 void dev_board_init();
 void rgb_init(void);
 void neopixel_test(void);
@@ -47,7 +47,6 @@ void on_ws_connect(void){
   if(!done){
     done = 1;
     wlog_n("firmware version %s", VERSION_CODE);
-
     wlog_n("wlog_n");
     wlog_e("wlog_e");
     wlog_w("wlog_w");
@@ -76,7 +75,8 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   Serial.begin(115200);
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
-  log_i("\nwvr starting up \n\n*** VERSION %s ***\n\n",VERSION_CODE);
+  log_i("cpu speed %d", ESP.getCpuFreqMHz());
+  log_i("wvr starting up \n\n*** VERSION %s ***\n\n",VERSION_CODE);
 
   cJSON_Hooks memoryHook;
 	memoryHook.malloc_fn = ps_malloc;
@@ -90,17 +90,19 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   file_system_init();
   logSize("file system");
 
-  clean_up_rack_directory();
-
-  int ret = check_for_recovery_mode();
-  if(!ret && checkRecoveryModePin)
+  if(checkRecoveryModePin)
   {
-    boot_into_recovery_mode();
-    return;
+    int ret = check_for_recovery_mode();
+    if(!ret)
+    {
+        recovery_server_begin();
+        log_i("! WVR is in recovery mode !");
+        vTaskDelete(NULL);
+        return;
+    }
   }
 
-  // wvr->globalVolume = metadata.global_volume;
-  // log_i("set global volume : %d", wvr->globalVolume);
+  clean_up_rack_directory();
 
   dac_init();
   logSize("dac");
@@ -131,19 +133,6 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
     server_pause();
   }
 
-  // encoder_init();
-  // pot_init();
-  // rgb_init();
-  // neopixel_test();
-
-
   log_pin_config();
-
-  // if(wvr->autoConfigPins)
-  // {
-  //   log_i("auto config pins");
-  // wvr_gpio_init();
-  // }
-
   logRam();
 }

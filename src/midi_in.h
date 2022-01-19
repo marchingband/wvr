@@ -21,8 +21,8 @@ struct midi_event_t {
 };
 
 uint8_t *get_channel_lut(void);
-uint8_t* midi_hook_default(uint8_t* in);
-void set_midi_hook(uint8_t*(*fn)(uint8_t *in));
+void midi_hook_default(uint8_t* in);
+void set_midi_hook(void(*fn)(uint8_t *in));
 
 #ifdef __cplusplus
 }

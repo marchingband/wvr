@@ -32,6 +32,7 @@ static void enc_a_handler(void)
 {
     xQueueSendFromISR(encoder_event_queue, &enc_a_gpio, NULL);
 }
+
 static void enc_b_handler(void)
 {
     xQueueSendFromISR(encoder_event_queue, &enc_b_gpio, NULL);

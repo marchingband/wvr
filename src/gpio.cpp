@@ -12,10 +12,6 @@
 #include "server.h"
 #include "gpio.h"
 
-// extern "C" {
-//     #include "wav_player.h"
-// }
-
 extern "C" void rpc_out(int procedure, int arg0, int arg1, int arg2);
 // extern "C" void server_pause(void);
 // extern "C" void server_resume(void);

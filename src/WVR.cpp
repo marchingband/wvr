@@ -5,6 +5,7 @@
 #include "server.h"
 #include "file_system.h"
 #include "encoder.h"
+#include "midi_in.h"
 
 WVR::WVR()
 {
@@ -32,13 +33,17 @@ void WVR::stop(uint8_t voice, uint8_t note)
 
 void WVR::wifiOff()
 {
-    server_pause();
+    if(get_wifi_is_on() == 1){
+        server_pause();
+    }
     this->wifiIsOn = get_wifi_is_on();
 }
 
 void WVR::wifiOn()
 {
-    server_resume();
+    if(get_wifi_is_on() == 0){
+        server_resume();
+    }
     this->wifiIsOn = get_wifi_is_on();
 }
 
@@ -54,6 +59,11 @@ void WVR::setGlobalVolume(uint8_t volume)
     set_global_volume(volume);
 }
 
+uint8_t WVR::getGlobalVolume(void)
+{
+    return get_global_volume();
+}
+
 void WVR::mute(void)
 {
     set_mute(true);
@@ -64,7 +74,7 @@ void WVR::unmute(void)
     set_mute(false);
 }
 
-void WVR::setMidiHook(uint8_t*(*fn)(uint8_t *in))
+void WVR::setMidiHook(void(*fn)(uint8_t *in))
 {
     set_midi_hook(fn);
 }
@@ -83,3 +93,14 @@ void WVR::resetPin(int pin)
 {
     gpio_reset_pin(gpioNumToGpioNum_T(pin));
 }
+
+uint8_t WVR::getVoice(int channel)
+{
+    return get_channel_lut()[channel];
+}
+
+void WVR::setVoice(int channel, int voice)
+{
+    get_channel_lut()[channel] = (voice & 0b00001111);
+}
+

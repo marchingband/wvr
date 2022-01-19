@@ -7,8 +7,8 @@
 
 WVR wvr;
 
-Button *switch_one;
-Button *switch_two;
+Button *switchOne;
+Button *switchTwo;
 
 void onEncoderDevBoard(bool down)
 {
@@ -38,34 +38,34 @@ void onPotDevBoard(uint32_t raw_val)
   if(temp != val)
   {
     val = temp;
-    log_i("%d", val);
+    // log_i("%d", val);
     wvr.setGlobalVolume(val);
   }
 }
 
-void switch_one_up(void)
+void switchOneUp(void)
 {
-  log_i("switch one up");
+  // log_i("switch one up");
   wvr.unmute();
   // rgb_set_color(100 /* red */,100 /* green */,100 /* blue */); // makes white
 }
 
-void switch_one_down(void)
+void switchOneDown(void)
 {
-  log_i("switch one down");
+  // log_i("switch one down");
   wvr.mute();
   // rgb_set_color(0 ,0 ,0); // turn off RGB LED
 }
 
-void switch_two_up(void)
+void switchTwoUp(void)
 {
-  log_i("switch two up");
+  // log_i("switch two up");
   wvr.wifiOn();
 }
 
-void switch_two_down(void)
+void switchTwoDown(void)
 {
-  log_i("switch two down");
+  // log_i("switch two down");
   wvr.wifiOff();
 }
 
@@ -86,13 +86,13 @@ void setup() {
   pinMode(D3, INPUT_PULLUP);
   pinMode(D4, INPUT_PULLUP);
 
-  switch_one = new Button(D3, FALLING, 60);
-  switch_two = new Button(D4, FALLING, 60);
+  switchOne = new Button(D3, FALLING, 60);
+  switchTwo = new Button(D4, FALLING, 60);
 
-  switch_one->onPress(switch_one_up);
-  switch_one->onRelease(switch_one_down);
-  switch_two->onPress(switch_two_up);
-  switch_two->onRelease(switch_two_down);
+  switchOne->onPress(switchOneUp);
+  switchOne->onRelease(switchOneDown);
+  switchTwo->onPress(switchTwoUp);
+  switchTwo->onRelease(switchTwoDown);
 
   wvr.wifiIsOn = get_metadata()->wifi_starts_on;
   log_i("wifi is %s", wvr.wifiIsOn ? "on" : "off");

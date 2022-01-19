@@ -35,7 +35,7 @@ static const char* TAG = "wav_player";
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
 
 #define NUM_BUFFERS 18
-// #define NUM_BUFFERS 20
+// #define NUM_BUFFERS 19
 
 #define DAMPEN_BITS 1
 #define LOG_PERFORMANCE 0
@@ -55,6 +55,7 @@ bool mute = false;
 struct buf_t {
   struct wav_lu_t wav_data;
   struct wav_player_event_t wav_player_event;
+  struct wav_player_event_t next_wav_player_event;
   int16_t *buffer_a;
   int16_t *buffer_b;
   size_t read_block;
@@ -68,6 +69,7 @@ struct buf_t {
   uint8_t done :1;
   uint8_t full :1;
   uint8_t current_buf :1;
+  uint8_t pruned :1;
 };
 
 esp_err_t ret;
@@ -83,29 +85,39 @@ esp_err_t emmc_read(void *dst, size_t start_sector, size_t sector_count);
 
 // declare function prototypes from dac.c
 esp_err_t dac_write(const void *src, size_t size, size_t *bytes_written);
+esp_err_t dac_write_int(const void *src, size_t size, size_t *bytes_written);
 void dac_pause(void);
 void dac_resume(void);
 
-
 struct buf_t bufs[NUM_BUFFERS];
-int16_t *output_buf;
+int *output_buf;
+int16_t *output_buf_16;
 struct wav_player_event_t wav_player_event;
 int new_midi = 0;
 int new_midi_buf = -1;
 
-int16_t sqrtLUT[128];
-float sqrt_float_LUT[128];
-float float_lut[128];
+struct response_curve_t {
+  float val;
+  uint8_t fade_val;
+};
 
-uint32_t tmp32;
-int16_t tmp16;
+struct response_curve_t lin_float_lut[128];
+struct response_curve_t sqrt_float_lut[128];
+struct response_curve_t inv_sqrt_float_lut[128];
+
+int16_t sample;
 
 void init_buffs(void)
 {
-  output_buf = (int16_t *)malloc( DAC_BUFFER_SIZE_IN_BYTES );
+  output_buf = (int *)ps_malloc( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int) );
   if(output_buf==NULL)
   {
       log_e("failed to alloc output buf");
+  }
+  output_buf_16 = (int16_t *)malloc( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t) );
+  if(output_buf_16==NULL)
+  {
+      log_e("failed to alloc output buf 16");
   }
   for(uint8_t i=0; i<NUM_BUFFERS; i++)
   {
@@ -113,6 +125,7 @@ void init_buffs(void)
     bufs[i].free = 1;
     bufs[i].done = 0;
     bufs[i].full = 0;
+    bufs[i].pruned = 0;
     bufs[i].current_buf = 0;
     // uint8_t's
     bufs[i].volume=127;
@@ -133,6 +146,7 @@ void init_buffs(void)
   for(int i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
   {
     output_buf[i]=0;
+    output_buf_16[i]=0;
   }
   log_i("%d buffers were initialized", NUM_BUFFERS);
 }
@@ -146,71 +160,75 @@ void free_bufs(void)
   }
 }
 
-void init_float_lut(void)
+void init_response_lut_fade_pair(struct response_curve_t *dest, struct response_curve_t *pair)
 {
   for(int i=0;i<128;i++)
   {
-    // float_lut
-    float num = (float)i/127.0;
-    float_lut[i] = num;
-    // sqrt_float_lut
-    float a = (float)sqrt(i * 127.0);
-    float b = a / 127;
-    sqrt_float_LUT[i] = b;
+    // find the nearest but smaller pair, so that the linear fade out starts at the best spot
+    for(int j=0;j<128;j++)
+    {
+      if(pair[j+1].val > dest[i].val)
+      {
+        dest[i].fade_val = j;
+        break;
+      }
+      // force the last one
+      if(j == 127)
+      {
+        dest[i].fade_val = j;
+      }
+    }
   }
 }
 
-int16_t IRAM_ATTR scale_sample (int16_t in, uint8_t volume)
+void convert_buf_linear(int num_buf)
 {
-  return (int16_t)(in * float_lut[volume]);
+  switch(bufs[num_buf].wav_data.response_curve){
+    case RESPONSE_SQUARE_ROOT:
+      bufs[num_buf].volume = sqrt_float_lut[bufs[num_buf].volume].fade_val;
+      break;
+    case RESPONSE_INV_SQUARE_ROOT:
+      bufs[num_buf].volume = inv_sqrt_float_lut[bufs[num_buf].volume].fade_val;
+      break;
+    default:
+      break;
+  }
+  bufs[num_buf].wav_data.response_curve = RESPONSE_LINEAR;
 }
 
-int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t volume)
+void init_response_luts(void)
 {
-  return (int16_t)(in * sqrt_float_LUT[volume]);
-}
-
-float eq_high = 1;
-float eq_low = 0;
-
-static float temp_low_L;
-static float temp_high_L;
-static float temp_low_R;
-static float temp_high_R;
-static float distanceToGo;
-static float trebleOnly;
-
-int16_t IRAM_ATTR apply_EQ(int16_t in, bool left)
-{
-  if(left)
+  for(int i=0;i<128;i++)
   {
-    // Treble calculations
-    distanceToGo = in - temp_low_L;
-    temp_low_L += distanceToGo * 0.125; // Number controls treble frequency
-    trebleOnly = in - temp_low_L;
-
-    // Bass calculations
-    distanceToGo = temp_low_L - temp_high_L;
-    temp_high_L += distanceToGo * 0.125; // Number controls bass frequency
-
-    return (int16_t)(temp_low_L + trebleOnly * eq_high + temp_high_L * eq_low);
+    lin_float_lut[i].val = i/127.0;
+    // lin_float_lut[i].fade_val = i;
+    sqrt_float_lut[i].val = sqrt(i * 127.0)/127;
+    inv_sqrt_float_lut[i].val = pow(i / 127.0, 2);
   }
-  else
-  {
-    // Treble calculations
-    distanceToGo = in - temp_low_R;
-    temp_low_R += distanceToGo * 0.125; // Number controls treble frequency
-    trebleOnly = in - temp_low_R;
+  init_response_lut_fade_pair(sqrt_float_lut, lin_float_lut);
+  init_response_lut_fade_pair(inv_sqrt_float_lut, lin_float_lut);
+  init_response_lut_fade_pair(lin_float_lut, lin_float_lut);
+}
 
-    // Bass calculations
-    distanceToGo = temp_low_R - temp_high_R;
-    temp_high_R += distanceToGo * 0.125; // Number controls bass frequency
+int16_t IRAM_ATTR scale_sample (int16_t in, uint8_t vol)
+{
+  return (int16_t)(in * lin_float_lut[vol].val);
+}
 
-    return (int16_t)(temp_low_R + trebleOnly * eq_high + temp_high_R * eq_low);
-  }
-  // return (int16_t)(temp_low_R + trebleOnly * 1 + temp_high_R * 0);
-  // The "1" controls treble. 0 = none; 1 = untouched; 2 = +6db
-  // The "0" controls bass. -1 = none; 0 = untouched; 1 = +6db
+int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t vol)
+{
+  return (int16_t)(in * sqrt_float_lut[vol].val);
+}
+
+int16_t IRAM_ATTR scale_sample_inv_sqrt (int16_t in, uint8_t vol)
+{
+  return (int16_t)(in * inv_sqrt_float_lut[vol].val);
+}
+
+int16_t IRAM_ATTR scale_sample_clamped_16(int in, uint8_t volume)
+{
+  int16_t out = (in > MAX_INT_16) ? MAX_INT_16 : (in < MIN_INT_16) ? MIN_INT_16 : in;
+  return (int16_t)(out * lin_float_lut[volume].val);
 }
 
 void stop_wav(uint8_t voice, uint8_t note)
@@ -239,6 +257,10 @@ int prune(uint8_t priority)
   int candidate = -1;
   for(int i=0;i<NUM_BUFFERS;i++)
   {
+    if(bufs[i].pruned)
+    {
+      continue;
+    }
     if(candidate == -1 && (bufs[i].wav_data.priority <= priority))
     {
       // this is the first candidate
@@ -246,22 +268,23 @@ int prune(uint8_t priority)
     }
     else
     {
+      // log_i("i: %d, c: %d",bufs[i].wav_data.priority,bufs[candidate].wav_data.priority);
       if(bufs[i].wav_data.priority < bufs[candidate].wav_data.priority)
       {
         candidate = i;
-        wlog_v("didnt check wav position");
+        // log_i("didnt check wav position");
       } 
       else if(
         (bufs[i].wav_data.priority == bufs[candidate].wav_data.priority) &&
         (bufs[i].wav_position > bufs[candidate].wav_position)
       )
       {
-        wlog_v("checked wav position");
+        // log_i("checked wav position");
         candidate = i;
       } 
     }
   }
-  wlog_d("pruned buf %d",candidate);
+  // log_i("pruned buf %d",candidate);
   return candidate;
 }
 
@@ -329,30 +352,32 @@ void wav_player_task(void* pvParameters)
       // try to play the note
       if(wav_player_event.code == MIDI_NOTE_ON && !abort_note)
       {
-        // get the wav file
+        // find a free buffer
         for(int8_t i=0; i<=NUM_BUFFERS; i++)
         {
-          if(i == NUM_BUFFERS)
+          if(i == NUM_BUFFERS) // none are free
           {
             // prune
             int to_prune = prune(new_wav.priority);
             if(to_prune == -1) 
             {
-              wlog_d("note blocked because bufs full of higher priorities");
+              log_v("note blocked because bufs full of higher priorities");
               break;
             }
             else
             {
-              bufs[to_prune].free = 1;
-              i = to_prune;
+              bufs[to_prune].next_wav_player_event = wav_player_event;
+              bufs[to_prune].fade = 1;
+              bufs[to_prune].pruned = 1;
+              break;
             }
           }
           if(bufs[i].free == 1)
           {
-            rpc_out(RPC_NOTE_ON, bufs[i].voice, wav_player_event.note, wav_player_event.velocity);
+            // rpc_out(RPC_NOTE_ON, bufs[i].voice, wav_player_event.note, wav_player_event.velocity);
             new_midi = 1;
             new_midi_buf = i;
-            wlog_d("adding to buffer %d",i);
+            // wlog_d("adding to buffer %d",i);
             bufs[i].wav_data = new_wav;
             if(bufs[i].wav_data.length == 0){
               // its a null_wav_file because it was a rack and it wasn't within the velocity ranges
@@ -379,7 +404,7 @@ void wav_player_task(void* pvParameters)
             {
               // its not a rack member or a fixed volume file
               bufs[i].volume = wav_player_event.velocity;
-              wlog_d("playing a non-rack memeber");
+              log_d("playing a non-rack memeber");
             }
             break;
           }
@@ -395,7 +420,7 @@ void wav_player_task(void* pvParameters)
               bufs[b].wav_data.note_off_meaning == HALT
             )
           {
-            bufs[b].fade=true;
+            bufs[b].fade=1;
             // bufs[b].done=1;
             // break; // comment out to stop them all, leave it uncommented to break just the first one that matches
           }
@@ -436,131 +461,99 @@ void wav_player_task(void* pvParameters)
     new_midi_buf=-1;
 
     // sum the next section of each buffer and send to DAC buffer
-    for(int i=0; i<NUM_BUFFERS; i++)
+    for(int buf=0; buf<NUM_BUFFERS; buf++)
     {
-      if(bufs[i].free == 0)
+      if(bufs[buf].free == 0)
       {
-        base_index = bufs[i].head_position * DAC_BUFFER_SIZE_IN_SAMPLES;
-        buf_pointer = bufs[i].current_buf == 0 ? bufs[i].buffer_a : bufs[i].buffer_b;
-
-        size_t remaining = (bufs[i].size - bufs[i].wav_position) / sizeof(int16_t);
+        base_index = bufs[buf].head_position * DAC_BUFFER_SIZE_IN_SAMPLES;
+        buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_a : bufs[buf].buffer_b;
+        size_t remaining = (bufs[buf].size - bufs[buf].wav_position) / sizeof(int16_t);
         size_t to_write = remaining < DAC_BUFFER_SIZE_IN_SAMPLES ? remaining : DAC_BUFFER_SIZE_IN_SAMPLES;
-
-        uint8_t channel = bufs[i].wav_player_event.channel;
-        uint8_t left_vol = channel_pan[channel].left_vol;
-        uint8_t right_vol = channel_pan[channel].right_vol;
-
-        bool left = false;
-        bool odd = false;
-        for(int s=0; s<to_write; s++)
+        for(int i=0; i<to_write; i++)
         {
-          left = !left;
-          if(left){
-            odd = !odd;
-          }
           // apply volume
-          if(bufs[i].wav_data.response_curve == RESPONSE_ROOT_SQUARE)
-          {
-            tmp16 = scale_sample_sqrt(buf_pointer[base_index + s], bufs[i].volume);
-          }
-          else
-          {
-            tmp16 = scale_sample(buf_pointer[base_index + s], bufs[i].volume);
-          }
-          // apply PAN
-          if(USE_PAN)
-          {
-            tmp16 = scale_sample(tmp16, left ? left_vol : right_vol);
-          }
-          if(bufs[i].fade > 0)
-          {
-            tmp16 = scale_sample(tmp16, 127 - bufs[i].fade);
+          switch(bufs[buf].wav_data.response_curve){
+            case RESPONSE_LINEAR:
+              sample = scale_sample(buf_pointer[base_index + i], bufs[buf].volume);
+              break;
+            case RESPONSE_SQUARE_ROOT:
+              sample = scale_sample_sqrt(buf_pointer[base_index + i], bufs[buf].volume);
+              break;
+            case RESPONSE_INV_SQUARE_ROOT:
+              sample = scale_sample_inv_sqrt(buf_pointer[base_index + i], bufs[buf].volume);
+              break;
+            default:
+              sample = scale_sample(buf_pointer[base_index + i], bufs[buf].volume);
+              break;
           }
           // mix into master 
-          // output_buf[s] += ( tmp16 >> DAMPEN_BITS );
-          // mix into master clamped
-          int next = output_buf[s] + ( tmp16 >> DAMPEN_BITS );
-          // int16_t next_16 = (int16_t)(next > MAX_INT_16 ? MAX_INT_16 : next < MIN_INT_16 ? MIN_INT_16 : next);
-          output_buf[s] = (next > MAX_INT_16) ? MAX_INT_16 : (next < MIN_INT_16) ? MIN_INT_16 : next;
-          // fade
-          if(bufs[i].fade > 0 && left && odd)
+          output_buf[i] += (sample >> DAMPEN_BITS);
+          // do fading
+          if( bufs[buf].fade > 0 && (i % 4 == 0))
           {
-            if(bufs[i].fade < 127)
+            // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
+            if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR)
             {
-              bufs[i].fade++;
+              convert_buf_linear(buf);
+            }
+            else if(bufs[buf].volume > 0)
+            {
+              bufs[buf].volume--;
             }
             else
             {
-              bufs[i].done = true;
+              bufs[buf].done = true;
             }
           }
-          // if(bufs[i].fade && left && odd)
-          // // if(bufs[i].fade && left && odd && quart && oct)
-          // {
-          //   if(bufs[i].volume > 0)
-          //   {
-          //     bufs[i].volume--;
-          //   }
-          //   else
-          //   {
-          //     bufs[i].done = true;
-          //   }
-          // }
         }
         // incriment that buffers position
-        bufs[i].head_position++;
-        bufs[i].wav_position += to_write * sizeof(int16_t);
+        bufs[buf].head_position++;
+        bufs[buf].wav_position += to_write * sizeof(int16_t);
         // if the head has reached the end
-        if(bufs[i].head_position >= LOOPS_PER_BUFFER) 
+        if(bufs[buf].head_position >= LOOPS_PER_BUFFER) 
         {
-          if(bufs[i].full == 0) wlog_i("buffer underrun!");
-          bufs[i].full = 0;
-          bufs[i].current_buf = bufs[i].current_buf == 0 ? 1 : 0;
-          bufs[i].head_position = 0;
+          if(bufs[buf].full == 0) log_e("buffer underrun!");
+          bufs[buf].full = 0;
+          bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+          bufs[buf].head_position = 0;
         }
         // if the wav is done
-        if(bufs[i].wav_position >= bufs[i].size)
+        if(bufs[buf].wav_position >= bufs[buf].size)
         {
-          if(bufs[i].wav_data.play_back_mode == LOOP)
+          if(bufs[buf].wav_data.play_back_mode == LOOP)
           {
             new_midi = 1;
-            new_midi_buf = i;
-            bufs[i].full = 0;
-            // bufs[i].current_buf = 0;
-            bufs[i].head_position = 0;
-            bufs[i].read_block = bufs[i].wav_data.start_block;
-            bufs[i].wav_position = 0;
+            new_midi_buf = buf;
+            bufs[buf].full = 0;
+            // bufs[buf].current_buf = 0;
+            bufs[buf].head_position = 0;
+            bufs[buf].read_block = bufs[buf].wav_data.start_block;
+            bufs[buf].wav_position = 0;
           }
           else
           {
-            bufs[i].done = 1;
+            bufs[buf].done = 1;
           }
         }
       }
     }
 
     // apply the global volume and EQ
-    bool left = false; 
     for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
     {
-      left = !left;
-      output_buf[i] = scale_sample(output_buf[i], metadata.global_volume);
-      if(USE_EQ )
-      {
-        output_buf[i] = apply_EQ(output_buf[i], left);
-      }
+      output_buf_16[i] = scale_sample_clamped_16(output_buf[i], metadata.global_volume);
     }
     // apply the mute
     if(mute)
     {
       for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
       {
-        output_buf[i] = 0;
+        output_buf_16[i] = 0;
       }
     }
 
     // send to the DAC
-    ret = dac_write((int16_t *)output_buf, DAC_BUFFER_SIZE_IN_BYTES, &bytes_to_dma);
+    ret = dac_write(output_buf_16, DAC_BUFFER_SIZE_IN_BYTES, &bytes_to_dma);
     if(ret != ESP_OK){
       log_i("i2s write error %s", esp_err_to_name(ret));
     }
@@ -569,17 +562,23 @@ void wav_player_task(void* pvParameters)
     for(int i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
     {
       output_buf[i]=0;
+      output_buf_16[i]=0;
     }
 
     // clean up the finished buffers
     for(int i=0;i<NUM_BUFFERS;i++)
     {
-      if(bufs[i].done==1)
+      if(bufs[i].done == 1)
       {
         bufs[i].free = 1;
         bufs[i].done = 0;
         bufs[i].current_buf = 0;
-        rpc_out(RPC_NOTE_OFF,bufs[i].voice,bufs[i].wav_player_event.note,NULL);
+        if(bufs[i].pruned == 1)
+        {
+          bufs[i].pruned = 0;
+          xQueueSendToBack(wav_player_queue,(void *) &bufs[i].next_wav_player_event, portMAX_DELAY);
+        }
+        // rpc_out(RPC_NOTE_OFF,bufs[i].voice,bufs[i].wav_player_event.note,NULL);
       }
     }
   }
@@ -591,10 +590,10 @@ BaseType_t task_return;
 
 void wav_player_start(void)
 {
-  init_float_lut();
   init_buffs();
-  bool dmaablebuf = esp_ptr_dma_capable(output_buf);
-  log_i( "dma capable buf : %d",(int)dmaablebuf);
+  init_response_luts();
+  bool dmaablebuf = esp_ptr_dma_capable(output_buf_16);
+  log_i( "dma capable output buf : %s", dmaablebuf ? "true" : "false");
   // task_return = xTaskCreatePinnedToCore(&wav_player_task, "wav_player_task", 1024 * 4, NULL, 10, &wav_player_task_handle, 0);
   task_return = xTaskCreatePinnedToCore(&wav_player_task, "wav_player_task", 1024 * 4, NULL, 24, &wav_player_task_handle, 1);
   if(task_return != pdPASS)

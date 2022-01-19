@@ -9,6 +9,7 @@
 #include "driver/sdmmc_host.h"
 #include "html.h"
 #include "bundle.h"
+#include "favicon.h"
 #include <string>
 #include "soc/rtc_wdt.h"
 #include "cJSON.h"
@@ -17,6 +18,8 @@
 #include "server.h"
 #include "file_system.h"
 #include "server.h"
+#include "esp_wifi.h"
+#include "boot.h"
 
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
@@ -26,6 +29,7 @@ extern "C" size_t place_wav(struct lut_t *_data,  size_t num_data_entries, size_
 // extern "C" void updateVoiceConfig(char* json);
 extern "C" void updatePinConfig(char* json);
 extern "C" void updateMetadata(char* json);
+extern "C" void reset_emmc(void);
 extern "C" char* on_rpc_in(cJSON* json);
 extern "C" char* write_recovery_firmware_to_emmc(uint8_t* source, size_t size);
 extern "C" char* close_recovery_firmware_to_emmc(size_t recovery_firmware_size);
@@ -115,10 +119,16 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
     if(Update.end()){
       if(Update.isFinished()){
         Serial.println("success\n\n");
+        metadata_t *new_metadata = get_metadata();
+        new_metadata->current_firmware_index = -1;
+        write_metadata(*new_metadata);
+        feedLoopWDT();
         request->send(204);
         sdmmc_host_deinit();
         delay(1000);
+        feedLoopWDT();
         ESP.restart();
+        force_reset();
       } else {
         request->send(500);
         Serial.println("not finished");
@@ -235,6 +245,16 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     AsyncWebHeader* note_string = request->getHeader("note");
     sscanf(note_string->value().c_str(), "%d", &w_note);
     w_start_block = find_gap_in_file_system(w_size);
+    if(w_start_block == 0)
+    {
+      // error no mem
+      request->send(507);
+    }
+  }
+  if(w_start_block == 0)
+  {
+    feedLoopWDT();
+    return;
   }
   //always
   feedLoopWDT();
@@ -266,6 +286,16 @@ void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_
     sscanf(request->getHeader("layer")->value().c_str(), "%d", &r_layer);
     r_rack_json = request->getHeader("rack-json")->value().c_str();
     r_start_block = find_gap_in_file_system(total);
+    if(r_start_block == 0)
+    {
+      //error no mem
+      request->send(507);
+    }
+  }
+  if(r_start_block == 0)
+  {
+    feedLoopWDT();
+    return;
   }
   //always
   feedLoopWDT();
@@ -384,6 +414,26 @@ void handleVoiceJSON(AsyncWebServerRequest *request){
   // log_i("end : %d", ESP.getFreeHeap());
 }
 
+void handleRecoveryVoiceJSON(AsyncWebServerRequest *request){
+  char *json = "[]";
+  feedLoopWDT();
+  size_t size = strlen(json);
+  AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+    feedLoopWDT();
+    size_t toWrite = min(size - index, maxLen);
+    memcpy(buffer, json + index, toWrite);
+    // if(index + toWrite == size){
+    // }
+    return toWrite;
+  });
+  response->addHeader("size",String(size));
+  feedLoopWDT();
+  request->send(response);
+  // free(json);
+  feedLoopWDT();
+  // log_i("end : %d", ESP.getFreeHeap());
+}
+
 void handleConfigJSON(AsyncWebServerRequest *request){
   // wav_player_resume();
   log_i("print_config_json()");
@@ -444,7 +494,10 @@ void handleBackupEMMC(AsyncWebServerRequest *request){
     }
     return toWrite;
   });
-  response->addHeader("size",String(numBytes));
+  // response->addHeader("size",String(numBytes));
+  // response->addHeader("Content-Type","application/octet-stream");
+  // response->addHeader("Content-Disposition","attachment");
+  // response->addHeader("filename","picture.png");
   request->send(response);
 }
 
@@ -482,19 +535,27 @@ void handleMain(AsyncWebServerRequest *request){
   });
 }
 
-void handleBundle(AsyncWebServerRequest *request){
+// void handleRecovery(AsyncWebServerRequest *request){
+//   size_t size = sizeof(RECOVERY_HTML) / sizeof(char);
+//   request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+//     feedLoopWDT();
+//     size_t toWrite = min(size - index, maxLen);
+//     memcpy(buffer, RECOVERY_HTML + index, toWrite);
+//     return toWrite;
+//   });
+// }
 
-  // size_t size = sizeof(BUNDLE) / sizeof(char);
-  // response->addHeader("Content-Encoding", "br");
-  // request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-  //   feedLoopWDT();
-  //   size_t toWrite = min(size - index, maxLen);
-  //   memcpy(buffer, BUNDLE + index, toWrite);
-  //   return toWrite;
-  // });
+void handleBundle(AsyncWebServerRequest *request){
   const char *type = "text/javascript";
   AsyncWebServerResponse *response = request->beginResponse_P(200, type, BUNDLE, BUNDLE_LEN);
   response->addHeader("Content-Encoding", "gzip");
+  request->send(response);
+}
+
+void handleFavicon(AsyncWebServerRequest *request){
+  const char *type = "image/x-icon";
+  AsyncWebServerResponse *response = request->beginResponse_P(200, type, FAVICON, sizeof(FAVICON));
+  // response->addHeader("Content-Encoding", "gzip");
   request->send(response);
 }
 
@@ -512,6 +573,20 @@ void handleBootFromEmmc(AsyncWebServerRequest *request){
   sscanf(firmware_slot_string->value().c_str(), "%d", &index);
   request->send(204);
   bootFromEmmc(index);
+}
+
+void handleDeleteFirmware(AsyncWebServerRequest *request){
+  char index = 0;
+  AsyncWebHeader* firmware_slot_string = request->getHeader("index");
+  sscanf(firmware_slot_string->value().c_str(), "%d", &index);
+  request->send(204);
+  delete_firmware(index);
+}
+
+void handleEmmcReset(AsyncWebServerRequest *request){
+  //wav_player_pause();
+  reset_emmc();
+  request->send(204);
 }
 
 void _server_pause(){
@@ -541,6 +616,14 @@ void server_begin() {
   Serial.print("AP IP address: ");
   Serial.println(myIP);
 
+  // set WiFi power
+  log_i("metadata wifiPower is %d",metadata->wifi_power);
+  int8_t power = metadata->wifi_power < 8 ? 8 : metadata->wifi_power;
+  esp_wifi_set_max_tx_power(power);
+  esp_wifi_get_max_tx_power(&power);
+  log_i("wifi power is %d", power);
+
+
   server.on(
     "/",
     HTTP_GET,
@@ -551,6 +634,12 @@ void server_begin() {
     "/bundle",
     HTTP_GET,
     handleBundle
+  );
+
+  server.on(
+    "/favicon.ico",
+    HTTP_GET,
+    handleFavicon
   );
 
   server.on(
@@ -584,7 +673,7 @@ void server_begin() {
   );
 
   server.on(
-    "/backupEMMC",
+    "/wvr_emmc_backup.bin",
     HTTP_GET,
     handleBackupEMMC
   );
@@ -681,8 +770,155 @@ void server_begin() {
     handleRPC
   );
 
+  server.on(
+    "/emmcReset",
+    HTTP_GET,
+    handleEmmcReset
+  );
+
+  server.on(
+    "/deleteFirmware",
+    HTTP_GET,
+    handleDeleteFirmware
+  );
+
+
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
+
+  server.begin();
+  Serial.println("Server started");
+}
+
+void recovery_server_begin() {
+  Serial.println("Configuring access point...");
+
+  WiFi.mode(WIFI_AP);
+
+  IPAddress IP = IPAddress (192, 168, 5, 18);
+  IPAddress gateway = IPAddress (192, 168, 5, 20);
+  IPAddress NMask = IPAddress (255, 255, 255, 0);
+
+  WiFi.softAPConfig(IP, gateway, NMask);
+
+  WiFi.softAP("WVR", "12345678");
+  log_i("recovery mode ssid :WVR, passphrase: 12345678");
+  log_i("normal mode wifi ssid is :%s, passphrase is: %s",metadata->ssid, metadata->passphrase);
+ 
+  //  again??
+  WiFi.softAPConfig(IP, gateway, NMask);
+
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+
+  // set low power WiFi
+  ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(8));
+  int8_t power;
+  ESP_ERROR_CHECK(esp_wifi_get_max_tx_power(&power));
+  log_i("wifi power is %d", power);
+
+  server.on(
+    "/",
+    HTTP_GET,
+    handleMain
+  );
+
+  server.on(
+    "/bundle",
+    HTTP_GET,
+    handleBundle
+  );
+
+  server.on(
+    "/favicon.ico",
+    HTTP_GET,
+    handleFavicon
+  );
+
+  server.on(
+    "/update",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleUpdate
+  );
+
+  server.on(
+    "/emmcReset",
+    HTTP_GET,
+    handleEmmcReset
+  );
+
+  server.on(
+    "/updatePinConfig",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleUpdatePinConfig
+  );
+
+  server.on(
+    "/updateMetadata",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleUpdateMetadata
+  );
+
+  server.on(
+    "/addfirmware",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleNewFirmware
+  );
+
+  server.on(
+    "/updaterecoveryfirmware",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleNewRecoveryFirmware
+  );
+
+  server.on(
+    "/bootFromEmmc",
+    HTTP_GET,
+    handleBootFromEmmc
+  );
+
+  server.on(
+    "/configjson",
+    HTTP_GET,
+    handleConfigJSON
+  );
+
+  server.on(
+    "/backupEMMC",
+    HTTP_GET,
+    handleBackupEMMC
+  );
+
+  server.on(
+    "/restoreEMMC",
+    HTTP_POST,
+    [](AsyncWebServerRequest * request){request->send(204);},
+    NULL,
+    handleRestoreEMMC
+  );
+
+  server.on(
+    "/deleteFirmware",
+    HTTP_GET,
+    handleDeleteFirmware
+  );
+
+  server.on(
+    "/voicejson",
+    HTTP_GET,
+    handleRecoveryVoiceJSON
+  );
 
   server.begin();
   Serial.println("Server started");

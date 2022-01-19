@@ -10,7 +10,7 @@ extern "C" {
 
     uint8_t* midi_parse(uint8_t in);
     uint8_t* usb_midi_parse(uint8_t in);
-    uint8_t* midi_hook_default(uint8_t *in);
+    void midi_hook_default(uint8_t *in);
 
 #ifdef __cplusplus
 }

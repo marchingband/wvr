@@ -517,8 +517,12 @@ void wav_player_task(void* pvParameters)
               bufs[buf].done = true;
             }
           }
+          // incriment the wav position
+          bufs[buf].wav_position += sizeof(int16_t);
+          
           if(i == (remaining - 1))
           {
+            //the wav is done
             if(bufs[i].wav_data.play_back_mode == LOOP)
             {
               buf_pointer = bufs[i].buffer_head;

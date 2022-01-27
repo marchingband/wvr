@@ -482,7 +482,7 @@ void wav_player_task(void* pvParameters)
         for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i++)
         {
           // stop the loop if the wav is done
-          if(bufs[i].done) break;
+          if(bufs[buf].done) break;
           // apply volume
           switch(bufs[buf].wav_data.response_curve){
             case RESPONSE_LINEAR:
@@ -519,34 +519,34 @@ void wav_player_task(void* pvParameters)
           }
           // incriment the wav position
           bufs[buf].wav_position += sizeof(int16_t);
-          
+
           if(i == (remaining - 1))
           {
             //the wav is done
-            if(bufs[i].wav_data.play_back_mode == LOOP)
+            if(bufs[buf].wav_data.play_back_mode == LOOP)
             {
-              buf_pointer = bufs[i].buffer_head;
-              bufs[i].current_buf = 2;
-              bufs[i].wav_position = 0;
-              bufs[i].sample_pointer = 0;
+              buf_pointer = bufs[buf].buffer_head;
+              bufs[buf].current_buf = 2;
+              bufs[buf].wav_position = 0;
+              bufs[buf].sample_pointer = 0;
               // next read can skip buffer_head
-              bufs[i].read_block = bufs[i].wav_data.start_block + BLOCKS_PER_READ;
-              bufs[i].full = 0;
-              remaining = bufs[i].size / sizeof(int16_t);
+              bufs[buf].read_block = bufs[buf].wav_data.start_block + BLOCKS_PER_READ;
+              bufs[buf].full = 0;
+              remaining = bufs[buf].size / sizeof(int16_t);
               remaining_in_buffer = SAMPLES_PER_READ;
             }
             else
             {
-              bufs[i].done = 1;
+              bufs[buf].done = 1;
             }
           }
           if(i == (remaining_in_buffer - 1))
           {
             //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
-            buf_pointer = bufs[i].current_buf == 0 ? bufs[i].buffer_b : bufs[i].buffer_a;
-            bufs[i].current_buf = bufs[i].current_buf == 0 ? 1 : 0;
-            bufs[i].sample_pointer = 0;
-            bufs[i].full = 0;
+            buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+            bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+            bufs[buf].sample_pointer = 0;
+            bufs[buf].full = 0;
           }
         }
       }

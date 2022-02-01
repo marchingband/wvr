@@ -39,6 +39,7 @@ static const char* TAG = "wav_player";
 
 #define DAMPEN_BITS 1
 #define LOG_PERFORMANCE 0
+#define LOG_PCM 0
 
 #define MAX_READS_PER_LOOP 4
 // #define MAX_READS_PER_LOOP 3
@@ -58,17 +59,18 @@ struct buf_t {
   struct wav_player_event_t next_wav_player_event;
   int16_t *buffer_a;
   int16_t *buffer_b;
+  int16_t *buffer_head;
   size_t read_block;
   size_t wav_position;
   size_t size;
+  size_t sample_pointer;
   uint8_t volume;
   uint8_t voice;
-  uint8_t head_position;
   uint8_t fade;
+  uint8_t current_buf;
   uint8_t free :1;
   uint8_t done :1;
   uint8_t full :1;
-  uint8_t current_buf :1;
   uint8_t pruned :1;
 };
 
@@ -129,16 +131,17 @@ void init_buffs(void)
     bufs[i].current_buf = 0;
     // uint8_t's
     bufs[i].volume=127;
-    bufs[i].head_position=0;
     bufs[i].fade=0;
     // size_t's
     bufs[i].read_block = 0;
     bufs[i].wav_position = 0;
     bufs[i].size = 0;
+    bufs[i].sample_pointer = 0;
     // buffers
-    bufs[i].buffer_a = (int16_t *)malloc(BYTES_PER_READ);
-    bufs[i].buffer_b = (int16_t *)malloc(BYTES_PER_READ);
-    if(bufs[i].buffer_a==NULL || bufs[i].buffer_b == NULL)
+    bufs[i].buffer_a    = (int16_t *)malloc(BYTES_PER_READ);
+    bufs[i].buffer_b    = (int16_t *)malloc(BYTES_PER_READ);
+    bufs[i].buffer_head = (int16_t *)ps_malloc(BYTES_PER_READ);
+    if(bufs[i].buffer_a==NULL || bufs[i].buffer_b == NULL || bufs[i].buffer_head == NULL)
     {
       log_e("failed to alloc buffers at %d",i);
     }
@@ -157,6 +160,7 @@ void free_bufs(void)
   {
     free(bufs[i].buffer_a);
     free(bufs[i].buffer_b);
+    free(bufs[i].buffer_head);
   }
 }
 
@@ -390,7 +394,7 @@ void wav_player_task(void* pvParameters)
             bufs[i].fade = 0;
             bufs[i].full = 0;
             bufs[i].current_buf = 0;
-            bufs[i].head_position = 0;
+            bufs[i].sample_pointer = 0;
             bufs[i].read_block = bufs[i].wav_data.start_block;
             bufs[i].wav_position = 0;
             bufs[i].size = bufs[i].wav_data.length;
@@ -433,9 +437,17 @@ void wav_player_task(void* pvParameters)
     // if there is a new midi message, read into that buffer for sure
     if(new_midi == 1)
     {
-        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
+        // if its a looped sample, read into the buffer_head
+        if(bufs[new_midi_buf].wav_data.play_back_mode == LOOP)
+        {
+          ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_head, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
+          bufs[new_midi_buf].current_buf = 2;
+        }
+        else
+        {
+          ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
+        }
         num_reads++;
-        // num_reads+=3;
         bufs[new_midi_buf].read_block += BLOCKS_PER_READ;
         new_midi = 0;
     }
@@ -465,29 +477,37 @@ void wav_player_task(void* pvParameters)
     {
       if(bufs[buf].free == 0)
       {
-        base_index = bufs[buf].head_position * DAC_BUFFER_SIZE_IN_SAMPLES;
-        buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_a : bufs[buf].buffer_b;
+        buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_a : bufs[buf].current_buf == 1 ? bufs[buf].buffer_b : bufs[buf].buffer_head;
         size_t remaining = (bufs[buf].size - bufs[buf].wav_position) / sizeof(int16_t);
-        size_t to_write = remaining < DAC_BUFFER_SIZE_IN_SAMPLES ? remaining : DAC_BUFFER_SIZE_IN_SAMPLES;
-        for(int i=0; i<to_write; i++)
+        size_t remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+        for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i++)
         {
+          // stop the loop if the wav is done
+          if(bufs[buf].done) break;
           // apply volume
           switch(bufs[buf].wav_data.response_curve){
             case RESPONSE_LINEAR:
-              sample = scale_sample(buf_pointer[base_index + i], bufs[buf].volume);
+              sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
               break;
             case RESPONSE_SQUARE_ROOT:
-              sample = scale_sample_sqrt(buf_pointer[base_index + i], bufs[buf].volume);
+              sample = scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
               break;
             case RESPONSE_INV_SQUARE_ROOT:
-              sample = scale_sample_inv_sqrt(buf_pointer[base_index + i], bufs[buf].volume);
+              sample = scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
               break;
             default:
-              sample = scale_sample(buf_pointer[base_index + i], bufs[buf].volume);
+              sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
               break;
           }
-          // mix into master 
-          output_buf[i] += (sample >> DAMPEN_BITS);
+          if(LOG_PCM)
+          {
+            log_i("%d %d", bufs[buf].wav_position, sample >> DAMPEN_BITS);
+          }
+          else
+          {
+            // mix into master
+            output_buf[i] += (sample >> DAMPEN_BITS);
+          }
           // do fading
           if( bufs[buf].fade > 0 && (i % 4 == 0))
           {
@@ -505,34 +525,36 @@ void wav_player_task(void* pvParameters)
               bufs[buf].done = true;
             }
           }
-        }
-        // incriment that buffers position
-        bufs[buf].head_position++;
-        bufs[buf].wav_position += to_write * sizeof(int16_t);
-        // if the head has reached the end
-        if(bufs[buf].head_position >= LOOPS_PER_BUFFER) 
-        {
-          if(bufs[buf].full == 0) log_e("buffer underrun!");
-          bufs[buf].full = 0;
-          bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
-          bufs[buf].head_position = 0;
-        }
-        // if the wav is done
-        if(bufs[buf].wav_position >= bufs[buf].size)
-        {
-          if(bufs[buf].wav_data.play_back_mode == LOOP)
+          // incriment the wav position
+          bufs[buf].wav_position += sizeof(int16_t);
+
+          if(i == (remaining - 1))
           {
-            new_midi = 1;
-            new_midi_buf = buf;
-            bufs[buf].full = 0;
-            // bufs[buf].current_buf = 0;
-            bufs[buf].head_position = 0;
-            bufs[buf].read_block = bufs[buf].wav_data.start_block;
-            bufs[buf].wav_position = 0;
+            //the wav is done
+            if(bufs[buf].wav_data.play_back_mode == LOOP)
+            {
+              buf_pointer = bufs[buf].buffer_head;
+              bufs[buf].current_buf = 2;
+              bufs[buf].wav_position = 0;
+              bufs[buf].sample_pointer = 0;
+              // next read can skip buffer_head
+              bufs[buf].read_block = bufs[buf].wav_data.start_block + BLOCKS_PER_READ;
+              bufs[buf].full = 0;
+              remaining = bufs[buf].size / sizeof(int16_t);
+              remaining_in_buffer = SAMPLES_PER_READ;
+            }
+            else
+            {
+              bufs[buf].done = 1;
+            }
           }
-          else
+          if(i == (remaining_in_buffer - 1))
           {
-            bufs[buf].done = 1;
+            //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+            buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+            bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+            bufs[buf].sample_pointer = 0;
+            bufs[buf].full = 0;
           }
         }
       }
@@ -573,6 +595,8 @@ void wav_player_task(void* pvParameters)
         bufs[i].free = 1;
         bufs[i].done = 0;
         bufs[i].current_buf = 0;
+        bufs[i].wav_position = 0;
+        bufs[i].sample_pointer = 0;
         if(bufs[i].pruned == 1)
         {
           bufs[i].pruned = 0;

@@ -39,6 +39,7 @@ static const char* TAG = "wav_player";
 
 #define DAMPEN_BITS 1
 #define LOG_PERFORMANCE 0
+#define LOG_PCM 0
 
 #define MAX_READS_PER_LOOP 4
 // #define MAX_READS_PER_LOOP 3
@@ -498,8 +499,15 @@ void wav_player_task(void* pvParameters)
               sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
               break;
           }
-          // mix into master 
-          output_buf[i] += (sample >> DAMPEN_BITS);
+          if(LOG_PCM)
+          {
+            log_i("%d %d", bufs[buf].wav_position, sample >> DAMPEN_BITS);
+          }
+          else
+          {
+            // mix into master
+            output_buf[i] += (sample >> DAMPEN_BITS);
+          }
           // do fading
           if( bufs[buf].fade > 0 && (i % 4 == 0))
           {

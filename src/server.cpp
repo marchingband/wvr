@@ -220,7 +220,6 @@ void handleUpdateMetadata(AsyncWebServerRequest *request, uint8_t *data, size_t 
     //done
     updateMetadata((char *)metadata_json);
     free(metadata_json);
-    // request->send(200, "text/plain", "all done pin config update");
     //wav_player_resume();
   }
 }
@@ -264,7 +263,6 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     //done
     close_wav_to_emmc();
     add_wav_to_file_system(&w_name[0],w_voice,w_note,w_start_block,total);
-    // request->send(200, "text/plain", "done upload wav");
     //wav_player_resume();
   }
 }

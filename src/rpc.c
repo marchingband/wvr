@@ -45,7 +45,7 @@ char* on_rpc_in(cJSON *json)
             uint8_t voice = cJSON_GetObjectItemCaseSensitive(json, "voice")->valueint;
             uint8_t note = cJSON_GetObjectItemCaseSensitive(json, "note")->valueint;
             uint8_t velocity = cJSON_GetObjectItemCaseSensitive(json, "velocity")->valueint;
-            play_wav(voice, note, velocity);
+            toggle_wav(voice, note, velocity);
             char * res = "started wav";
             return(res);
             break;

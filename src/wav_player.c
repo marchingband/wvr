@@ -235,6 +235,18 @@ int16_t IRAM_ATTR scale_sample_clamped_16(int in, uint8_t volume)
   return (int16_t)(out * lin_float_lut[volume].val);
 }
 
+bool is_playing(uint8_t voice, uint8_t note)
+{
+  for(int i=0;i<NUM_BUFFERS;i++)
+  {
+    if((bufs[i].free == false) && (bufs[i].wav_player_event.voice == voice) && (bufs[i].wav_player_event.note == note))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
 void stop_wav(uint8_t voice, uint8_t note)
 {
   struct wav_player_event_t wav_player_event;
@@ -254,6 +266,18 @@ void play_wav(uint8_t voice, uint8_t note, uint8_t velocity)
   wav_player_event.note = note;
   wav_player_event.channel = 0;
   xQueueSendToBack(wav_player_queue, &wav_player_event, portMAX_DELAY);
+}
+
+void toggle_wav(uint8_t voice, uint8_t note, uint8_t velocity)
+{
+  if(is_playing(voice, note))
+  {
+    stop_wav(voice, note);
+  }
+  else
+  {
+    play_wav(voice, note, velocity);
+  }
 }
 
 int prune(uint8_t priority)

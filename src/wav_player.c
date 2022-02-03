@@ -82,11 +82,11 @@ struct asr_t make_asr_data(struct wav_lu_t wav)
   // size_t asr_offset_bytes = end_buf_head % BLOCK_SIZE; // this is the offset in bytes
   // asr.offset = asr_offset_bytes / sizeof(int16_t); // convert to mono-samples
 
-  log_i("%d",asr.loop_start);
-  log_i("%d",asr.loop_end);
-  log_i("%d",asr.read_block);
-  log_i("%d",asr.offset);
-  log_i("%d",asr.read_ptr);
+  // log_i("%d",asr.loop_start);
+  // log_i("%d",asr.loop_end);
+  // log_i("%d",asr.read_block);
+  // log_i("%d",asr.offset);
+  // log_i("%d",asr.read_ptr);
 
 //   [I][wav_player.c:85] make_asr_data(  80000
 // [I][wav_player.c:86] make_asr_data(): 160000
@@ -606,12 +606,15 @@ void wav_player_task(void* pvParameters)
             // if it's within the buf_head region, copy it
             if((bufs[buf].wav_position >= bufs[buf].asr.loop_start) && (bufs[buf].wav_position < bufs[buf].asr.loop_end))
             {
-              log_i("cpy %d", bufs[buf].wav_position);
+              if((bufs[buf].wav_position == bufs[buf].asr.loop_start) || (bufs[buf].wav_position == (bufs[buf].asr.loop_end - 2)))
+              {
+                log_i("cpy %d", bufs[buf].wav_position);
+              }
               // ptr has been incrimented so -1
               bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1];
             }
             // maybe loop
-            if((bufs[buf].wav_position == bufs[buf].asr.loop_end -1) && (!bufs[buf].fade))
+            if((bufs[buf].wav_position == bufs[buf].asr.loop_end -2) && (!bufs[buf].fade))
             {
               buf_pointer = bufs[buf].buffer_head;
               bufs[buf].current_buf = 2;

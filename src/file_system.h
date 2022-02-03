@@ -30,7 +30,8 @@ extern "C"
 enum play_back_mode {
     ONE_SHOT,
     LOOP,
-    PING_PONG
+    PING_PONG,
+    ASR_LOOP,
 };
 
 enum retrigger_mode {
@@ -112,11 +113,10 @@ struct wav_lu_t {
     enum retrigger_mode retrigger_mode;
     enum note_off_meaning note_off_meaning;
     enum response_curve response_curve;
-    int8_t buffer_index;
     uint8_t priority; // 0 to 15
-    uint8_t empty :1;
-    uint8_t shouldHalt :1;
-    uint8_t playing :1;
+    uint8_t empty;
+    size_t loop_start;
+    size_t loop_end;
 };
 
 struct wav_file_t {
@@ -130,6 +130,8 @@ struct wav_file_t {
     enum response_curve response_curve;
     uint8_t priority; // 0 to 15
     uint8_t empty;
+    size_t loop_start;
+    size_t loop_end;
 };
 
 struct firmware_t {

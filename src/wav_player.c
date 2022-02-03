@@ -53,10 +53,43 @@ struct pan_t channel_pan[16];
 
 extern struct metadata_t metadata;
 bool mute = false;
+
+struct asr_t {
+  size_t loop_start; // byte position to start reading into buf_head
+  size_t loop_end; // byte position to loop back to buf_head
+  size_t read_block; // block number to start reading from after buf_head
+  size_t offset; // num mono-samples to skip in the .read_block
+  size_t read_ptr; // num bytes read into buf_head
+};
+
+struct asr_t make_asr_data(struct wav_lu_t wav)
+{
+  struct asr_t asr;
+  asr.read_ptr = 0;
+  asr.loop_start = wav.loop_start * 2 * sizeof(int16_t); // convert to bytes
+  asr.loop_end = wav.loop_end * 2 * sizeof(int16_t); // convert to bytes
+  size_t end_buf_head = asr.loop_start + (BYTES_PER_READ);
+  asr.read_block = end_buf_head / BLOCK_SIZE; // rounds down
+  size_t asr_offset_bytes = end_buf_head % BLOCK_SIZE; // this is the offset in bytes
+  asr.offset = asr_offset_bytes / sizeof(int16_t); // convert to mono-samples
+
+
+  // asr.loop_start = wav.loop_start * 2; // convert from stereo-samples to mono-samples
+  // asr.loop_end = wav.loop_end * 2; // convert from stereo-samples to mono-samples
+  // size_t loop_start_bytes = wav.loop_start * 2 * sizeof(int16_t); // convert to bytes
+  // size_t end_buf_head = loop_start_bytes + (BYTES_PER_READ);
+  // asr.read_block = end_buf_head / BLOCK_SIZE; // rounds down
+  // size_t asr_offset_bytes = end_buf_head % BLOCK_SIZE; // this is the offset in bytes
+  // asr.offset = asr_offset_bytes / sizeof(int16_t); // convert to mono-samples
+
+  return asr;
+}
+
 struct buf_t {
   struct wav_lu_t wav_data;
   struct wav_player_event_t wav_player_event;
   struct wav_player_event_t next_wav_player_event;
+  struct asr_t asr;
   int16_t *buffer_a;
   int16_t *buffer_b;
   int16_t *buffer_head;
@@ -422,6 +455,11 @@ void wav_player_task(void* pvParameters)
             bufs[i].read_block = bufs[i].wav_data.start_block;
             bufs[i].wav_position = 0;
             bufs[i].size = bufs[i].wav_data.length;
+            // calculate the ASR data if needed
+            if(new_wav.play_back_mode == ASR_LOOP)
+            {
+              bufs[i].asr = make_asr_data(new_wav);
+            }
             if(new_wav.isRack == -2 || new_wav.response_curve == RESPONSE_FIXED)
             {
               // it's a rack member or a fixed volume file
@@ -549,6 +587,30 @@ void wav_player_task(void* pvParameters)
               bufs[buf].done = true;
             }
           }
+
+          // asr stuff
+          if(bufs[buf].wav_data.play_back_mode == ASR_LOOP)
+          {
+            // if it's within the buf_head region, copy it
+            if((bufs[buf].wav_position >= bufs[buf].asr.loop_start) && (bufs[buf].wav_position < bufs[buf].asr.loop_end))
+            {
+              bufs[i].buffer_head[bufs[buf].asr.read_ptr++] = sample;
+            }
+            // maybe loop
+            if((bufs[buf].wav_position == bufs[buf].asr.loop_end -1) && (!bufs[buf].fade))
+            {
+              buf_pointer = bufs[buf].buffer_head;
+              bufs[buf].current_buf = 2;
+              bufs[buf].wav_position = bufs[buf].asr.loop_start;
+              bufs[buf].sample_pointer = 0;
+              // next read is at the asr.read_block
+              bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block;
+              bufs[buf].full = 0;
+              remaining = (bufs[buf].size - bufs[buf].asr.loop_start) / sizeof(int16_t);
+              remaining_in_buffer = SAMPLES_PER_READ;
+            }
+          }
+
           // incriment the wav position
           bufs[buf].wav_position += sizeof(int16_t);
 
@@ -576,9 +638,14 @@ void wav_player_task(void* pvParameters)
           {
             //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
             buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
-            bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
             bufs[buf].sample_pointer = 0;
             bufs[buf].full = 0;
+            // asr skips the offset but only the first time
+            if((bufs[buf].wav_data.play_back_mode == ASR_LOOP) && (bufs[buf].current_buf = 2))
+            {
+              bufs[buf].sample_pointer += bufs[buf].asr.offset;
+            }
+            bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
           }
         }
       }

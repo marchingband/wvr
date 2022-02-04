@@ -582,8 +582,8 @@ void wav_player_task(void* pvParameters)
             // mix into master
             output_buf[i] += (sample >> DAMPEN_BITS);
           }
-          // do fading
-          if( bufs[buf].fade > 0 && (i % 4 == 0))
+          // do fading, but not for asr's
+          if( (bufs[buf].fade > 0) && (i % 4 == 0) && (bufs[buf].wav_data.play_back_mode != ASR_LOOP))
           {
             // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
             if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR)
@@ -606,10 +606,6 @@ void wav_player_task(void* pvParameters)
             // if it's within the buf_head region, copy it
             if((bufs[buf].wav_position >= bufs[buf].asr.loop_start) && (bufs[buf].wav_position < bufs[buf].asr.loop_end))
             {
-              if((bufs[buf].wav_position == bufs[buf].asr.loop_start) || (bufs[buf].wav_position == (bufs[buf].asr.loop_end - 2)))
-              {
-                log_i("cpy %d", bufs[buf].wav_position);
-              }
               // ptr has been incrimented so -1
               bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1];
             }

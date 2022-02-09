@@ -34,18 +34,16 @@ static const char* TAG = "wav_player";
 #define DAC_BUFFER_SIZE_IN_BYTES ( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t) ) 
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
 
-#define NUM_BUFFERS 18
+// #define NUM_BUFFERS 16    // 1.1.x
+#define NUM_BUFFERS 18 // 1.0.x
 // #define NUM_BUFFERS 19
 
 #define DAMPEN_BITS 1
-#define LOG_PERFORMANCE 0
-#define LOG_PCM 0
 
-#define MAX_READS_PER_LOOP 4
+// #define MAX_READS_PER_LOOP 6
+// #define MAX_READS_PER_LOOP 5
+#define MAX_READS_PER_LOOP 4 // default
 // #define MAX_READS_PER_LOOP 3
-
-#define USE_EQ 0
-#define USE_PAN 0
 
 // from midi.c
 uint8_t channel_lut[16];
@@ -67,9 +65,9 @@ struct asr_t make_asr_data(struct wav_lu_t wav)
 {
   struct asr_t asr;
   asr.read_ptr = 0;
-  asr.loop_start = wav.loop_start * 2 * sizeof(int16_t); // convert to bytes
-  asr.loop_end = wav.loop_end * 2 * sizeof(int16_t); // convert to bytes
-  size_t end_buf_head = asr.loop_start + (BYTES_PER_READ);
+  asr.loop_start = wav.loop_start * 2; // convert to mono samples
+  asr.loop_end = wav.loop_end * 2; // convert to mono samples
+  size_t end_buf_head = (asr.loop_start * 2) + (BYTES_PER_READ);
   asr.read_block = end_buf_head / BLOCK_SIZE; // rounds down
   size_t asr_offset_bytes = end_buf_head % BLOCK_SIZE; // this is the offset in bytes
   asr.offset = asr_offset_bytes / sizeof(int16_t); // convert to mono-samples
@@ -230,7 +228,6 @@ void init_response_luts(void)
   for(int i=0;i<128;i++)
   {
     lin_float_lut[i].val = i/127.0;
-    // lin_float_lut[i].fade_val = i;
     sqrt_float_lut[i].val = sqrt(i * 127.0)/127;
     inv_sqrt_float_lut[i].val = pow(i / 127.0, 2);
   }
@@ -446,7 +443,7 @@ void wav_player_task(void* pvParameters)
             bufs[i].sample_pointer = 0;
             bufs[i].read_block = bufs[i].wav_data.start_block;
             bufs[i].wav_position = 0;
-            bufs[i].size = bufs[i].wav_data.length;
+            bufs[i].size = bufs[i].wav_data.length / sizeof(int16_t);
             // calculate the ASR data if needed
             if(new_wav.play_back_mode == ASR_LOOP)
             {
@@ -487,9 +484,7 @@ void wav_player_task(void* pvParameters)
     }
 
     num_reads = 0;
-
-    // if there is a new midi message, read into that buffer for sure
-    if(new_midi == 1)
+    if(new_midi == 1) // if there is a new midi message, read into that buffer for sure
     {
       // if its a looped sample, read into the buffer_head
       if(bufs[new_midi_buf].wav_data.play_back_mode == LOOP)
@@ -532,7 +527,7 @@ void wav_player_task(void* pvParameters)
       if(bufs[buf].free == 0)
       {
         buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_a : bufs[buf].current_buf == 1 ? bufs[buf].buffer_b : bufs[buf].buffer_head;
-        size_t remaining = (bufs[buf].size - bufs[buf].wav_position) / sizeof(int16_t);
+        size_t remaining = bufs[buf].size - bufs[buf].wav_position;
         size_t remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
         for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i++)
         {
@@ -563,12 +558,12 @@ void wav_player_task(void* pvParameters)
               if((bufs[buf].asr.full == false) && (bufs[buf].wav_position >= bufs[buf].asr.loop_start)) // if it's within the buf_head region, and its not full, copy it
               {
                 bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
-                if(bufs[buf].wav_position == (bufs[buf].asr.loop_start + BYTES_PER_READ - 2)) // this is the last read into buf_head
+                if(bufs[buf].wav_position == (bufs[buf].asr.loop_start + SAMPLES_PER_READ - 1)) // this is the last read into buf_head
                 {
                   bufs[buf].asr.full = true;
                 }
               }
-              if((bufs[buf].wav_position == bufs[buf].asr.loop_end -2) && (!bufs[buf].fade)) // maybe loop
+              if((bufs[buf].wav_position == bufs[buf].asr.loop_end -1) && (!bufs[buf].fade)) // maybe loop
               {
                 buf_pointer = bufs[buf].buffer_head;
                 bufs[buf].current_buf = 2;
@@ -576,10 +571,10 @@ void wav_player_task(void* pvParameters)
                 bufs[buf].sample_pointer = 0;
                 bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
                 bufs[buf].full = 0;
-                remaining = (bufs[buf].size - bufs[buf].asr.loop_start) / sizeof(int16_t);
+                remaining = bufs[buf].size - bufs[buf].asr.loop_start;
                 remaining_in_buffer = SAMPLES_PER_READ;
               }
-              bufs[buf].wav_position += sizeof(int16_t); // incriment the wav position
+              bufs[buf].wav_position += 1; // incriment the wav position
               if(i == (remaining - 1)) //the wav is done
               {
                   bufs[buf].done = 1;
@@ -612,7 +607,7 @@ void wav_player_task(void* pvParameters)
                   bufs[buf].done = true;
                 }
               }
-              bufs[buf].wav_position += sizeof(int16_t); // incriment the wav position
+              bufs[buf].wav_position += 1; // incriment the wav position
               if(i == (remaining - 1)) //the wav is done
               {
                 buf_pointer = bufs[buf].buffer_head;
@@ -621,16 +616,17 @@ void wav_player_task(void* pvParameters)
                 bufs[buf].sample_pointer = 0;
                 bufs[buf].read_block = bufs[buf].wav_data.start_block + BLOCKS_PER_READ; // next read can skip buffer_head
                 bufs[buf].full = 0;
-                remaining = bufs[buf].size / sizeof(int16_t);
+                remaining = bufs[buf].size;
                 remaining_in_buffer = SAMPLES_PER_READ;
-              }
-              if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+              } 
+              else if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
               {
                 buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
                 bufs[buf].sample_pointer = 0;
                 bufs[buf].full = 0;
                 bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
               }
+              break;
             default :
               if( (bufs[buf].fade > 0) && (i % 4 == 0) )
               {
@@ -647,24 +643,24 @@ void wav_player_task(void* pvParameters)
                   bufs[buf].done = true;
                 }
               }
-              bufs[buf].wav_position += sizeof(int16_t); // incriment the wav position
+              bufs[buf].wav_position += 1; // incriment the wav position
               if(i == (remaining - 1)) //the wav is done
               {                
                 bufs[buf].done = 1;
               }
-              if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+              else if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
               {
                 buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
                 bufs[buf].sample_pointer = 0;
                 bufs[buf].full = 0;
                 bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
               }
+              break;
           }
         }
       }
     }
-
-    // apply the global volume and EQ
+    // apply the global volume
     for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
     {
       output_buf_16[i] = scale_sample_clamped_16(output_buf[i], metadata.global_volume);
@@ -685,11 +681,8 @@ void wav_player_task(void* pvParameters)
     }
     
     // clear the output buffer
-    for(int i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
-    {
-      output_buf[i]=0;
-      output_buf_16[i]=0;
-    }
+    bzero(output_buf, DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int));
+    bzero(output_buf_16, DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t));
 
     // clean up the finished buffers
     for(int i=0;i<NUM_BUFFERS;i++)

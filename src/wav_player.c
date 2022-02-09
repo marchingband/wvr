@@ -60,6 +60,7 @@ struct asr_t {
   size_t read_block; // block number to start reading from after buf_head
   size_t offset; // num mono-samples to skip in the .read_block
   size_t read_ptr; // num bytes read into buf_head
+  bool full; // the buffer has been filled previusly
 };
 
 struct asr_t make_asr_data(struct wav_lu_t wav)
@@ -72,28 +73,7 @@ struct asr_t make_asr_data(struct wav_lu_t wav)
   asr.read_block = end_buf_head / BLOCK_SIZE; // rounds down
   size_t asr_offset_bytes = end_buf_head % BLOCK_SIZE; // this is the offset in bytes
   asr.offset = asr_offset_bytes / sizeof(int16_t); // convert to mono-samples
-
-
-  // asr.loop_start = wav.loop_start * 2; // convert from stereo-samples to mono-samples
-  // asr.loop_end = wav.loop_end * 2; // convert from stereo-samples to mono-samples
-  // size_t loop_start_bytes = wav.loop_start * 2 * sizeof(int16_t); // convert to bytes
-  // size_t end_buf_head = loop_start_bytes + (BYTES_PER_READ);
-  // asr.read_block = end_buf_head / BLOCK_SIZE; // rounds down
-  // size_t asr_offset_bytes = end_buf_head % BLOCK_SIZE; // this is the offset in bytes
-  // asr.offset = asr_offset_bytes / sizeof(int16_t); // convert to mono-samples
-
-  // log_i("%d",asr.loop_start);
-  // log_i("%d",asr.loop_end);
-  // log_i("%d",asr.read_block);
-  // log_i("%d",asr.offset);
-  // log_i("%d",asr.read_ptr);
-
-//   [I][wav_player.c:85] make_asr_data(  80000
-// [I][wav_player.c:86] make_asr_data(): 160000
-// [I][wav_player.c:87] make_asr_data(): 162
-// [I][wav_player.c:88] make_asr_data(): 64
-// [I][wav_player.c:89] make_asr_data(): 0
-
+  asr.full = false;
   return asr;
 }
 
@@ -511,19 +491,19 @@ void wav_player_task(void* pvParameters)
     // if there is a new midi message, read into that buffer for sure
     if(new_midi == 1)
     {
-        // if its a looped sample, read into the buffer_head
-        if(bufs[new_midi_buf].wav_data.play_back_mode == LOOP)
-        {
-          ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_head, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
-          bufs[new_midi_buf].current_buf = 2;
-        }
-        else
-        {
-          ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
-        }
-        num_reads++;
-        bufs[new_midi_buf].read_block += BLOCKS_PER_READ;
-        new_midi = 0;
+      // if its a looped sample, read into the buffer_head
+      if(bufs[new_midi_buf].wav_data.play_back_mode == LOOP)
+      {
+        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_head, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
+        bufs[new_midi_buf].current_buf = 2;
+      }
+      else
+      {
+        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
+      }
+      num_reads++;
+      bufs[new_midi_buf].read_block += BLOCKS_PER_READ;
+      new_midi = 0;
     }
 
     // read into all the other buffers that need it, up to MAX_READS_PER_LOOP
@@ -573,93 +553,112 @@ void wav_player_task(void* pvParameters)
               sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
               break;
           }
-          if(LOG_PCM)
-          {
-            log_i("%d %d", bufs[buf].wav_position, sample >> DAMPEN_BITS);
-          }
-          else
-          {
-            // mix into master
-            output_buf[i] += (sample >> DAMPEN_BITS);
-          }
-          // do fading, but not for asr's
-          if( (bufs[buf].fade > 0) && (i % 4 == 0) && (bufs[buf].wav_data.play_back_mode != ASR_LOOP))
-          {
-            // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
-            if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR)
-            {
-              convert_buf_linear(buf);
-            }
-            else if(bufs[buf].volume > 0)
-            {
-              bufs[buf].volume--;
-            }
-            else
-            {
-              bufs[buf].done = true;
-            }
-          }
 
-          // asr stuff
-          if(bufs[buf].wav_data.play_back_mode == ASR_LOOP)
-          {
-            // if it's within the buf_head region, copy it
-            if((bufs[buf].wav_position >= bufs[buf].asr.loop_start) && (bufs[buf].wav_position < bufs[buf].asr.loop_end))
-            {
-              // ptr has been incrimented so -1
-              bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1];
-            }
-            // maybe loop
-            if((bufs[buf].wav_position == bufs[buf].asr.loop_end -2) && (!bufs[buf].fade))
-            {
-              buf_pointer = bufs[buf].buffer_head;
-              bufs[buf].current_buf = 2;
-              bufs[buf].wav_position = bufs[buf].asr.loop_start;
-              bufs[buf].sample_pointer = 0;
-              // next read is at the asr.read_block
-              bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block;
-              bufs[buf].full = 0;
-              remaining = (bufs[buf].size - bufs[buf].asr.loop_start) / sizeof(int16_t);
-              remaining_in_buffer = SAMPLES_PER_READ;
-            }
-          }
+          // mix into master
+          output_buf[i] += (sample >> DAMPEN_BITS);
 
-          // incriment the wav position
-          bufs[buf].wav_position += sizeof(int16_t);
-
-          if(i == (remaining - 1))
+          switch(bufs[buf].wav_data.play_back_mode)
           {
-            //the wav is done
-            if(bufs[buf].wav_data.play_back_mode == LOOP)
-            {
-              buf_pointer = bufs[buf].buffer_head;
-              bufs[buf].current_buf = 2;
-              bufs[buf].wav_position = 0;
-              bufs[buf].sample_pointer = 0;
-              // next read can skip buffer_head
-              bufs[buf].read_block = bufs[buf].wav_data.start_block + BLOCKS_PER_READ;
-              bufs[buf].full = 0;
-              remaining = bufs[buf].size / sizeof(int16_t);
-              remaining_in_buffer = SAMPLES_PER_READ;
-            }
-            else
-            {
-              bufs[buf].done = 1;
-            }
-          }
-          if(i == (remaining_in_buffer - 1))
-          {
-            //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
-            buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
-            bufs[buf].sample_pointer = 0;
-            bufs[buf].full = 0;
-
-            // asr skips the offset but only the first time
-            if((bufs[buf].wav_data.play_back_mode == ASR_LOOP) && (bufs[buf].current_buf == 2))
-            {
-              bufs[buf].sample_pointer += bufs[buf].asr.offset;
-            }
-            bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+            case ASR_LOOP :
+              if((bufs[buf].asr.full == false) && (bufs[buf].wav_position >= bufs[buf].asr.loop_start)) // if it's within the buf_head region, and its not full, copy it
+              {
+                bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
+                if(bufs[buf].wav_position == (bufs[buf].asr.loop_start + BYTES_PER_READ - 2)) // this is the last read into buf_head
+                {
+                  bufs[buf].asr.full = true;
+                }
+              }
+              if((bufs[buf].wav_position == bufs[buf].asr.loop_end -2) && (!bufs[buf].fade)) // maybe loop
+              {
+                buf_pointer = bufs[buf].buffer_head;
+                bufs[buf].current_buf = 2;
+                bufs[buf].wav_position = bufs[buf].asr.loop_start;
+                bufs[buf].sample_pointer = 0;
+                bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
+                bufs[buf].full = 0;
+                remaining = (bufs[buf].size - bufs[buf].asr.loop_start) / sizeof(int16_t);
+                remaining_in_buffer = SAMPLES_PER_READ;
+              }
+              bufs[buf].wav_position += sizeof(int16_t); // incriment the wav position
+              if(i == (remaining - 1)) //the wav is done
+              {
+                  bufs[buf].done = 1;
+              }
+              if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+              {
+                buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+                bufs[buf].sample_pointer = 0;
+                bufs[buf].full = 0;
+                if(bufs[buf].current_buf == 2) // asr skips the offset but only the first time
+                {
+                  bufs[buf].sample_pointer += bufs[buf].asr.offset;
+                }
+                bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+              }
+              break;
+            case LOOP :
+              if( (bufs[buf].fade > 0) && (i % 4 == 0) ) // do fading
+              {
+                if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
+                {
+                  convert_buf_linear(buf);
+                }
+                else if(bufs[buf].volume > 0)
+                {
+                  bufs[buf].volume--;
+                }
+                else
+                {
+                  bufs[buf].done = true;
+                }
+              }
+              bufs[buf].wav_position += sizeof(int16_t); // incriment the wav position
+              if(i == (remaining - 1)) //the wav is done
+              {
+                buf_pointer = bufs[buf].buffer_head;
+                bufs[buf].current_buf = 2;
+                bufs[buf].wav_position = 0;
+                bufs[buf].sample_pointer = 0;
+                bufs[buf].read_block = bufs[buf].wav_data.start_block + BLOCKS_PER_READ; // next read can skip buffer_head
+                bufs[buf].full = 0;
+                remaining = bufs[buf].size / sizeof(int16_t);
+                remaining_in_buffer = SAMPLES_PER_READ;
+              }
+              if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+              {
+                buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+                bufs[buf].sample_pointer = 0;
+                bufs[buf].full = 0;
+                bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+              }
+            default :
+              if( (bufs[buf].fade > 0) && (i % 4 == 0) )
+              {
+                if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
+                {
+                  convert_buf_linear(buf);
+                }
+                else if(bufs[buf].volume > 0)
+                {
+                  bufs[buf].volume--;
+                }
+                else
+                {
+                  bufs[buf].done = true;
+                }
+              }
+              bufs[buf].wav_position += sizeof(int16_t); // incriment the wav position
+              if(i == (remaining - 1)) //the wav is done
+              {                
+                bufs[buf].done = 1;
+              }
+              if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+              {
+                buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+                bufs[buf].sample_pointer = 0;
+                bufs[buf].full = 0;
+                bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+              }
           }
         }
       }

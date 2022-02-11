@@ -338,7 +338,7 @@ int prune(uint8_t priority)
   return candidate;
 }
 
-void wav_player_task(void* pvParameters)
+void IRAM_ATTR wav_player_task(void* pvParameters)
 {
   static size_t bytes_to_dma = 0;
   size_t base_index;
@@ -529,137 +529,388 @@ void wav_player_task(void* pvParameters)
         buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_a : bufs[buf].current_buf == 1 ? bufs[buf].buffer_b : bufs[buf].buffer_head;
         size_t remaining = bufs[buf].size - bufs[buf].wav_position;
         size_t remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
-        for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i++)
+        size_t to_write_total = DAC_BUFFER_SIZE_IN_SAMPLES < remaining ? DAC_BUFFER_SIZE_IN_SAMPLES : remaining;
+        size_t to_write_a = to_write_total < remaining_in_buffer ? to_write_total : remaining_in_buffer;
+        size_t to_write_b = to_write_total - to_write_a;
+        // if(to_write_total == remaining) bufs[buf].done = true;
+        int i = 0;
+        for(; i<to_write_a; i++)
         {
-          // stop the loop if the wav is done
-          if(bufs[buf].done) break;
-          // apply volume
-          switch(bufs[buf].wav_data.response_curve){
-            case RESPONSE_LINEAR:
-              sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
-              break;
-            case RESPONSE_SQUARE_ROOT:
-              sample = scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
-              break;
-            case RESPONSE_INV_SQUARE_ROOT:
-              sample = scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
-              break;
-            default:
-              sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
-              break;
-          }
-
+          sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+            scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
+            bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+            scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
+            scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
           // mix into master
           output_buf[i] += (sample >> DAMPEN_BITS);
-
-          switch(bufs[buf].wav_data.play_back_mode)
+          if( (bufs[buf].fade > 0) && (i % 4 == 0) )
           {
-            case ASR_LOOP :
-              if((bufs[buf].asr.full == false) && (bufs[buf].wav_position >= bufs[buf].asr.loop_start)) // if it's within the buf_head region, and its not full, copy it
-              {
-                bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
-                if(bufs[buf].wav_position == (bufs[buf].asr.loop_start + SAMPLES_PER_READ - 1)) // this is the last read into buf_head
-                {
-                  bufs[buf].asr.full = true;
-                }
-              }
-              if((bufs[buf].wav_position == bufs[buf].asr.loop_end -1) && (!bufs[buf].fade)) // maybe loop
-              {
-                buf_pointer = bufs[buf].buffer_head;
-                bufs[buf].current_buf = 2;
-                bufs[buf].wav_position = bufs[buf].asr.loop_start;
-                bufs[buf].sample_pointer = 0;
-                bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
-                bufs[buf].full = 0;
-                remaining = bufs[buf].size - bufs[buf].asr.loop_start;
-                remaining_in_buffer = SAMPLES_PER_READ;
-              }
-              bufs[buf].wav_position += 1; // incriment the wav position
-              if(i == (remaining - 1)) //the wav is done
-              {
-                  bufs[buf].done = 1;
-              }
-              if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
-              {
-                buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
-                bufs[buf].sample_pointer = 0;
-                bufs[buf].full = 0;
-                if(bufs[buf].current_buf == 2) // asr skips the offset but only the first time
-                {
-                  bufs[buf].sample_pointer += bufs[buf].asr.offset;
-                }
-                bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
-              }
+            if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
+            {
+              convert_buf_linear(buf);
+            }
+            else if(bufs[buf].volume > 0)
+            {
+              bufs[buf].volume--;
+            }
+            else
+            {
+              bufs[buf].done = true;
               break;
-            case LOOP :
-              if( (bufs[buf].fade > 0) && (i % 4 == 0) ) // do fading
-              {
-                if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
-                {
-                  convert_buf_linear(buf);
-                }
-                else if(bufs[buf].volume > 0)
-                {
-                  bufs[buf].volume--;
-                }
-                else
-                {
-                  bufs[buf].done = true;
-                }
-              }
-              bufs[buf].wav_position += 1; // incriment the wav position
-              if(i == (remaining - 1)) //the wav is done
-              {
-                buf_pointer = bufs[buf].buffer_head;
-                bufs[buf].current_buf = 2;
-                bufs[buf].wav_position = 0;
-                bufs[buf].sample_pointer = 0;
-                bufs[buf].read_block = bufs[buf].wav_data.start_block + BLOCKS_PER_READ; // next read can skip buffer_head
-                bufs[buf].full = 0;
-                remaining = bufs[buf].size;
-                remaining_in_buffer = SAMPLES_PER_READ;
-              } 
-              else if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
-              {
-                buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
-                bufs[buf].sample_pointer = 0;
-                bufs[buf].full = 0;
-                bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
-              }
-              break;
-            default :
-              if( (bufs[buf].fade > 0) && (i % 4 == 0) )
-              {
-                if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
-                {
-                  convert_buf_linear(buf);
-                }
-                else if(bufs[buf].volume > 0)
-                {
-                  bufs[buf].volume--;
-                }
-                else
-                {
-                  bufs[buf].done = true;
-                }
-              }
-              bufs[buf].wav_position += 1; // incriment the wav position
-              if(i == (remaining - 1)) //the wav is done
-              {                
-                bufs[buf].done = 1;
-              }
-              else if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
-              {
-                buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
-                bufs[buf].sample_pointer = 0;
-                bufs[buf].full = 0;
-                bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
-              }
-              break;
+            }
           }
         }
+        bufs[buf].wav_position += to_write_a;
+        if(bufs[buf].wav_position == bufs[buf].size - 1)
+        {
+          // loop or done
+        }
+        if(to_write_a == remaining_in_buffer)
+        {
+          //maybe ASR_LOOP
+        }
+
+        if(to_write_b == 0) continue;
+        buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+        bufs[buf].sample_pointer = 0;
+        bufs[buf].full = 0;
+        bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+        for(; i<to_write_total; i++)
+        {
+          sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+            scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
+            bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+            scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
+            scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+          // mix into master
+          output_buf[i] += (sample >> DAMPEN_BITS);
+          if( (bufs[buf].fade > 0) && (i % 4 == 0) )
+          {
+            if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
+            {
+              convert_buf_linear(buf);
+            }
+            else if(bufs[buf].volume > 0)
+            {
+              bufs[buf].volume--;
+            }
+            else
+            {
+              bufs[buf].done = true;
+              break;
+            }
+          }
+        }
+        bufs[buf].wav_position += to_write_b;
+        // switch(bufs[buf].wav_data.play_back_mode)
+        // {
+        //   case ONE_SHOT :
+        //     for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i++)
+        //     {
+        //       // stop the loop if the wav is done
+        //       if(bufs[buf].done) break;
+        //       // apply volume
+        //       switch(bufs[buf].wav_data.response_curve){
+        //         case RESPONSE_LINEAR:
+        //           sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //         case RESPONSE_SQUARE_ROOT:
+        //           sample = scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //         case RESPONSE_INV_SQUARE_ROOT:
+        //           sample = scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //         default:
+        //           sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //       }
+        //       // mix into master
+        //       output_buf[i] += (sample >> DAMPEN_BITS);
+        //       if( (bufs[buf].fade > 0) && (i % 4 == 0) )
+        //       {
+        //         if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
+        //         {
+        //           convert_buf_linear(buf);
+        //         }
+        //         else if(bufs[buf].volume > 0)
+        //         {
+        //           bufs[buf].volume--;
+        //         }
+        //         else
+        //         {
+        //           bufs[buf].done = true;
+        //         }
+        //       }
+        //       bufs[buf].wav_position++; // incriment the wav position
+        //       if(i == (remaining - 1)) //the wav is done
+        //       {                
+        //         bufs[buf].done = 1;
+        //       }
+        //       else if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+        //       {
+        //         buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+        //         bufs[buf].sample_pointer = 0;
+        //         bufs[buf].full = 0;
+        //         bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+        //       }
+        //     }
+        //     break;
+        //   case LOOP :
+        //     for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i++)
+        //     {
+        //       // stop the loop if the wav is done
+        //       if(bufs[buf].done) break;
+        //       // apply volume
+        //       switch(bufs[buf].wav_data.response_curve){
+        //         case RESPONSE_LINEAR:
+        //           sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //         case RESPONSE_SQUARE_ROOT:
+        //           sample = scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //         case RESPONSE_INV_SQUARE_ROOT:
+        //           sample = scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //         default:
+        //           sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //       }
+        //       // mix into master
+        //       output_buf[i] += (sample >> DAMPEN_BITS);
+        //       if( (bufs[buf].fade > 0) && (i % 4 == 0) ) // do fading
+        //       {
+        //         if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
+        //         {
+        //           convert_buf_linear(buf);
+        //         }
+        //         else if(bufs[buf].volume > 0)
+        //         {
+        //           bufs[buf].volume--;
+        //         }
+        //         else
+        //         {
+        //           bufs[buf].done = true;
+        //         }
+        //       }
+        //       bufs[buf].wav_position += 1; // incriment the wav position
+        //       if(i == (remaining - 1)) //the wav is done
+        //       {
+        //         buf_pointer = bufs[buf].buffer_head;
+        //         bufs[buf].current_buf = 2;
+        //         bufs[buf].wav_position = 0;
+        //         bufs[buf].sample_pointer = 0;
+        //         bufs[buf].read_block = bufs[buf].wav_data.start_block + BLOCKS_PER_READ; // next read can skip buffer_head
+        //         bufs[buf].full = 0;
+        //         remaining = bufs[buf].size;
+        //         remaining_in_buffer = SAMPLES_PER_READ;
+        //       } 
+        //       else if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+        //       {
+        //         buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+        //         bufs[buf].sample_pointer = 0;
+        //         bufs[buf].full = 0;
+        //         bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+        //       }
+        //     }
+        //     break;
+        //   case ASR_LOOP :
+        //     for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i++)
+        //     {
+        //       // stop the loop if the wav is done
+        //       if(bufs[buf].done) break;
+        //       // apply volume
+        //       switch(bufs[buf].wav_data.response_curve){
+        //         case RESPONSE_LINEAR:
+        //           sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //         case RESPONSE_SQUARE_ROOT:
+        //           sample = scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //         case RESPONSE_INV_SQUARE_ROOT:
+        //           sample = scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //         default:
+        //           sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+        //           break;
+        //       }
+        //       // mix into master
+        //       output_buf[i] += (sample >> DAMPEN_BITS);
+        //       if((bufs[buf].asr.full == false) && (bufs[buf].wav_position >= bufs[buf].asr.loop_start)) // if it's within the buf_head region, and its not full, copy it
+        //       {
+        //         bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
+        //         if(bufs[buf].wav_position == (bufs[buf].asr.loop_start + SAMPLES_PER_READ - 1)) // this is the last read into buf_head
+        //         {
+        //           bufs[buf].asr.full = true;
+        //         }
+        //       }
+        //       if((bufs[buf].wav_position == bufs[buf].asr.loop_end -1) && (!bufs[buf].fade)) // maybe loop
+        //       {
+        //         buf_pointer = bufs[buf].buffer_head;
+        //         bufs[buf].current_buf = 2;
+        //         bufs[buf].wav_position = bufs[buf].asr.loop_start;
+        //         bufs[buf].sample_pointer = 0;
+        //         bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
+        //         bufs[buf].full = 0;
+        //         remaining = bufs[buf].size - bufs[buf].asr.loop_start;
+        //         remaining_in_buffer = SAMPLES_PER_READ;
+        //       }
+        //       bufs[buf].wav_position += 1; // incriment the wav position
+        //       if(i == (remaining - 1)) //the wav is done
+        //       {
+        //           bufs[buf].done = 1;
+        //       }
+        //       if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+        //       {
+        //         buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+        //         bufs[buf].sample_pointer = 0;
+        //         bufs[buf].full = 0;
+        //         if(bufs[buf].current_buf == 2) // asr skips the offset but only the first time
+        //         {
+        //           bufs[buf].sample_pointer += bufs[buf].asr.offset;
+        //         }
+        //         bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+        //       }
+        //     }
+        //     break;
+        //   default : break;
+        // }
       }
     }
+
+
+
+    //     for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i++)
+    //     {
+    //       // stop the loop if the wav is done
+    //       if(bufs[buf].done) break;
+    //       // apply volume
+    //       switch(bufs[buf].wav_data.response_curve){
+    //         case RESPONSE_LINEAR:
+    //           sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+    //           break;
+    //         case RESPONSE_SQUARE_ROOT:
+    //           sample = scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+    //           break;
+    //         case RESPONSE_INV_SQUARE_ROOT:
+    //           sample = scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+    //           break;
+    //         default:
+    //           sample = scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+    //           break;
+    //       }
+
+    //       // mix into master
+    //       output_buf[i] += (sample >> DAMPEN_BITS);
+
+    //       switch(bufs[buf].wav_data.play_back_mode)
+    //       {
+    //         case ASR_LOOP :
+    //           if((bufs[buf].asr.full == false) && (bufs[buf].wav_position >= bufs[buf].asr.loop_start)) // if it's within the buf_head region, and its not full, copy it
+    //           {
+    //             bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
+    //             if(bufs[buf].wav_position == (bufs[buf].asr.loop_start + SAMPLES_PER_READ - 1)) // this is the last read into buf_head
+    //             {
+    //               bufs[buf].asr.full = true;
+    //             }
+    //           }
+    //           if((bufs[buf].wav_position == bufs[buf].asr.loop_end -1) && (!bufs[buf].fade)) // maybe loop
+    //           {
+    //             buf_pointer = bufs[buf].buffer_head;
+    //             bufs[buf].current_buf = 2;
+    //             bufs[buf].wav_position = bufs[buf].asr.loop_start;
+    //             bufs[buf].sample_pointer = 0;
+    //             bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
+    //             bufs[buf].full = 0;
+    //             remaining = bufs[buf].size - bufs[buf].asr.loop_start;
+    //             remaining_in_buffer = SAMPLES_PER_READ;
+    //           }
+    //           bufs[buf].wav_position += 1; // incriment the wav position
+    //           if(i == (remaining - 1)) //the wav is done
+    //           {
+    //               bufs[buf].done = 1;
+    //           }
+    //           if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+    //           {
+    //             buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+    //             bufs[buf].sample_pointer = 0;
+    //             bufs[buf].full = 0;
+    //             if(bufs[buf].current_buf == 2) // asr skips the offset but only the first time
+    //             {
+    //               bufs[buf].sample_pointer += bufs[buf].asr.offset;
+    //             }
+    //             bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+    //           }
+    //           break;
+    //         case LOOP :
+    //           if( (bufs[buf].fade > 0) && (i % 4 == 0) ) // do fading
+    //           {
+    //             if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
+    //             {
+    //               convert_buf_linear(buf);
+    //             }
+    //             else if(bufs[buf].volume > 0)
+    //             {
+    //               bufs[buf].volume--;
+    //             }
+    //             else
+    //             {
+    //               bufs[buf].done = true;
+    //             }
+    //           }
+    //           bufs[buf].wav_position += 1; // incriment the wav position
+    //           if(i == (remaining - 1)) //the wav is done
+    //           {
+    //             buf_pointer = bufs[buf].buffer_head;
+    //             bufs[buf].current_buf = 2;
+    //             bufs[buf].wav_position = 0;
+    //             bufs[buf].sample_pointer = 0;
+    //             bufs[buf].read_block = bufs[buf].wav_data.start_block + BLOCKS_PER_READ; // next read can skip buffer_head
+    //             bufs[buf].full = 0;
+    //             remaining = bufs[buf].size;
+    //             remaining_in_buffer = SAMPLES_PER_READ;
+    //           } 
+    //           else if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+    //           {
+    //             buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+    //             bufs[buf].sample_pointer = 0;
+    //             bufs[buf].full = 0;
+    //             bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+    //           }
+    //           break;
+    //         default :
+    //           if( (bufs[buf].fade > 0) && (i % 4 == 0) )
+    //           {
+    //             if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
+    //             {
+    //               convert_buf_linear(buf);
+    //             }
+    //             else if(bufs[buf].volume > 0)
+    //             {
+    //               bufs[buf].volume--;
+    //             }
+    //             else
+    //             {
+    //               bufs[buf].done = true;
+    //             }
+    //           }
+    //           bufs[buf].wav_position += 1; // incriment the wav position
+    //           if(i == (remaining - 1)) //the wav is done
+    //           {                
+    //             bufs[buf].done = 1;
+    //           }
+    //           else if(i == (remaining_in_buffer - 1)) //out of buffer but the wav isnt done (todo:check that both arnt true at the same time)
+    //           {
+    //             buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+    //             bufs[buf].sample_pointer = 0;
+    //             bufs[buf].full = 0;
+    //             bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+    //           }
+    //           break;
+    //       }
+    //     }
+    //   }
+    // }
+
     // apply the global volume
     for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
     {

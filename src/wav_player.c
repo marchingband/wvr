@@ -627,23 +627,28 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             }
             break;
           }
-////////////////////////////////////////////////////////////////////////////////////////
-//
-//  |<--attack-->|<----------------------sustain--------------------->|<---release--->|
-//
-//               |<------buffer_head------>|
-//
-//  |    |    |    |    |    |    |    |    |    |    |    |    |    |    |<-natural buffer alignment 
-//                                     ^
-//               ^                     |                              ^
-//               |               asr.read_block                       |
-//         asr.loop_start                                      asr.loop_end
-//                                     |<->|
-//                                       ^
-//                                       |
-//                                   asr.offset
-//
-////////////////////////////////////////////////////////////////////////////////////////
+
+/*
+
+                                    ANATOMY OF ASR LOOP
+
+
+    |<--attack-->|<----------------------sustain--------------------->|<---release--->|
+
+                 |<------buffer_head------>|
+
+    |    |    |    |    |    |    |    |    |    |    |    |    |    |    | <-natural buffer alignment 
+                                       ^
+                 ^                     |                              ^
+                 |               asr.read_block                       |
+           asr.loop_start                                      asr.loop_end
+                                       |<->|
+                                         ^
+                                         |
+                                     asr.offset
+  
+*/
+
           case ASR_LOOP :
           {
             size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES;

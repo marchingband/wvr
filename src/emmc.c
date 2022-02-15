@@ -28,7 +28,7 @@ size_t current_block = 0;
 // utility functions for other files to import
 esp_err_t emmc_write(const void *source, size_t block, size_t size)
 {
-//   log_i("%u",block);
+//   log_i("write block %d",block);
   ret = sdmmc_write_sectors(&card, (const void *)source, (size_t)block, (size_t)size);
   // ret = sdmmc_write_sectors(&card, (char *)source, (size_t)block, (size_t)size);
   return(ret);
@@ -76,6 +76,7 @@ void emmc_init(void)
 
 esp_err_t write_wav_to_emmc(char* source, size_t block, size_t size)
 {
+	// log_i("write wav block %d", block);
 	if(current_block==0)
 	{
 		// this is the first chunk from the client

@@ -64,8 +64,8 @@
 #define FILE_STORAGE_END_BLOCK (RECOVERY_FIRMWARE_START_BLOCK - 1)
 
 // july 10 / 2021
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v0.x.x 
-// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; 
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v1.x.x 
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.0.0
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c

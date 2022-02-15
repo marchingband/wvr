@@ -90,7 +90,9 @@ void init_uart_usb()
 
 #define MIDI_BUFFER_SIZE 256
 
-uint8_t channel_lut[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+struct metadata_t *metadata;
+
+uint8_t channel_lut[16] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 struct pan_t channel_pan[16] = {FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE};
 
 float eq_high;
@@ -112,7 +114,7 @@ static void read_uart_task()
     }
 
     log_i("midi task running on core %u",xPortGetCoreID());
-
+    metadata = get_metadata();
     for(;;) {
         if(xQueueReceive(uart_queue, (void *)&event, (portTickType)portMAX_DELAY)) {
             bzero(tmp, MIDI_BUFFER_SIZE);
@@ -128,6 +130,17 @@ static void read_uart_task()
                         // send it through the midi filter hook
                         log_i("midi %d %d %d",msg[0],msg[1],msg[2]);
                         midi_hook(msg);
+                    }
+                    if(msg)
+                    {
+                        uint8_t channel = msg[0] & 0b00001111;
+                        if(
+                            (metadata->midi_channel != -1) && // WVR is not in OMNI mode
+                            (metadata->midi_channel != channel) // this is not the channel WVR is listening on
+                        )
+                        {
+                            msg = NULL;
+                        }
                     }
                     if(msg)
                     {

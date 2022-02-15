@@ -62,8 +62,8 @@
 #define FILE_STORAGE_END_BLOCK (RECOVERY_FIRMWARE_START_BLOCK - 1)
 
 // july 10 / 2021
-// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; 
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; 
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v0.x.x 
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; 
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -202,10 +202,11 @@ void init_metadata(void){
         .should_check_strapping_pin = 1, // default to should check
         .global_volume = 127,
         .wlog_verbosity = 0,
-        .wifi_power = 8,
         .wifi_starts_on = 1,
         .ssid = "WVR",
-        .passphrase = "12345678"
+        .passphrase = "12345678",
+        .wifi_power = 8,
+        .midi_channel = 0
     };
     memcpy(new_metadata.tag, waver_tag, METADATA_TAG_LENGTH);
     write_metadata(new_metadata);
@@ -905,6 +906,7 @@ void add_metadata_json(cJSON * RESPONSE_ROOT){
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wLogVerbosity",metadata.wlog_verbosity);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiPower",metadata.wifi_power);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiStartsOn",metadata.wifi_starts_on);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"midiChannel",metadata.midi_channel);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkName",metadata.ssid);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkPassword",metadata.passphrase);
 }
@@ -1298,16 +1300,18 @@ void updateMetadata(cJSON *config){
     metadata.wifi_starts_on = cJSON_GetObjectItemCaseSensitive(json, "wifiStartsOn")->valueint;
     metadata.wlog_verbosity = cJSON_GetObjectItemCaseSensitive(json, "wLogVerbosity")->valueint;
     metadata.wifi_power = cJSON_GetObjectItemCaseSensitive(json, "wifiPower")->valueint;
+    metadata.midi_channel = cJSON_GetObjectItemCaseSensitive(json, "midiChannel")->valueint;
     memcpy(&metadata.ssid,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring,20);
     memcpy(&metadata.passphrase,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring,20);
     write_metadata(metadata);
-    wlog_i("gv:%d scsp:%d rmsp:%d wso:%d wlv:%d",
+    wlog_i("gv:%d scsp:%d rmsp:%d wso:%d wlv:%d wfp:%d mdc%d",
         metadata.global_volume,
         metadata.should_check_strapping_pin,
         metadata.recovery_mode_straping_pin,
         metadata.wifi_starts_on,
         metadata.wlog_verbosity,
-        metadata.wifi_power
+        metadata.wifi_power,
+        metadata.midi_channel
     );
     wlog_i("updated and saved metadata");
     cJSON_Delete(json);

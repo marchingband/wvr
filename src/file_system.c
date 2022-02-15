@@ -12,9 +12,11 @@
 #include "cJSON.h"
 #include "esp_heap_caps.h"
 
+// #define METADATA_START_BLOCK 2
 #define METADATA_START_BLOCK 1
 #define METADATA_SIZE_IN_BLOCKS 1
 
+// #define FIRMWARE_LUT_START_BLOCK 3
 #define FIRMWARE_LUT_START_BLOCK 2
 #define MAX_FIRMWARES 10
 #define FIRMWARE_LUT_SIZE (sizeof(struct firmware_t) * MAX_FIRMWARES)
@@ -80,6 +82,7 @@ struct pin_config_t *pin_config_lut;
 void file_system_init(void)
 {
     // alloc_luts();
+    // log_i("metadata_t is %d bytes", sizeof(struct metadata_t));
     if(wav_lut == NULL){
         wav_lut = (struct wav_lu_t**)ps_malloc(NUM_VOICES * sizeof(struct wav_lu_t*));
         if(wav_lut == NULL){log_e("failed to alloc wav_lut");}

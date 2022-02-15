@@ -134,9 +134,11 @@ static void read_uart_task()
                     if(msg)
                     {
                         uint8_t channel = msg[0] & 0b00001111;
+                        log_i("chan %d listening on %d", channel, metadata->midi_channel);
                         if(
-                            (metadata->midi_channel != -1) && // WVR is not in OMNI mode
-                            (metadata->midi_channel != channel) // this is not the channel WVR is listening on
+                            (metadata->midi_channel != 0) && // WVR is not in OMNI mode
+                            // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)
+                            (metadata->midi_channel != (channel + 1)) // this is not the channel WVR is listening on
                         )
                         {
                             msg = NULL;
@@ -145,6 +147,7 @@ static void read_uart_task()
                     if(msg)
                     {
                         uint8_t channel = msg[0] & 0b00001111;
+                        log_i("chan %d", channel);
                         uint8_t code = (msg[0] >> 4) & 0b00001111;
                         switch (code)
                         {
@@ -286,6 +289,20 @@ static void read_usb_uart_task()
                     if(usb_msg)
                     {
                         uint8_t channel = usb_msg[0] & 0b00001111;
+                        log_i("chan %d listening on %d", channel, metadata->midi_channel);
+                        if(
+                            (metadata->midi_channel != 0) && // WVR is not in OMNI mode
+                            // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)
+                            (metadata->midi_channel != (channel + 1)) // this is not the channel WVR is listening on
+                        )
+                        {
+                            usb_msg = NULL;
+                        }
+                    }
+                    if(usb_msg)
+                    {
+                        uint8_t channel = usb_msg[0] & 0b00001111;
+                        log_i("ch:%d", channel);
                         uint8_t code = (usb_msg[0] >> 4) & 0b00001111;
                         switch (code)
                         {

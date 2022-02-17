@@ -33,6 +33,7 @@ QueueHandle_t uart_queue_usb; // usb uart Events queue
 struct wav_player_event_t wav_player_event;
 uint8_t *msg;
 uint8_t *usb_msg;
+struct metadata_t metadata;
 
 void(*midi_hook)(uint8_t *in);
 
@@ -90,7 +91,7 @@ void init_uart_usb()
 
 #define MIDI_BUFFER_SIZE 256
 
-uint8_t channel_lut[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t channel_lut[16] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 struct pan_t channel_pan[16] = {FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE};
 
 float eq_high;
@@ -112,7 +113,7 @@ static void read_uart_task()
     }
 
     log_i("midi task running on core %u",xPortGetCoreID());
-
+    // metadata = get_metadata();
     for(;;) {
         if(xQueueReceive(uart_queue, (void *)&event, (portTickType)portMAX_DELAY)) {
             bzero(tmp, MIDI_BUFFER_SIZE);
@@ -126,12 +127,26 @@ static void read_uart_task()
                     if(msg)
                     {
                         // send it through the midi filter hook
-                        log_i("midi %d %d %d",msg[0],msg[1],msg[2]);
+                        // log_i("midi %d %d %d",msg[0],msg[1],msg[2]);
                         midi_hook(msg);
                     }
                     if(msg)
                     {
                         uint8_t channel = msg[0] & 0b00001111;
+                        // log_i("chan %d listening on %d", channel, metadata.midi_channel);
+                        if(
+                            (metadata.midi_channel != 0) && // WVR is not in OMNI mode
+                            // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)
+                            (metadata.midi_channel != (channel + 1)) // this is not the channel WVR is listening on
+                        )
+                        {
+                            msg = NULL;
+                        }
+                    }
+                    if(msg)
+                    {
+                        uint8_t channel = msg[0] & 0b00001111;
+                        // log_i("chan %d", channel);
                         uint8_t code = (msg[0] >> 4) & 0b00001111;
                         switch (code)
                         {
@@ -145,14 +160,14 @@ static void read_uart_task()
                                 wav_player_event.velocity = msg[2]  & 0b01111111;
                                 wav_player_event.channel = channel;
                                 xQueueSendToBack(wav_player_queue,(void *) &wav_player_event, portMAX_DELAY);                  
-                                log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
-                                    i,
-                                    wav_player_event.note,
-                                    wav_player_event.velocity,
-                                    wav_player_event.channel,
-                                    wav_player_event.voice,
-                                    wav_player_event.code
-                                );
+                                // log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
+                                //     i,
+                                //     wav_player_event.note,
+                                //     wav_player_event.velocity,
+                                //     wav_player_event.channel,
+                                //     wav_player_event.voice,
+                                //     wav_player_event.code
+                                // );
                             }
                             break;
                         case MIDI_PROGRAM_CHANGE:
@@ -273,6 +288,20 @@ static void read_usb_uart_task()
                     if(usb_msg)
                     {
                         uint8_t channel = usb_msg[0] & 0b00001111;
+                        log_i("chan %d listening on %d", channel, metadata.midi_channel);
+                        if(
+                            (metadata.midi_channel != 0) && // WVR is not in OMNI mode
+                            // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)
+                            (metadata.midi_channel != (channel + 1)) // this is not the channel WVR is listening on
+                        )
+                        {
+                            usb_msg = NULL;
+                        }
+                    }
+                    if(usb_msg)
+                    {
+                        uint8_t channel = usb_msg[0] & 0b00001111;
+                        log_i("ch:%d", channel);
                         uint8_t code = (usb_msg[0] >> 4) & 0b00001111;
                         switch (code)
                         {

@@ -76,6 +76,7 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
   log_i("cpu speed %d", ESP.getCpuFreqMHz());
+  log_i("Flash Speed = %d Flash mode = %d", ESP.getFlashChipSpeed(), (int)ESP.getFlashChipMode());
   log_i("wvr starting up \n\n*** VERSION %s ***\n\n",VERSION_CODE);
 
   cJSON_Hooks memoryHook;

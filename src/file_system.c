@@ -12,9 +12,11 @@
 #include "cJSON.h"
 #include "esp_heap_caps.h"
 
+// #define METADATA_START_BLOCK 2
 #define METADATA_START_BLOCK 1
 #define METADATA_SIZE_IN_BLOCKS 1
 
+// #define FIRMWARE_LUT_START_BLOCK 3
 #define FIRMWARE_LUT_START_BLOCK 2
 #define MAX_FIRMWARES 10
 #define FIRMWARE_LUT_SIZE (sizeof(struct firmware_t) * MAX_FIRMWARES)
@@ -62,7 +64,8 @@
 #define FILE_STORAGE_END_BLOCK (RECOVERY_FIRMWARE_START_BLOCK - 1)
 
 // july 10 / 2021
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; 
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v1.x.x 
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -79,6 +82,7 @@ struct pin_config_t *pin_config_lut;
 void file_system_init(void)
 {
     // alloc_luts();
+    // log_i("metadata_t is %d bytes", sizeof(struct metadata_t));
     if(wav_lut == NULL){
         wav_lut = (struct wav_lu_t**)ps_malloc(NUM_VOICES * sizeof(struct wav_lu_t*));
         if(wav_lut == NULL){log_e("failed to alloc wav_lut");}
@@ -201,10 +205,11 @@ void init_metadata(void){
         .should_check_strapping_pin = 1, // default to should check
         .global_volume = 127,
         .wlog_verbosity = 0,
-        .wifi_power = 8,
         .wifi_starts_on = 1,
         .ssid = "WVR",
-        .passphrase = "12345678"
+        .passphrase = "12345678",
+        .wifi_power = 8,
+        .midi_channel = 0
     };
     memcpy(new_metadata.tag, waver_tag, METADATA_TAG_LENGTH);
     write_metadata(new_metadata);
@@ -227,15 +232,16 @@ void init_wav_lut(void){
     {
         for(size_t j=0; j<NUM_NOTES; j++)
         {
-            wav_lut[i][j].isRack=-1;
-            wav_lut[i][j].empty=1;
-            wav_lut[i][j].start_block=0;
-            wav_lut[i][j].length=0;
+            wav_lut[i][j].isRack = -1;
+            wav_lut[i][j].empty = 1;
+            wav_lut[i][j].start_block = 0;
+            wav_lut[i][j].length = 0;
             wav_lut[i][j].play_back_mode = ONE_SHOT;
             wav_lut[i][j].retrigger_mode = RETRIGGER;
             wav_lut[i][j].response_curve = RESPONSE_SQUARE_ROOT;
             wav_lut[i][j].priority = 0;
-            // wav_lut[i][j].edge=0;
+            wav_lut[i][j].loop_start = 0;
+            wav_lut[i][j].loop_end = 0;
         }
     }
     // log_i("writting blank filesystem into %d blocks", BLOCKS_PER_VOICE * NUM_VOICES);
@@ -252,6 +258,8 @@ void init_wav_lut(void){
             voice[j].retrigger_mode = RETRIGGER;
             voice[j].response_curve = RESPONSE_SQUARE_ROOT;
             voice[j].priority = 0;
+            voice[j].loop_start = 0;
+            voice[j].loop_end = 0;
             memcpy(voice[j].name, blank, 1);
         }
         ESP_ERROR_CHECK(emmc_write(
@@ -392,6 +400,8 @@ void read_wav_lut_from_disk(void)
             wav_lut[i][j].note_off_meaning = voice[j].note_off_meaning;
             wav_lut[i][j].response_curve = voice[j].response_curve;
             wav_lut[i][j].priority = voice[j].priority;
+            wav_lut[i][j].loop_start = voice[j].loop_start;
+            wav_lut[i][j].loop_end = voice[j].loop_end;
         }
     }
     free(voice);
@@ -495,6 +505,8 @@ struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_
             wav.note_off_meaning = wav_lut[voice][note].note_off_meaning;
             wav.response_curve = wav_lut[voice][note].response_curve;
             wav.priority = wav_lut[voice][note].priority;
+            wav.loop_start = wav_lut[voice][note].loop_start;
+            wav.loop_end = wav_lut[voice][note].loop_end;
             return wav;
         }
     }
@@ -841,6 +853,10 @@ cJSON* add_voice_json(uint8_t voice_num)
         if(ret==NULL){log_e("failed to make json responseCurve");continue;}
         ret = cJSON_AddNumberToObject(note, "priority", voice[j].priority);
         if(ret==NULL){log_e("failed to make json priority");continue;}
+        ret = cJSON_AddNumberToObject(note, "loopStart", voice[j].loop_start);
+        if(ret==NULL){log_e("failed to make json loppStart");continue;}
+        ret = cJSON_AddNumberToObject(note, "loopEnd", voice[j].loop_end);
+        if(ret==NULL){log_e("failed to make json priority");continue;}
         if(voice[j].isRack > -1){
             // its a rack
             // log_i("rack %d",voice[j].isRack);
@@ -893,6 +909,7 @@ void add_metadata_json(cJSON * RESPONSE_ROOT){
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wLogVerbosity",metadata.wlog_verbosity);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiPower",metadata.wifi_power);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiStartsOn",metadata.wifi_starts_on);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"midiChannel",metadata.midi_channel);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkName",metadata.ssid);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkPassword",metadata.passphrase);
 }
@@ -1086,7 +1103,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
     struct wav_file_t *voice_data = (struct wav_file_t*)ps_malloc(BLOCKS_PER_VOICE * SECTOR_SIZE);
     if(voice_data==NULL){log_e("not enough ram to alloc voice_data");}
     size_t voice_start_block = WAV_LUT_START_BLOCK + (BLOCKS_PER_VOICE * num_voice);
-    ESP_ERROR_CHECK(emmc_read(voice_data,voice_start_block,BLOCKS_PER_VOICE));
+    ESP_ERROR_CHECK(emmc_read(voice_data, voice_start_block, BLOCKS_PER_VOICE));
     // read the rack data
     struct rack_file_t *rack_data = NULL;
     bool should_write_rack_lut = false;
@@ -1099,6 +1116,8 @@ void updateSingleVoiceConfig(char *json, int num_voice){
         voice_data[num_note].note_off_meaning = cJSON_GetObjectItemCaseSensitive(note, "noteOff")->valueint;
         voice_data[num_note].response_curve = cJSON_GetObjectItemCaseSensitive(note, "responseCurve")->valueint;
         voice_data[num_note].priority = cJSON_GetObjectItemCaseSensitive(note, "priority")->valueint;
+        voice_data[num_note].loop_start = cJSON_GetObjectItemCaseSensitive(note, "loopStart")->valueint;
+        voice_data[num_note].loop_end = cJSON_GetObjectItemCaseSensitive(note, "loopEnd")->valueint;
         // is a rack, and not a new rack (would be -2)
         if(cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint >= 0)
         {
@@ -1142,6 +1161,8 @@ void updateSingleVoiceConfig(char *json, int num_voice){
             voice_data[num_note].note_off_meaning = HALT;
             voice_data[num_note].response_curve = RESPONSE_SQUARE_ROOT;
             voice_data[num_note].priority = 0;
+            voice_data[num_note].loop_start = 0;
+            voice_data[num_note].loop_end = 0;
             char *blank = "";
             memcpy(voice_data[num_note].name, blank, 1);
             feedLoopWDT();
@@ -1282,16 +1303,18 @@ void updateMetadata(cJSON *config){
     metadata.wifi_starts_on = cJSON_GetObjectItemCaseSensitive(json, "wifiStartsOn")->valueint;
     metadata.wlog_verbosity = cJSON_GetObjectItemCaseSensitive(json, "wLogVerbosity")->valueint;
     metadata.wifi_power = cJSON_GetObjectItemCaseSensitive(json, "wifiPower")->valueint;
+    metadata.midi_channel = cJSON_GetObjectItemCaseSensitive(json, "midiChannel")->valueint;
     memcpy(&metadata.ssid,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring,20);
     memcpy(&metadata.passphrase,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring,20);
     write_metadata(metadata);
-    wlog_i("gv:%d scsp:%d rmsp:%d wso:%d wlv:%d",
+    wlog_i("gv:%d scsp:%d rmsp:%d wso:%d wlv:%d wfp:%d mdc%d",
         metadata.global_volume,
         metadata.should_check_strapping_pin,
         metadata.recovery_mode_straping_pin,
         metadata.wifi_starts_on,
         metadata.wlog_verbosity,
-        metadata.wifi_power
+        metadata.wifi_power,
+        metadata.midi_channel
     );
     wlog_i("updated and saved metadata");
     cJSON_Delete(json);

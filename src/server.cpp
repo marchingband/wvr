@@ -51,12 +51,12 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 extern "C" void sendWSLog(char* msg){
-  cJSON *root = cJSON_CreateObject();
-  cJSON_AddStringToObject(root,"log",msg);
-  char* out = cJSON_PrintUnformatted(root);
-  cJSON_Delete(root);
-  ws.textAll(out);
-  free(out);
+  // static cJSON *root = cJSON_CreateObject();
+  // cJSON_AddStringToObject(root,"log",msg);
+  // char* out = cJSON_PrintUnformatted(root);
+  // cJSON_Delete(root);
+  // ws.textAll(out);
+  // free(out);
 }
 
 extern "C" void sendWSMsg(char* msg){

@@ -34,6 +34,8 @@ struct wav_player_event_t wav_player_event;
 uint8_t *msg;
 uint8_t *usb_msg;
 
+struct metadata_t metadata; // the global metadata object
+
 void(*midi_hook)(uint8_t *in);
 
 void init_gpio()
@@ -90,7 +92,7 @@ void init_uart_usb()
 
 #define MIDI_BUFFER_SIZE 256
 
-uint8_t channel_lut[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t channel_lut[16] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 struct pan_t channel_pan[16] = {FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE};
 
 float eq_high;
@@ -121,13 +123,25 @@ static void read_uart_task()
                 bytes_read = uart_read_bytes(MIDI_UART_NUM, tmp, event.size, portMAX_DELAY);
                 for(int i=0;i<bytes_read;i++)
                 {
-                    // returns uint8_t* or NULL
                     msg = midi_parse(tmp[i]);
                     if(msg)
                     {
                         // send it through the midi filter hook
                         log_i("midi %d %d %d",msg[0],msg[1],msg[2]);
                         midi_hook(msg);
+                    }
+                    if(msg)
+                    {
+                        uint8_t channel = msg[0] & 0b00001111;
+                        // log_i("chan %d listening on %d", channel, metadata.midi_channel);
+                        if(
+                            (metadata.midi_channel != 0) && // WVR is not in OMNI mode
+                            // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)
+                            (metadata.midi_channel != (channel + 1)) // this is not the channel WVR is listening on
+                        )
+                        {
+                            msg = NULL;
+                        }
                     }
                     if(msg)
                     {
@@ -269,6 +283,19 @@ static void read_usb_uart_task()
                     {
                         // send it through the midi filter hook
                         midi_hook(usb_msg);
+                    }
+                    if(usb_msg)
+                    {
+                        uint8_t channel = usb_msg[0] & 0b00001111;
+                        log_i("chan %d listening on %d", channel, metadata.midi_channel);
+                        if(
+                            (metadata.midi_channel != 0) && // WVR is not in OMNI mode
+                            // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)
+                            (metadata.midi_channel != (channel + 1)) // this is not the channel WVR is listening on
+                        )
+                        {
+                            usb_msg = NULL;
+                        }
                     }
                     if(usb_msg)
                     {

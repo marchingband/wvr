@@ -102,6 +102,7 @@ struct metadata_t {
     char ssid[20];
     char passphrase[20];
     uint8_t wifi_power;
+    uint8_t midi_channel;
 };
 
 struct wav_lu_t {

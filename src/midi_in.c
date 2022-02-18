@@ -127,7 +127,7 @@ static void read_uart_task()
                     if(msg)
                     {
                         // send it through the midi filter hook
-                        log_i("midi %d %d %d",msg[0],msg[1],msg[2]);
+                        // log_i("midi %d %d %d",msg[0],msg[1],msg[2]);
                         midi_hook(msg);
                     }
                     if(msg)
@@ -159,14 +159,14 @@ static void read_uart_task()
                                 wav_player_event.velocity = msg[2]  & 0b01111111;
                                 wav_player_event.channel = channel;
                                 xQueueSendToBack(wav_player_queue,(void *) &wav_player_event, portMAX_DELAY);                  
-                                log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
-                                    i,
-                                    wav_player_event.note,
-                                    wav_player_event.velocity,
-                                    wav_player_event.channel,
-                                    wav_player_event.voice,
-                                    wav_player_event.code
-                                );
+                                // log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
+                                //     i,
+                                //     wav_player_event.note,
+                                //     wav_player_event.velocity,
+                                //     wav_player_event.channel,
+                                //     wav_player_event.voice,
+                                //     wav_player_event.code
+                                // );
                             }
                             break;
                         case MIDI_PROGRAM_CHANGE:
@@ -287,7 +287,7 @@ static void read_usb_uart_task()
                     if(usb_msg)
                     {
                         uint8_t channel = usb_msg[0] & 0b00001111;
-                        log_i("chan %d listening on %d", channel, metadata.midi_channel);
+                        // log_i("chan %d listening on %d", channel, metadata.midi_channel);
                         if(
                             (metadata.midi_channel != 0) && // WVR is not in OMNI mode
                             // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)

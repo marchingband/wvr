@@ -13,6 +13,7 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * [playing sounds](#playing-sounds)
 * sound settings
 * * [understanding priority](#understanding-priority)
+* * [understanding exclusive group](#understanding-exclusive-group)
 * * [understanding response curve](#understanding-response-curve)
 * * [understanding retrigger mode](#understanding-retrigger-mode)
 * * [understanding note off](#understanding-note-off)
@@ -87,6 +88,9 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR
 
 # understanding priority
 WVR can playback up to 18 stereo sounds at once. It mixes all the sounds into a stereo output. If you play very fast, or play dense chords, or have very long sounds, it's possible to ask the WVR to play back more then 18 sounds. When this happens, WVR runs an algorithm to figure out what to do. It will try to find an old, or an unimportant sound, stop playing that sound, and play the newly triggered sound instead. You can help it make this decision by giving some sounds higher **priority**. A lower priority sound will never stop a higher priority sound, only equal or lower priority. In the case where all 18 voices are busy playing high priority sounds, and a lower priority sound is triggered, WVR will not play the sound.
+
+# understanding exclusive group
+**Exclusive Group** allows you to tell WVR that only one member out of a group of notes can be playing at one time. If you want your open hihat sample to stop when a closed hihat sample starts, or if you want one bass note to stop when another starts, you can achieve this by setting the **exclusive group** value of all the notes in that group to the same number ie. add them all to the same exclusive group. These groups work across voices and channels. When a note-on is received on a memeber of an exclusive group, any other note in that group that is playing will be immidiately stopped. As with all the note settings, you can select multiple notes using shift-click or command-click, and change the exclusive group for all selected notes.
 
 # understanding response curve
 Every MIDI note has a velocity (or volume) attached to it. This is a value from 0 to 127. Imagine a graph with these 127 velocities on the y axis, and the playback volume that each actually triggers on the x axis. If this is a streight line, we have a **linear** response curve. Many people find other curves to be more human, or more musical. The default response curve for WVR is the **Square Root** algorithm, but you can also choose **linear** or **logarithmic**.

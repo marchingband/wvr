@@ -65,8 +65,8 @@
 
 // july 10 / 2021
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v1.x.x 
-// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -244,7 +244,6 @@ void init_wav_lut(void){
             wav_lut[i][j].mute_group = 0;
             wav_lut[i][j].loop_start = 0;
             wav_lut[i][j].loop_end = 0;
-            wav_lut[i][j].RFU = 0;
         }
     }
     // log_i("writting blank filesystem into %d blocks", BLOCKS_PER_VOICE * NUM_VOICES);
@@ -264,6 +263,7 @@ void init_wav_lut(void){
             voice[j].mute_group = 0;
             voice[j].loop_start = 0;
             voice[j].loop_end = 0;
+            voice[j].RFU = 0;
             memcpy(voice[j].name, blank, 1);
         }
         ESP_ERROR_CHECK(emmc_write(

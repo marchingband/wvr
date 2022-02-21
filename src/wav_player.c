@@ -309,7 +309,7 @@ int prune(uint8_t priority)
   int candidate = -1;
   for(int i=0;i<NUM_BUFFERS;i++)
   {
-    if(bufs[i].pruned)
+    if(bufs[i].pruned || bufs[i].wav_data.playback_mode == ASR_LOOP)
     {
       continue;
     }

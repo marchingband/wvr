@@ -115,6 +115,7 @@ struct wav_lu_t {
     enum note_off_meaning note_off_meaning;
     enum response_curve response_curve;
     uint8_t priority; // 0 to 15
+    uint8_t mute_group;
     uint8_t empty;
     size_t loop_start;
     size_t loop_end;
@@ -130,6 +131,7 @@ struct wav_file_t {
     enum note_off_meaning note_off_meaning;
     enum response_curve response_curve;
     uint8_t priority; // 0 to 15
+    uint8_t mute_group; // 0 to 15
     uint8_t empty;
     size_t loop_start;
     size_t loop_end;

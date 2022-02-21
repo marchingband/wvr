@@ -401,6 +401,16 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
           }
         }
       }
+      if(wav_player_event.code == MIDI_NOTE_ON && !abort_note && new_wav.mute_group > 0)
+      {
+        for(int8_t i=0; i<=NUM_BUFFERS; i++)
+        {
+          if(bufs[i].wav_data.mute_group == new_wav.mute_group)
+          {
+            bufs[i].fade = 1;
+          }
+        }
+      }
       // try to play the note
       if(wav_player_event.code == MIDI_NOTE_ON && !abort_note)
       {

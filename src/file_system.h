@@ -135,6 +135,7 @@ struct wav_file_t {
     uint8_t empty;
     size_t loop_start;
     size_t loop_end;
+    int RFU;
 };
 
 struct firmware_t {

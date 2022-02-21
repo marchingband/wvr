@@ -244,6 +244,7 @@ void init_wav_lut(void){
             wav_lut[i][j].mute_group = 0;
             wav_lut[i][j].loop_start = 0;
             wav_lut[i][j].loop_end = 0;
+            wav_lut[i][j].RFU = 0;
         }
     }
     // log_i("writting blank filesystem into %d blocks", BLOCKS_PER_VOICE * NUM_VOICES);

@@ -50,6 +50,8 @@ static const char* TAG = "wav_player";
 // from midi.c
 uint8_t channel_lut[16];
 struct pan_t channel_pan[16];
+uint8_t channel_vol[16];
+uint8_t channel_exp[16];
 
 extern struct metadata_t metadata;
 bool mute = false;
@@ -129,6 +131,7 @@ struct response_curve_t {
 };
 
 struct response_curve_t lin_float_lut[128];
+struct response_curve_t exp_float_lut[128];
 struct response_curve_t sqrt_float_lut[128];
 struct response_curve_t inv_sqrt_float_lut[128];
 
@@ -229,9 +232,10 @@ void init_response_luts(void)
 {
   for(int i=0;i<128;i++)
   {
-    lin_float_lut[i].val = i/127.0;
-    sqrt_float_lut[i].val = sqrt(i * 127.0)/127;
+    lin_float_lut[i].val = i / 127.0;
+    sqrt_float_lut[i].val = sqrt(i * 127.0) / 127;
     inv_sqrt_float_lut[i].val = pow(i / 127.0, 2);
+    exp_float_lut[i].val = i / 100.0;
   }
   init_response_lut_fade_pair(sqrt_float_lut, lin_float_lut);
   init_response_lut_fade_pair(inv_sqrt_float_lut, lin_float_lut);
@@ -241,6 +245,11 @@ void init_response_luts(void)
 int16_t IRAM_ATTR scale_sample (int16_t in, uint8_t vol)
 {
   return (int16_t)(in * lin_float_lut[vol].val);
+}
+
+int IRAM_ATTR scale_sample_exp (int16_t in, uint8_t vol)
+{
+  return (int)(in * lin_float_lut[vol].val);
 }
 
 int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t vol)
@@ -309,7 +318,7 @@ int prune(uint8_t priority)
   int candidate = -1;
   for(int i=0;i<NUM_BUFFERS;i++)
   {
-    if(bufs[i].pruned || bufs[i].wav_data.playback_mode == ASR_LOOP)
+    if(bufs[i].pruned || bufs[i].wav_data.play_back_mode == ASR_LOOP)
     {
       continue;
     }
@@ -552,7 +561,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
                 scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
                 scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
-              output_buf[i] += (sample >> DAMPEN_BITS);
+              // output_buf[i] += (sample >> DAMPEN_BITS);
               if( (bufs[buf].fade > 0) && (i % 4 == 0) )
               {
                 if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
@@ -600,7 +609,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
                   scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
                   scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
-                output_buf[i] += (sample >> DAMPEN_BITS);
+                // output_buf[i] += (sample >> DAMPEN_BITS);
                 if( (bufs[buf].fade > 0) && (i % 4 == 0) )
                 {
                   if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
@@ -714,7 +723,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
                     scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
                     scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
-                  output_buf[i] += (sample >> DAMPEN_BITS);
+                  // output_buf[i] += (sample >> DAMPEN_BITS);
                   bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
                 }
               }
@@ -727,7 +736,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
                     scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
                     scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
-                  output_buf[i] += (sample >> DAMPEN_BITS);
+                  // output_buf[i] += (sample >> DAMPEN_BITS);
                 }
               }
               bufs[buf].wav_position += this_write;
@@ -771,6 +780,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             break;
           }
         }
+        // apply vol and exp
+        int16_t with_vol = scale_sample(sample, channel_vol[wav_player_event.channel]);
+        int with_exp = scale_sample_exp(with_vol, channel_vol[wav_player_event.channel]);
+        //mix into master
+        output_buf[i] += (sample >> DAMPEN_BITS);
       }
     }
     

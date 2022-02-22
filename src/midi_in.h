@@ -9,7 +9,12 @@
 #define MIDI_NOTE_ON 9
 #define MIDI_PROGRAM_CHANGE 12
 #define MIDI_CC 11
+#define MIDI_CC_VOLUME 7
 #define MIDI_CC_PAN 10
+#define MIDI_CC_EXP 11
+#define MIDI_CC_MUTE 120
+#define MIDI_CC_RESET 121
+
 #define MIDI_CC_EQ_BASS 20
 #define MIDI_CC_EQ_TREBLE 21
 

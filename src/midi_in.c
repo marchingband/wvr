@@ -91,11 +91,17 @@ void init_uart_usb()
 
 #define MIDI_BUFFER_SIZE 256
 
-uint8_t channel_lut[16] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-struct pan_t channel_pan[16] = {FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE};
+uint8_t channel_lut_default[16] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+uint8_t channel_lut[16];
 
-float eq_high;
-float eq_low;
+const struct pan_t channel_pan_default[16] = {FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE,FX_NONE};
+struct pan_t channel_pan[16];
+
+const uint8_t channel_vol_default[16] = {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 };
+uint8_t channel_vol[16];
+
+const uint8_t channel_exp_default[16] = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
+uint8_t channel_exp[16];
 
 uint8_t *get_channel_lut(void)
 {
@@ -126,107 +132,7 @@ static void read_uart_task()
                     msg = midi_parse(tmp[i]);
                     if(msg)
                     {
-                        // send it through the midi filter hook
-                        // log_i("midi %d %d %d",msg[0],msg[1],msg[2]);
-                        midi_hook(msg);
-                    }
-                    if(msg)
-                    {
-                        uint8_t channel = msg[0] & 0b00001111;
-                        // log_i("chan %d listening on %d", channel, metadata.midi_channel);
-                        if(
-                            (metadata.midi_channel != 0) && // WVR is not in OMNI mode
-                            // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)
-                            (metadata.midi_channel != (channel + 1)) // this is not the channel WVR is listening on
-                        )
-                        {
-                            msg = NULL;
-                        }
-                    }
-                    if(msg)
-                    {
-                        uint8_t channel = msg[0] & 0b00001111;
-                        // log_i("chan %d", channel);
-                        uint8_t code = (msg[0] >> 4) & 0b00001111;
-                        switch (code)
-                        {
-                        case MIDI_NOTE_ON:
-                        case MIDI_NOTE_OFF:
-                            {
-                                struct wav_player_event_t wav_player_event;
-                                wav_player_event.code = (msg[0] >> 4) & 0b00001111;
-                                wav_player_event.voice = channel_lut[channel];
-                                wav_player_event.note = msg[1] & 0b01111111;
-                                wav_player_event.velocity = msg[2]  & 0b01111111;
-                                wav_player_event.channel = channel;
-                                xQueueSendToBack(wav_player_queue,(void *) &wav_player_event, portMAX_DELAY);                  
-                                // log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
-                                //     i,
-                                //     wav_player_event.note,
-                                //     wav_player_event.velocity,
-                                //     wav_player_event.channel,
-                                //     wav_player_event.voice,
-                                //     wav_player_event.code
-                                // );
-                            }
-                            break;
-                        case MIDI_PROGRAM_CHANGE:
-                            {
-                                uint8_t voice = msg[1] & 0b01111111;
-                                // log_e("prog chng %d on channel %d",voice, channel);
-                                // if the program change is out of range set it to the highest voice
-                                voice = voice < NUM_VOICES ? voice : NUM_VOICES - 1;
-                                channel_lut[channel] = voice;
-                                break;
-                            }
-                        case MIDI_CC:
-                            {
-                                uint8_t CC = msg[1] & 0b01111111;
-                                uint8_t val = msg[2]  & 0b01111111;
-                                // log_i("MIDI_CC:#%d val:%d on channel %d", CC, val, channel);
-                                switch (CC)
-                                {
-                                case MIDI_CC_PAN:
-                                    // log_e("Pan %d",val);
-                                    if(val == 64)
-                                    {
-                                        channel_pan[channel].left_vol = 127;
-                                        channel_pan[channel].right_vol = 127;
-                                    }
-                                    else if(val == 0)
-                                    {
-                                        channel_pan[channel].right_vol = 0;
-                                        channel_pan[channel].left_vol = 127;
-                                    }
-                                    else if(val == 127)
-                                    {
-                                        channel_pan[channel].right_vol = 127;
-                                        channel_pan[channel].left_vol = 0;
-                                    }
-                                    else if(val > 64)
-                                    {
-                                        channel_pan[channel].right_vol = 127;
-                                        channel_pan[channel].left_vol = 127 - ((val - 64) * 2);
-                                    }
-                                    else if(val < 64)
-                                    {
-                                        channel_pan[channel].right_vol = 127 - ((64 - val) * 2);
-                                        channel_pan[channel].left_vol = 127;
-                                    }
-                                    break;
-                                case MIDI_CC_EQ_BASS:
-                                    eq_low = ((val * 2.0) / 127) - 1;
-                                    break;
-                                case MIDI_CC_EQ_TREBLE:
-                                    eq_high = ((val * 2.0) / 127);
-                                    break;
-                                default:
-                                    break;
-                                }
-                            }
-                        default:
-                            break;
-                        }
+                        handle_midi(msg);
                     }
                 }
             }
@@ -278,110 +184,10 @@ static void read_usb_uart_task()
                 bytes_read = uart_read_bytes(USB_MIDI_UART_NUM, tmp, event.size, portMAX_DELAY);
                 for(int i=0;i<bytes_read;i++)
                 {
-                    // returns uint8_t* or NULL
                     usb_msg = usb_midi_parse(tmp[i]);
                     if(usb_msg)
                     {
-                        // send it through the midi filter hook
-                        midi_hook(usb_msg);
-                    }
-                    if(usb_msg)
-                    {
-                        uint8_t channel = usb_msg[0] & 0b00001111;
-                        log_i("chan %d listening on %d", channel, metadata.midi_channel);
-                        if(
-                            (metadata.midi_channel != 0) && // WVR is not in OMNI mode
-                            // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)
-                            (metadata.midi_channel != (channel + 1)) // this is not the channel WVR is listening on
-                        )
-                        {
-                            usb_msg = NULL;
-                        }
-                    }
-                    if(usb_msg)
-                    {
-                        uint8_t channel = usb_msg[0] & 0b00001111;
-                        log_i("ch:%d", channel);
-                        uint8_t code = (usb_msg[0] >> 4) & 0b00001111;
-                        switch (code)
-                        {
-                        case MIDI_NOTE_ON:
-                        case MIDI_NOTE_OFF:
-                            {
-                                struct wav_player_event_t wav_player_event;
-                                wav_player_event.code = (usb_msg[0] >> 4) & 0b00001111;
-                                wav_player_event.voice = channel_lut[channel];
-                                wav_player_event.note = usb_msg[1] & 0b01111111;
-                                wav_player_event.velocity = usb_msg[2]  & 0b01111111;
-                                wav_player_event.channel = channel;
-                                xQueueSendToBack(wav_player_queue,(void *) &wav_player_event, portMAX_DELAY);                  
-                                // log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
-                                //     i,
-                                //     wav_player_event.note,
-                                //     wav_player_event.velocity,
-                                //     wav_player_event.channel,
-                                //     wav_player_event.voice,
-                                //     wav_player_event.code
-                                // );
-                            }
-                            break;
-                        case MIDI_PROGRAM_CHANGE:
-                            {
-                                uint8_t voice = usb_msg[1] & 0b01111111;
-                                // log_e("prog chng %d on channel %d",voice, channel);
-                                // if the program change is out of range set it to the highest voice
-                                voice = voice < NUM_VOICES ? voice : NUM_VOICES - 1;
-                                channel_lut[channel] = voice;
-                                break;
-                            }
-                        case MIDI_CC:
-                            {
-                                uint8_t CC = usb_msg[1] & 0b01111111;
-                                uint8_t val = usb_msg[2]  & 0b01111111;
-                                // log_i("MIDI_CC:#%d val:%d on channel %d", CC, val, channel);
-                                switch (CC)
-                                {
-                                case MIDI_CC_PAN:
-                                    // log_e("Pan %d",val);
-                                    if(val == 64)
-                                    {
-                                        channel_pan[channel].left_vol = 127;
-                                        channel_pan[channel].right_vol = 127;
-                                    }
-                                    else if(val == 0)
-                                    {
-                                        channel_pan[channel].right_vol = 0;
-                                        channel_pan[channel].left_vol = 127;
-                                    }
-                                    else if(val == 127)
-                                    {
-                                        channel_pan[channel].right_vol = 127;
-                                        channel_pan[channel].left_vol = 0;
-                                    }
-                                    else if(val > 64)
-                                    {
-                                        channel_pan[channel].right_vol = 127;
-                                        channel_pan[channel].left_vol = 127 - ((val - 64) * 2);
-                                    }
-                                    else if(val < 64)
-                                    {
-                                        channel_pan[channel].right_vol = 127 - ((64 - val) * 2);
-                                        channel_pan[channel].left_vol = 127;
-                                    }
-                                    break;
-                                case MIDI_CC_EQ_BASS:
-                                    eq_low = ((val * 2.0) / 127) - 1;
-                                    break;
-                                case MIDI_CC_EQ_TREBLE:
-                                    eq_high = ((val * 2.0) / 127);
-                                    break;
-                                default:
-                                    break;
-                                }
-                            }
-                        default:
-                            break;
-                        }
+                        handle_midi(usb_msg);
                     }
                 }
             }
@@ -413,8 +219,126 @@ static void read_usb_uart_task()
     }
 }
 
+static void handle_midi(uint8_t *msg)
+{
+    // send it through the midi filter hook
+    // log_i("midi %d %d %d",msg[0],msg[1],msg[2]);
+    midi_hook(msg);
+    if(msg)
+    {
+        uint8_t channel = msg[0] & 0b00001111;
+        // log_i("chan %d listening on %d", channel, metadata.midi_channel);
+        if(
+            (metadata.midi_channel != 0) && // WVR is not in OMNI mode
+            // have to add one to channel here, because midi data 0 means midi channel 1 (eye roll)
+            (metadata.midi_channel != (channel + 1)) // this is not the channel WVR is listening on
+        )
+        {
+            msg = NULL;
+        }
+    }
+    if(msg)
+    {
+        uint8_t channel = msg[0] & 0b00001111;
+        // log_i("chan %d", channel);
+        uint8_t code = (msg[0] >> 4) & 0b00001111;
+        switch (code)
+        {
+        case MIDI_NOTE_ON:
+        case MIDI_NOTE_OFF:
+            {
+                struct wav_player_event_t wav_player_event;
+                wav_player_event.code = (msg[0] >> 4) & 0b00001111;
+                wav_player_event.voice = channel_lut[channel];
+                wav_player_event.note = msg[1] & 0b01111111;
+                wav_player_event.velocity = msg[2]  & 0b01111111;
+                wav_player_event.channel = channel;
+                xQueueSendToBack(wav_player_queue,(void *) &wav_player_event, portMAX_DELAY);                  
+                // log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
+                //     i,
+                //     wav_player_event.note,
+                //     wav_player_event.velocity,
+                //     wav_player_event.channel,
+                //     wav_player_event.voice,
+                //     wav_player_event.code
+                // );
+            }
+            break;
+        case MIDI_PROGRAM_CHANGE:
+            {
+                uint8_t voice = msg[1] & 0b01111111;
+                // log_e("prog chng %d on channel %d",voice, channel);
+                // if the program change is out of range set it to the highest voice
+                voice = voice < NUM_VOICES ? voice : NUM_VOICES - 1;
+                channel_lut[channel] = voice;
+                break;
+            }
+        case MIDI_CC:
+            {
+                uint8_t CC = msg[1] & 0b01111111;
+                uint8_t val = msg[2]  & 0b01111111;
+                // log_i("MIDI_CC:#%d val:%d on channel %d", CC, val, channel);
+                switch (CC)
+                {
+                case MIDI_CC_PAN:
+                    // log_e("Pan %d",val);
+                    if(val == 64)
+                    {
+                        channel_pan[channel].left_vol = 127;
+                        channel_pan[channel].right_vol = 127;
+                    }
+                    else if(val == 0)
+                    {
+                        channel_pan[channel].right_vol = 0;
+                        channel_pan[channel].left_vol = 127;
+                    }
+                    else if(val == 127)
+                    {
+                        channel_pan[channel].right_vol = 127;
+                        channel_pan[channel].left_vol = 0;
+                    }
+                    else if(val > 64)
+                    {
+                        channel_pan[channel].right_vol = 127;
+                        channel_pan[channel].left_vol = 127 - ((val - 64) * 2);
+                    }
+                    else if(val < 64)
+                    {
+                        channel_pan[channel].right_vol = 127 - ((64 - val) * 2);
+                        channel_pan[channel].left_vol = 127;
+                    }
+                    break;
+                case MIDI_CC_VOLUME:
+                    channel_vol[channel] = val;
+                    break;
+                case MIDI_CC_EXP:
+                    channel_exp[channel] = val;
+                    break;
+                default:
+                    break;
+                }
+            }
+        default:
+            break;
+        }
+    }
+}
+}
+
+void reset_midi_controllers(void)
+{
+    for(in i=0; i<16; i++)
+    {
+        channel_lut[i] = channel_lut_default[i];
+        channel_pan[i] = channel_pan_default[i];
+        channel_vol[i] = channel_vol_default[i];
+        channel_exp[i] = channel_exp_default[i];
+    }
+}
+
 void midi_init(bool useUsbMidi)
 {
+    reset_midi_controllers();
     init_gpio();
     init_uart();
     midi_hook = midi_hook_default;

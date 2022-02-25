@@ -106,6 +106,11 @@ struct metadata_t {
     uint8_t midi_channel; // 0 is omni
 };
 
+struct vol_t {
+  uint8_t left;
+  uint8_t right;
+};
+
 struct wav_lu_t {
     size_t length;
     size_t start_block;

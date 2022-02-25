@@ -242,10 +242,9 @@ static void handle_midi(uint8_t *msg)
         uint8_t channel = msg[0] & 0b00001111;
         // log_i("chan %d", channel);
         uint8_t code = (msg[0] >> 4) & 0b00001111;
-        switch (code)
-        {
-        case MIDI_NOTE_ON:
-        case MIDI_NOTE_OFF:
+        switch (code){
+            case MIDI_NOTE_ON:
+            case MIDI_NOTE_OFF:
             {
                 struct wav_player_event_t wav_player_event;
                 wav_player_event.code = (msg[0] >> 4) & 0b00001111;
@@ -262,9 +261,9 @@ static void handle_midi(uint8_t *msg)
                 //     wav_player_event.voice,
                 //     wav_player_event.code
                 // );
+                break;
             }
-            break;
-        case MIDI_PROGRAM_CHANGE:
+            case MIDI_PROGRAM_CHANGE:
             {
                 uint8_t voice = msg[1] & 0b01111111;
                 // log_e("prog chng %d on channel %d",voice, channel);
@@ -273,7 +272,7 @@ static void handle_midi(uint8_t *msg)
                 channel_lut[channel] = voice;
                 break;
             }
-        case MIDI_CC:
+            case MIDI_CC:
             {
                 uint8_t CC = msg[1] & 0b01111111;
                 uint8_t val = msg[2]  & 0b01111111;
@@ -314,20 +313,35 @@ static void handle_midi(uint8_t *msg)
                 case MIDI_CC_EXP:
                     channel_exp[channel] = val;
                     break;
+                case MIDI_CC_MUTE:
+                {
+                    struct wav_player_event_t wav_player_event;
+                    wav_player_event.code = (msg[0] >> 4) & 0b00001111; // pass the cc code
+                    wav_player_event.voice = 0;
+                    wav_player_event.note = msg[1] & 0b01111111; // send the cc type as the note
+                    wav_player_event.velocity = 0;
+                    wav_player_event.channel = channel;
+                    xQueueSendToBack(wav_player_queue,(void *) &wav_player_event, portMAX_DELAY);                  
+                    break;
+                }
+                case MIDI_CC_RESET:
+                    channel_lut[channel] = channel_lut_default[channel];
+                    channel_pan[channel] = channel_pan_default[channel];
+                    channel_vol[channel] = channel_vol_default[channel];
+                    channel_exp[channel] = channel_exp_default[channel];
                 default:
                     break;
                 }
             }
-        default:
-            break;
+            default:
+                break;
         }
     }
-}
 }
 
 void reset_midi_controllers(void)
 {
-    for(in i=0; i<16; i++)
+    for(int i=0; i<16; i++)
     {
         channel_lut[i] = channel_lut_default[i];
         channel_pan[i] = channel_pan_default[i];

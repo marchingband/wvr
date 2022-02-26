@@ -589,8 +589,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             {
               convert_buf_linear(buf);
             }
-            int fade_factor = 4 + channel_release[bufs[buf].wav_player_event.channel];
-            // log_i(fade_factor);
+            int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
             for(int i=0; i<to_write; i++)
             {
               uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
@@ -647,7 +646,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               {
                 convert_buf_linear(buf);
               }
-              int fade_factor = 4 + channel_release[bufs[buf].wav_player_event.channel];
+              int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
               for(; i<this_write_end; i++)
               {
                 uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel

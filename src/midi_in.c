@@ -103,6 +103,12 @@ uint8_t channel_vol[16];
 const uint8_t channel_exp_default[16] = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
 uint8_t channel_exp[16];
 
+const uint16_t note_sustain_default[128] = {0};
+int16_t note_sustain[128];
+
+const bool channel_sustain_default[16] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
+bool channel_sustain[16];
+
 uint8_t *get_channel_lut(void)
 {
     return &channel_lut[0];
@@ -219,6 +225,44 @@ static void read_usb_uart_task()
     }
 }
 
+static bool sustain_hook(uint8_t *msg)
+{
+    uint8_t channel = msg[0] & 0b00001111;
+    if(channel_sustain[channel])
+    {
+        uint8_t code = (msg[0] >> 4) & 0b00001111;
+        uint8_t note = msg[1] & 0b01111111;
+        if(code == MIDI_NOTE_ON)
+        {
+            note_sustain[note] &= ~(1 << channel); // clear the channel bit in that notes reg
+        }
+        else // note off
+        {
+            note_sustain[note] |= (1 << channel); // set the channel bit in that notes reg
+            return false;
+        }
+    }
+    return true;
+}
+
+static void handle_channel_sustain_release(channel)
+{
+    for(int i=0; i<128; i++)
+    {
+        if(note_sustain[i] & (1 << channel)) // there is a stored note-off
+        {
+            note_sustain[i] &= ~(1 << channel); // clear the bit
+            struct wav_player_event_t wav_player_event;
+            wav_player_event.code = MIDI_NOTE_OFF;
+            wav_player_event.voice = channel_lut[channel];
+            wav_player_event.note = i;
+            wav_player_event.velocity = 0;
+            wav_player_event.channel = channel;
+            xQueueSendToBack(wav_player_queue,(void *) &wav_player_event, portMAX_DELAY); // send the note off
+        }
+    }
+}
+
 static void handle_midi(uint8_t *msg)
 {
     // send it through the midi filter hook
@@ -246,6 +290,10 @@ static void handle_midi(uint8_t *msg)
             case MIDI_NOTE_ON:
             case MIDI_NOTE_OFF:
             {
+                // setting msg to NULL in the hook, like we do in other hooks, seems to cause problems with fast note offs.
+                // The NULL value persists to the next event if they are close together in time. return bool instead
+                bool res = sustain_hook(msg);
+                if(!res) break; // it was a note off captured by the sustain hook
                 struct wav_player_event_t wav_player_event;
                 wav_player_event.code = (msg[0] >> 4) & 0b00001111;
                 wav_player_event.voice = channel_lut[channel];
@@ -280,7 +328,6 @@ static void handle_midi(uint8_t *msg)
                 switch (CC)
                 {
                 case MIDI_CC_PAN:
-                    // log_e("Pan %d",val);
                     if(val == 64)
                     {
                         channel_pan[channel].left_vol = 127;
@@ -329,9 +376,25 @@ static void handle_midi(uint8_t *msg)
                     channel_pan[channel] = channel_pan_default[channel];
                     channel_vol[channel] = channel_vol_default[channel];
                     channel_exp[channel] = channel_exp_default[channel];
+                    channel_sustain[channel] = channel_sustain_default[channel];
+                    handle_channel_sustain_release(channel); // lift the sustain pedal
+                    break;
+                case MIDI_CC_SUSTAIN:
+                    if(val > 63)
+                    {
+
+                        channel_sustain[channel] = true;
+                    }
+                    else
+                    {
+                        channel_sustain[channel] = false;
+                        handle_channel_sustain_release(channel);
+                    }
+                    break;
                 default:
                     break;
                 }
+                break;
             }
             default:
                 break;
@@ -347,6 +410,11 @@ void reset_midi_controllers(void)
         channel_pan[i] = channel_pan_default[i];
         channel_vol[i] = channel_vol_default[i];
         channel_exp[i] = channel_exp_default[i];
+        channel_sustain[i] = channel_sustain_default[i];
+    }
+    for(int i=0; i<128; i++)
+    {
+        note_sustain[i] = 0;
     }
 }
 

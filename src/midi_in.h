@@ -12,6 +12,7 @@
 #define MIDI_CC_VOLUME 7
 #define MIDI_CC_PAN 10
 #define MIDI_CC_EXP 11
+#define MIDI_CC_SUSTAIN 64
 #define MIDI_CC_MUTE 120
 #define MIDI_CC_RESET 121
 

@@ -109,6 +109,9 @@ int16_t note_sustain[128];
 const bool channel_sustain_default[16] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
 bool channel_sustain[16];
 
+const uint8_t channel_release_default[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t channel_release[16];
+
 uint8_t *get_channel_lut(void)
 {
     return &channel_lut[0];
@@ -391,6 +394,9 @@ static void handle_midi(uint8_t *msg)
                         handle_channel_sustain_release(channel);
                     }
                     break;
+                case MIDI_CC_RELEASE:
+                    channel_release[channel] = val;
+                    break;
                 default:
                     break;
                 }
@@ -410,6 +416,7 @@ void reset_midi_controllers(void)
         channel_pan[i] = channel_pan_default[i];
         channel_vol[i] = channel_vol_default[i];
         channel_exp[i] = channel_exp_default[i];
+        channel_release[i] = channel_release_default[i];
         channel_sustain[i] = channel_sustain_default[i];
     }
     for(int i=0; i<128; i++)

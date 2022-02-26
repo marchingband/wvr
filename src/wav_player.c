@@ -52,6 +52,7 @@ uint8_t channel_lut[16];
 struct pan_t channel_pan[16];
 uint8_t channel_vol[16];
 uint8_t channel_exp[16];
+uint8_t channel_release[16];
 
 extern struct metadata_t metadata;
 bool mute = false;
@@ -588,6 +589,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             {
               convert_buf_linear(buf);
             }
+            int fade_factor = 4 + channel_release[bufs[buf].wav_player_event.channel];
+            // log_i(fade_factor);
             for(int i=0; i<to_write; i++)
             {
               uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
@@ -598,7 +601,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
                 scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
               output_buf[i] += (sample >> DAMPEN_BITS);
-              if( (bufs[buf].fade > 0) && (i % 4 == 0) )
+              if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
               {
                 bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
                 bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
@@ -644,6 +647,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               {
                 convert_buf_linear(buf);
               }
+              int fade_factor = 4 + channel_release[bufs[buf].wav_player_event.channel];
               for(; i<this_write_end; i++)
               {
                 uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
@@ -653,7 +657,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
                   scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                 output_buf[i] += (sample >> DAMPEN_BITS);
-                if( (bufs[buf].fade > 0) && (i % 4 == 0) )
+                if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
                 {
                   bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
                   bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);

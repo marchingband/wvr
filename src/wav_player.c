@@ -690,9 +690,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             }
             break;
           }
-
 /*
-
                                     ANATOMY OF ASR LOOP
 
 
@@ -709,9 +707,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                                          ^
                                          |
                                      asr.offset
-  
 */
-
           case ASR_LOOP :
           {
             size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES;

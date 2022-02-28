@@ -65,7 +65,8 @@
 
 // july 10 / 2021
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v1.x.x 
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -240,6 +241,7 @@ void init_wav_lut(void){
             wav_lut[i][j].retrigger_mode = RETRIGGER;
             wav_lut[i][j].response_curve = RESPONSE_SQUARE_ROOT;
             wav_lut[i][j].priority = 0;
+            wav_lut[i][j].mute_group = 0;
             wav_lut[i][j].loop_start = 0;
             wav_lut[i][j].loop_end = 0;
         }
@@ -258,8 +260,10 @@ void init_wav_lut(void){
             voice[j].retrigger_mode = RETRIGGER;
             voice[j].response_curve = RESPONSE_SQUARE_ROOT;
             voice[j].priority = 0;
+            voice[j].mute_group = 0;
             voice[j].loop_start = 0;
             voice[j].loop_end = 0;
+            voice[j].RFU = 0;
             memcpy(voice[j].name, blank, 1);
         }
         ESP_ERROR_CHECK(emmc_write(
@@ -400,6 +404,7 @@ void read_wav_lut_from_disk(void)
             wav_lut[i][j].note_off_meaning = voice[j].note_off_meaning;
             wav_lut[i][j].response_curve = voice[j].response_curve;
             wav_lut[i][j].priority = voice[j].priority;
+            wav_lut[i][j].mute_group = voice[j].mute_group;
             wav_lut[i][j].loop_start = voice[j].loop_start;
             wav_lut[i][j].loop_end = voice[j].loop_end;
         }
@@ -505,6 +510,7 @@ struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_
             wav.note_off_meaning = wav_lut[voice][note].note_off_meaning;
             wav.response_curve = wav_lut[voice][note].response_curve;
             wav.priority = wav_lut[voice][note].priority;
+            wav.mute_group = wav_lut[voice][note].mute_group;
             wav.loop_start = wav_lut[voice][note].loop_start;
             wav.loop_end = wav_lut[voice][note].loop_end;
             return wav;
@@ -853,10 +859,12 @@ cJSON* add_voice_json(uint8_t voice_num)
         if(ret==NULL){log_e("failed to make json responseCurve");continue;}
         ret = cJSON_AddNumberToObject(note, "priority", voice[j].priority);
         if(ret==NULL){log_e("failed to make json priority");continue;}
+        ret = cJSON_AddNumberToObject(note, "muteGroup", voice[j].mute_group);
+        if(ret==NULL){log_e("failed to make json muteGroup");continue;}
         ret = cJSON_AddNumberToObject(note, "loopStart", voice[j].loop_start);
         if(ret==NULL){log_e("failed to make json loppStart");continue;}
         ret = cJSON_AddNumberToObject(note, "loopEnd", voice[j].loop_end);
-        if(ret==NULL){log_e("failed to make json priority");continue;}
+        if(ret==NULL){log_e("failed to make json loop_end");continue;}
         if(voice[j].isRack > -1){
             // its a rack
             // log_i("rack %d",voice[j].isRack);
@@ -1116,6 +1124,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
         voice_data[num_note].note_off_meaning = cJSON_GetObjectItemCaseSensitive(note, "noteOff")->valueint;
         voice_data[num_note].response_curve = cJSON_GetObjectItemCaseSensitive(note, "responseCurve")->valueint;
         voice_data[num_note].priority = cJSON_GetObjectItemCaseSensitive(note, "priority")->valueint;
+        voice_data[num_note].mute_group = cJSON_GetObjectItemCaseSensitive(note, "muteGroup")->valueint;
         voice_data[num_note].loop_start = cJSON_GetObjectItemCaseSensitive(note, "loopStart")->valueint;
         voice_data[num_note].loop_end = cJSON_GetObjectItemCaseSensitive(note, "loopEnd")->valueint;
         // is a rack, and not a new rack (would be -2)
@@ -1161,6 +1170,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
             voice_data[num_note].note_off_meaning = HALT;
             voice_data[num_note].response_curve = RESPONSE_SQUARE_ROOT;
             voice_data[num_note].priority = 0;
+            voice_data[num_note].mute_group = 0;
             voice_data[num_note].loop_start = 0;
             voice_data[num_note].loop_end = 0;
             char *blank = "";

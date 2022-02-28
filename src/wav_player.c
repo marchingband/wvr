@@ -50,6 +50,9 @@ static const char* TAG = "wav_player";
 // from midi.c
 uint8_t channel_lut[16];
 struct pan_t channel_pan[16];
+uint8_t channel_vol[16];
+uint8_t channel_exp[16];
+uint8_t channel_release[16];
 
 extern struct metadata_t metadata;
 bool mute = false;
@@ -82,6 +85,8 @@ struct buf_t {
   struct wav_player_event_t wav_player_event;
   struct wav_player_event_t next_wav_player_event;
   struct asr_t asr;
+  // enum response_curve response_curve;
+  struct vol_t stereo_volume;
   int16_t *buffer_a;
   int16_t *buffer_b;
   int16_t *buffer_head;
@@ -129,6 +134,7 @@ struct response_curve_t {
 };
 
 struct response_curve_t lin_float_lut[128];
+struct response_curve_t exp_float_lut[128];
 struct response_curve_t sqrt_float_lut[128];
 struct response_curve_t inv_sqrt_float_lut[128];
 
@@ -210,28 +216,31 @@ void init_response_lut_fade_pair(struct response_curve_t *dest, struct response_
   }
 }
 
-void convert_buf_linear(int num_buf)
+void convert_buf_linear(int buf)
 {
-  switch(bufs[num_buf].wav_data.response_curve){
+  switch(bufs[buf].wav_data.response_curve){
     case RESPONSE_SQUARE_ROOT:
-      bufs[num_buf].volume = sqrt_float_lut[bufs[num_buf].volume].fade_val;
+      bufs[buf].stereo_volume.left = sqrt_float_lut[bufs[buf].stereo_volume.left].fade_val;
+      bufs[buf].stereo_volume.right = sqrt_float_lut[bufs[buf].stereo_volume.right].fade_val;
       break;
     case RESPONSE_INV_SQUARE_ROOT:
-      bufs[num_buf].volume = inv_sqrt_float_lut[bufs[num_buf].volume].fade_val;
+      bufs[buf].stereo_volume.left = inv_sqrt_float_lut[bufs[buf].stereo_volume.left].fade_val;
+      bufs[buf].stereo_volume.right = inv_sqrt_float_lut[bufs[buf].stereo_volume.right].fade_val;
       break;
     default:
       break;
   }
-  bufs[num_buf].wav_data.response_curve = RESPONSE_LINEAR;
+  bufs[buf].wav_data.response_curve = RESPONSE_LINEAR;
 }
 
 void init_response_luts(void)
 {
   for(int i=0;i<128;i++)
   {
-    lin_float_lut[i].val = i/127.0;
-    sqrt_float_lut[i].val = sqrt(i * 127.0)/127;
+    lin_float_lut[i].val = i / 127.0;
+    sqrt_float_lut[i].val = sqrt(i * 127.0) / 127;
     inv_sqrt_float_lut[i].val = pow(i / 127.0, 2);
+    exp_float_lut[i].val = i / 100.0;
   }
   init_response_lut_fade_pair(sqrt_float_lut, lin_float_lut);
   init_response_lut_fade_pair(inv_sqrt_float_lut, lin_float_lut);
@@ -241,6 +250,11 @@ void init_response_luts(void)
 int16_t IRAM_ATTR scale_sample (int16_t in, uint8_t vol)
 {
   return (int16_t)(in * lin_float_lut[vol].val);
+}
+
+int IRAM_ATTR scale_sample_exp (int16_t in, uint8_t vol)
+{
+  return (int)(in * lin_float_lut[vol].val);
 }
 
 int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t vol)
@@ -309,7 +323,7 @@ int prune(uint8_t priority)
   int candidate = -1;
   for(int i=0;i<NUM_BUFFERS;i++)
   {
-    if(bufs[i].pruned)
+    if(bufs[i].pruned || bufs[i].wav_data.play_back_mode == ASR_LOOP)
     {
       continue;
     }
@@ -338,6 +352,15 @@ int prune(uint8_t priority)
   }
   // log_i("pruned buf %d",candidate);
   return candidate;
+}
+
+void IRAM_ATTR update_stereo_volume(uint8_t buf)
+{
+  uint8_t chan = bufs[buf].wav_player_event.channel;
+  uint32_t left = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].left_vol * bufs[buf].volume;
+  uint32_t right = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].right_vol * bufs[buf].volume;
+  bufs[buf].stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127*127
+  bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
 }
 
 void IRAM_ATTR wav_player_task(void* pvParameters)
@@ -398,6 +421,16 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 break;
             }
             break;
+          }
+        }
+      }
+      if(wav_player_event.code == MIDI_NOTE_ON && !abort_note && new_wav.mute_group > 0)
+      {
+        for(int8_t i=0; i<NUM_BUFFERS; i++)
+        {
+          if(bufs[i].wav_data.mute_group == new_wav.mute_group)
+          {
+            bufs[i].fade = 1;
           }
         }
       }
@@ -483,6 +516,19 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
           }
         }
       }
+      else if(wav_player_event.code == MIDI_CC)
+      {
+        if(wav_player_event.note == MIDI_CC_MUTE)
+        {
+          for(int buf=0; buf<NUM_BUFFERS; buf++)
+          {
+            if(bufs[buf].wav_player_event.channel == wav_player_event.channel)
+            {
+              bufs[buf].done = true;
+            }
+          }
+        }
+      }
     }
 
     num_reads = 0;
@@ -535,21 +581,30 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             size_t remaining = bufs[buf].size - bufs[buf].wav_position;
             size_t remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
             size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES < remaining ? DAC_BUFFER_SIZE_IN_SAMPLES : remaining;
+            if(bufs[buf].fade == 0) // dont update stereo volume while fading
+            {
+              update_stereo_volume(buf);
+            }
+            else if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // starting a fade but the buf is not a linear response
+            {
+              convert_buf_linear(buf);
+            }
+            int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
             for(int i=0; i<to_write; i++)
             {
-              sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
-                scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
+              uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
+              sample = 
+                bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+                scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
                 bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
-                scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
-                scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+                scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
+                scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
               output_buf[i] += (sample >> DAMPEN_BITS);
-              if( (bufs[buf].fade > 0) && (i % 4 == 0) )
+              if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
               {
-                if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
-                  convert_buf_linear(buf);
-                else if(bufs[buf].volume > 0)
-                  bufs[buf].volume--;
-                else
+                bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+                bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+                if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
                 {
                   bufs[buf].done = true;
                   break;
@@ -583,21 +638,29 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               size_t tmp = remaining < remaining_in_buffer ? remaining : remaining_in_buffer;
               size_t this_write = tmp < to_write ? tmp : to_write; // the smallest of all 3
               size_t this_write_end = this_write + i;
+              if(bufs[buf].fade == 0) // dont update stereo volume while fading
+              {
+                update_stereo_volume(buf);
+              }
+              else if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // starting a fade but the buf is not a linear response
+              {
+                convert_buf_linear(buf);
+              }
+              int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
               for(; i<this_write_end; i++)
               {
+                uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
                 sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
-                  scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
+                  scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
                   bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
-                  scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
-                  scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+                  scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
+                  scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                 output_buf[i] += (sample >> DAMPEN_BITS);
-                if( (bufs[buf].fade > 0) && (i % 4 == 0) )
+                if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
                 {
-                  if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // look for new non-linear ones that are about to fade, convert them to linear scale to avoid pops
-                    convert_buf_linear(buf);
-                  else if(bufs[buf].volume > 0)
-                    bufs[buf].volume--;
-                  else
+                  bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+                  bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+                  if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
                   {
                     bufs[buf].done = true;
                     break;
@@ -627,9 +690,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             }
             break;
           }
-
 /*
-
                                     ANATOMY OF ASR LOOP
 
 
@@ -646,9 +707,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                                          ^
                                          |
                                      asr.offset
-  
 */
-
           case ASR_LOOP :
           {
             size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES;
@@ -695,15 +754,17 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 should_copy = false;
               }
               size_t this_write_end = this_write + i;
+              update_stereo_volume(buf);
               if(should_copy)
               {
                 for(; i<this_write_end; i++) // mix into output and copy to buffer_head
                 {
+                  uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
                   sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
-                    scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
+                    scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
                     bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
-                    scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
-                    scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+                    scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
+                    scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                   output_buf[i] += (sample >> DAMPEN_BITS);
                   bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
                 }
@@ -712,11 +773,12 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               {
                 for(; i<this_write_end; i++) // just mix into output
                 {
+                  uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
                   sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
-                    scale_sample(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
+                    scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
                     bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
-                    scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume) :
-                    scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], bufs[buf].volume);
+                    scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
+                    scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                   output_buf[i] += (sample >> DAMPEN_BITS);
                 }
               }

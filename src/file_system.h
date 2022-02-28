@@ -106,6 +106,11 @@ struct metadata_t {
     uint8_t midi_channel; // 0 is omni
 };
 
+struct vol_t {
+  uint8_t left;
+  uint8_t right;
+};
+
 struct wav_lu_t {
     size_t length;
     size_t start_block;
@@ -115,6 +120,7 @@ struct wav_lu_t {
     enum note_off_meaning note_off_meaning;
     enum response_curve response_curve;
     uint8_t priority; // 0 to 15
+    uint8_t mute_group;
     uint8_t empty;
     size_t loop_start;
     size_t loop_end;
@@ -130,9 +136,11 @@ struct wav_file_t {
     enum note_off_meaning note_off_meaning;
     enum response_curve response_curve;
     uint8_t priority; // 0 to 15
+    uint8_t mute_group; // 0 to 15
     uint8_t empty;
     size_t loop_start;
     size_t loop_end;
+    int RFU;
 };
 
 struct firmware_t {

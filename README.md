@@ -11,6 +11,7 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * [powering wvr](#powering-wvr)
 * [updating firmware](#updating-firmware)
 * [playing sounds](#playing-sounds)
+* [midi control](#midi-control)
 * sound settings
 * * [understanding priority](#understanding-priority)
 * * [understanding exclusive group](#understanding-exclusive-group)
@@ -86,6 +87,21 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR
 * connect headphones or some line out to the WVR
 * using a wire (or a female jumper cable) connect the **GND** pin on the WVR to pin **D2**, and your sound should play.
 * Changes to the Pin Configuration will not take effect until you reset the WVR, so get in the habit of reseting your WVR as you make changes, after perforing a SYNC. WVR only takes a few seconds to boot and present WIFI, so it is not a real bottle neck in your workflow, your computer will not even notice that the network has been reset.
+
+# midi control
+
+WVR will respond to the following midi events:
+Note on
+Note off
+Program Change
+CC 7 (volume)
+CC 10 (panning)
+CC 11 (expression)
+CC 64 (sustain, like the pedal on a piano)
+CC 72 (release time (up to ~30ms fade out))
+CC 120 (all sound off)
+CC 121 (reset all controllers)
+Note that volume, panning and expressing, like velocity, will respond acording to a particular sounds response curve. A sound with Inverse Square Root response curve selected will pan with that same algorythm applied.
 
 # understanding priority
 WVR can playback up to 18 stereo sounds at once. It mixes all the sounds into a stereo output. If you play very fast, or play dense chords, or have very long sounds, it's possible to ask the WVR to play back more then 18 sounds. When this happens, WVR runs an algorithm to figure out what to do. It will try to find an old, or an unimportant sound, stop playing that sound, and play the newly triggered sound instead. You can help it make this decision by giving some sounds higher **priority**. A lower priority sound will never stop a higher priority sound, only equal or lower priority. In the case where all 18 voices are busy playing high priority sounds, and a lower priority sound is triggered, WVR will not play the sound.

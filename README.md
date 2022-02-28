@@ -90,17 +90,17 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR
 
 # midi control
 
-WVR will respond to the following midi events:
-Note on
-Note off
-Program Change
-CC 7 (volume)
-CC 10 (panning)
-CC 11 (expression)
-CC 64 (sustain, like the pedal on a piano)
-CC 72 (release time (up to ~30ms fade out))
-CC 120 (all sound off)
-CC 121 (reset all controllers)
+WVR will respond to the following midi events:  
+Note on  
+Note off  
+Program Change  
+CC 7 (volume)  
+CC 10 (panning)  
+CC 11 (expression)  
+CC 64 (sustain, like the pedal on a piano)  
+CC 72 (release time (up to ~30ms fade out))  
+CC 120 (all sound off)  
+CC 121 (reset all controllers)  
 Note that volume, panning and expressing, like velocity, will respond acording to a particular sounds response curve. A sound with Inverse Square Root response curve selected will pan with that same algorythm applied.
 
 # understanding priority

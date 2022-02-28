@@ -53,7 +53,7 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 https://github.com/marchingband/wvr_binaries
 and find the folder for your board, download the .ino.bin file, which will be a link like:
 https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.10/wvr_basic.ino.bin
-Choose the newest binary (currently v1.0.10)
+Choose the newest binary (currently v3.0.0)
 * Apply power to your WVR.
 * On a computer, join the wifi network **WVR**, using the password **12345678**
 * Open Google Chrome (or another browser which [impliments the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open

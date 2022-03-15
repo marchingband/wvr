@@ -65,6 +65,8 @@ extern "C" void sendWSMsg(char* msg){
 
 cJSON *ws_root;
 
+QueueHandle_t web_midi_queue;
+
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
   if(type == WS_EVT_CONNECT){
     Serial.printf("ws[%s][%u] connect\n", server->url(), client->id());
@@ -83,8 +85,12 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
     String msg = "";
     if(info->final && info->index == 0 && info->len == len){
       //the whole message is in a single frame and we got all of it's data
-      ws_root = cJSON_Parse((char *)data);
-      on_rpc_in(ws_root);
+      // ws_root = cJSON_Parse((char *)data);
+      // on_rpc_in(ws_root);
+      for(int i=0; i<len; i++){
+        // log_i("got midi %d index:%d", data[i], i);
+        xQueueSendToBack(web_midi_queue, (void *)&data[i], portMAX_DELAY);
+      }
     }
   }
 }

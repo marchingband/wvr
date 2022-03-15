@@ -7,14 +7,17 @@
 
 midiXparser midiParser;
 midiXparser usbMidiParser;
+midiXparser webMidiParser;
 uint8_t *msg;
 uint8_t *usb_msg;
+uint8_t *web_msg;
 
 
 void midi_parser_init(void)
 {
     midiParser.setMidiMsgFilter( midiXparser::channelVoiceMsgTypeMsk );
     usbMidiParser.setMidiMsgFilter( midiXparser::channelVoiceMsgTypeMsk );
+    webMidiParser.setMidiMsgFilter( midiXparser::channelVoiceMsgTypeMsk );
 }
 
 extern "C" uint8_t* midi_parse(uint8_t in)
@@ -48,6 +51,25 @@ extern "C" uint8_t* usb_midi_parse(uint8_t in)
         {
             usb_msg = usbMidiParser.getMidiMsg();
             return usb_msg;
+        }
+    }
+    return NULL;
+}
+
+extern "C" uint8_t* web_midi_parse(uint8_t in)
+{
+    // log_i("got a byte %d", in);
+    if ( webMidiParser.parse( in ) )  // Do we received a channel voice msg ?
+    {
+        if ( 
+                webMidiParser.isMidiStatus(midiXparser::noteOnStatus) || 
+                webMidiParser.isMidiStatus(midiXparser::noteOffStatus) || 
+                webMidiParser.isMidiStatus(midiXparser::programChangeStatus) || 
+                webMidiParser.isMidiStatus(midiXparser::controlChangeStatus) 
+            ) 
+        {
+            web_msg = webMidiParser.getMidiMsg();
+            return web_msg;
         }
     }
     return NULL;

@@ -29,10 +29,12 @@ esp_err_t ret;
 QueueHandle_t wav_player_queue;
 QueueHandle_t uart_queue; // uart Events queue
 QueueHandle_t uart_queue_usb; // usb uart Events queue
+QueueHandle_t web_midi_queue; // usb uart Events queue
 
 struct wav_player_event_t wav_player_event;
 uint8_t *msg;
 uint8_t *usb_msg;
+uint8_t *web_msg;
 struct metadata_t metadata;
 
 void(*midi_hook)(uint8_t *in);
@@ -168,6 +170,22 @@ static void read_uart_task()
             else
             {
                 log_e("other uart event %d", event.type);
+            }
+        }
+    }
+}
+
+static void web_midi_task()
+{
+    uint8_t web_midi_byte;
+    for(;;)
+    {
+        if(xQueueReceive(web_midi_queue, (void *)&web_midi_byte, (portTickType)portMAX_DELAY))
+        {
+            web_msg = web_midi_parse(web_midi_byte);
+            if(web_msg)
+            {
+                handle_midi(web_msg);
             }
         }
     }
@@ -432,6 +450,8 @@ void midi_init(bool useUsbMidi)
     init_uart();
     midi_hook = midi_hook_default;
     xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", 4096, NULL, 3, NULL, 0);
+    web_midi_queue = xQueueCreate(64, sizeof(uint8_t));
+    xTaskCreatePinnedToCore(web_midi_task, "web_midi_task", 4096, NULL, 3, NULL, 0);
     if(useUsbMidi)
     {
         init_gpio_usb();

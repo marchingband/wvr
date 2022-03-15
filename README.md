@@ -12,6 +12,7 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * [updating firmware](#updating-firmware)
 * [playing sounds](#playing-sounds)
 * [midi control](#midi-control)
+* [web midi](#web-midi)
 * sound settings
 * * [understanding priority](#understanding-priority)
 * * [understanding exclusive group](#understanding-exclusive-group)
@@ -102,6 +103,14 @@ CC 72 (release time (up to ~30ms fade out))
 CC 120 (all sound off)  
 CC 121 (reset all controllers)  
 Note that volume, panning and expressing, like velocity, will respond acording to a particular sounds response curve. A sound with Inverse Square Root response curve selected will pan with that same algorythm applied.
+
+# web midi
+
+The WVR Web UI can act as a MIDI destination for your DAW or other MIDI applications, and send MIDI data over Wifi to WVR. Using this technique you can play your WVR wirelessly.  
+On macos, open Audio MIDI Setup, open the MIDI Studio panel, double click the IAC Driver to open its preferences, and check the "Device is online" box.  
+In your DAW's preferences, make the IAC Driver a midi output. Select the IAC Driver as the MIDI destination for your midi track.  
+Now in the WVR Web UI, in the Global Screen (click the "WVR" button top and center), click the "Refresh" button at the bottom of the screen, under "Web MIDI", and make sure the IAC Driver is listed to the right.  
+Your DAW should now stream MIDI data wirelessly to WVR.
 
 # understanding priority
 WVR can playback up to 18 stereo sounds at once. It mixes all the sounds into a stereo output. If you play very fast, or play dense chords, or have very long sounds, it's possible to ask the WVR to play back more then 18 sounds. When this happens, WVR runs an algorithm to figure out what to do. It will try to find an old, or an unimportant sound, stop playing that sound, and play the newly triggered sound instead. You can help it make this decision by giving some sounds higher **priority**. A lower priority sound will never stop a higher priority sound, only equal or lower priority. In the case where all 18 voices are busy playing high priority sounds, and a lower priority sound is triggered, WVR will not play the sound.

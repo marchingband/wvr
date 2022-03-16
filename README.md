@@ -90,7 +90,6 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR
 * Changes to the Pin Configuration will not take effect until you reset the WVR, so get in the habit of reseting your WVR as you make changes, after perforing a SYNC. WVR only takes a few seconds to boot and present WIFI, so it is not a real bottle neck in your workflow, your computer will not even notice that the network has been reset.
 
 # midi control
-
 WVR will respond to the following midi events:  
 Note on  
 Note off  
@@ -105,11 +104,12 @@ CC 121 (reset all controllers)
 Note that volume, panning and expressing, like velocity, will respond acording to a particular sounds response curve. A sound with Inverse Square Root response curve selected will pan with that same algorythm applied.
 
 # web midi
-
-The WVR Web UI can act as a MIDI destination for your DAW or other MIDI applications, and send MIDI data over Wifi to WVR. Using this technique you can play your WVR wirelessly.  
-On macos, open Audio MIDI Setup, open the MIDI Studio panel, double click the IAC Driver to open its preferences, and check the "Device is online" box.  
+The WVR Web UI can act as a MIDI destination for your DAW or other MIDI applications, and in turn send MIDI data over Wifi to WVR. Using this technique you can play your WVR wirelessly.  
+On macos, open Audio MIDI Setup, open the MIDI Studio panel, double click the IAC Driver to open its preferences, and check the **Device is online** box.  
 In your DAW's preferences, make the IAC Driver a midi output. Select the IAC Driver as the MIDI destination for your midi track.  
-Now in the WVR Web UI, in the Global Screen (click the "WVR" button top and center), click the "Refresh" button at the bottom of the screen, under "Web MIDI", and make sure the IAC Driver is listed to the right.  
+Google Chrome currently considers Web MIDI to be a "powerful feature" and so access is limited to HTTPS websites. Since ESP32 cannot serve over HTTPS, we need to ask Google Chrome to make an exception and trust the WVR.  
+In Google Chrome, enter **chrome://flags/#unsafely-treat-insecure-origin-as-secure** into the url bar, add **http://192.168.5.18** to the list, click **enable**, and then restart Google Chrome.  
+Now in the WVR Web UI, in the Global Screen (click the **WVR** button top and center), click the **Refresh** button at the bottom of the screen, under **Web MIDI**, and make sure the IAC Driver is listed to the right.  
 Your DAW should now stream MIDI data wirelessly to WVR.
 
 # understanding priority

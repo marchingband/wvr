@@ -26,6 +26,7 @@ struct wav_player_event_t {
 void current_bank_up(void);
 void current_bank_down(void);
 void play_wav(uint8_t voice, uint8_t note, uint8_t velocity);
+void toggle_wav(uint8_t voice, uint8_t note, uint8_t velocity);
 void stop_wav(uint8_t voice, uint8_t note);
 void set_mute(bool should_mute);
 

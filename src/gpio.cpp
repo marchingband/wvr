@@ -11,6 +11,7 @@
 #include "midi_in.h"
 #include "server.h"
 #include "gpio.h"
+#include "wav_player.h"
 
 extern "C" void rpc_out(int procedure, int arg0, int arg1, int arg2);
 // extern "C" void server_pause(void);

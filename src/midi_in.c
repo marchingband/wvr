@@ -10,6 +10,7 @@
 #include "wav_player.h"
 #include "file_system.h"
 #include "midi.h"
+#include "wav_player.h"
 
 #define MIDI_UART_NUM UART_NUM_2
 #define USB_MIDI_UART_NUM UART_NUM_1

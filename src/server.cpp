@@ -20,6 +20,7 @@
 #include "server.h"
 #include "esp_wifi.h"
 #include "boot.h"
+#include "wav_player.h"
 
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
@@ -593,6 +594,23 @@ void handleEmmcReset(AsyncWebServerRequest *request){
   request->send(204);
 }
 
+void handlePlayWav(AsyncWebServerRequest *request){
+
+  uint8_t voice;
+  uint8_t note;
+  uint8_t velocity;
+
+  AsyncWebHeader* voice_string = request->getHeader("voice");
+  AsyncWebHeader* note_string = request->getHeader("note");
+  AsyncWebHeader* velocity_string = request->getHeader("velocity");
+  sscanf(voice_string->value().c_str(), "%d", &voice);
+  sscanf(note_string->value().c_str(), "%d", &note);
+  sscanf(velocity_string->value().c_str(), "%d", &velocity);
+
+  toggle_wav(voice, note, velocity);
+  request->send(204);
+}
+
 void _server_pause(){
   ws.closeAll();
   server.end();
@@ -778,6 +796,12 @@ void server_begin() {
     "/emmcReset",
     HTTP_GET,
     handleEmmcReset
+  );
+
+  server.on(
+    "/playWav",
+    HTTP_GET,
+    handlePlayWav
   );
 
   server.on(

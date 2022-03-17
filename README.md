@@ -101,7 +101,7 @@ CC 64 (sustain, like the pedal on a piano)
 CC 72 (release time (up to ~30ms fade out))  
 CC 120 (all sound off)  
 CC 121 (reset all controllers)  
-Note that volume, panning and expressing, like velocity, will respond acording to a particular sounds response curve. A sound with Inverse Square Root response curve selected will pan with that same algorythm applied.
+Note that volume, panning and expression, like velocity, will respond acording to a particular sounds response curve. A sound with Inverse Square Root response curve selected will pan with that same algorythm applied.
 
 # web midi
 The WVR Web UI can act as a MIDI destination for your DAW or other MIDI applications, and in turn send MIDI data over Wifi to WVR. Using this technique you can play your WVR wirelessly.  

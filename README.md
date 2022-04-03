@@ -103,6 +103,12 @@ CC 120 (all sound off)
 CC 121 (reset all controllers)  
 Note that volume, panning and expression, like velocity, will respond acording to a particular sounds response curve. A sound with Inverse Square Root response curve selected will pan with that same algorythm applied.
 
+You can also send some 1-byte SYSEX commands for global controls, currently:
+0x01 = WiFi on
+0x02 = WiFi off
+
+So a sysex file to turn off wifi would look like "F0 02 F7". (F0 and F7 are the SYSEX start and end bytes)
+
 # web midi
 The WVR Web UI can act as a MIDI destination for your DAW or other MIDI applications, and in turn send MIDI data over Wifi to WVR. Using this technique you can play your WVR wirelessly.  
 On macos, open Audio MIDI Setup, open the MIDI Studio panel, double click the IAC Driver to open its preferences, and check the **Device is online** box.  

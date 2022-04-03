@@ -240,6 +240,7 @@ size_t w_start_block;
 
 void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   log_i("start len %d", len);
+  request->send(100);
   if(index==0){
     //start
     //wav_player_pause();

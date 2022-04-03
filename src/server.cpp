@@ -239,27 +239,25 @@ int w_size;
 size_t w_start_block;
 
 void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
-  log_i("start len %d", len);
-  request->send(100);
   if(index==0){
     //start
     //wav_player_pause();
-    log_i("start len %d", len);
+    // log_i("start len %d", len);
     AsyncWebHeader* size_string = request->getHeader("size");
     sscanf(size_string->value().c_str(), "%d", &w_size);
-    log_i("size %d", w_size);
+    // log_i("size %d", w_size);
     AsyncWebHeader* name = request->getHeader("name");
     strcpy(&w_name[0], name->value().c_str());
-    log_i("name %s", w_name);
+    // log_i("name %s", w_name);
     AsyncWebHeader* voice_string = request->getHeader("voice");
     sscanf(voice_string->value().c_str(), "%d", &w_voice);
-    log_i("voice %d", w_voice);
+    // log_i("voice %d", w_voice);
     AsyncWebHeader* note_string = request->getHeader("note");
     sscanf(note_string->value().c_str(), "%d", &w_note);
-    log_i("note %d", w_note);
-    log_i("%s w_size %d w_voice %d w_note %d", w_name, w_size, w_voice, w_note);
+    // log_i("note %d", w_note);
+    // log_i("%s w_size %d w_voice %d w_note %d", w_name, w_size, w_voice, w_note);
     w_start_block = find_gap_in_file_system(w_size);
-    log_i("w_start_block %d",w_start_block);
+    // log_i("w_start_block %d",w_start_block);
     if(w_start_block == 0)
     {
       // error no mem
@@ -273,16 +271,16 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
   }
   //always
   feedLoopWDT();
-  log_i("len %d", len);
+  // log_i("len %d", len);
   write_wav_to_emmc(data, w_start_block, len);
   w_bytes_read += len;
   if(index + len == total){
     //done
-    log_i("close %d");
+    // log_i("close %d");
     close_wav_to_emmc();
     add_wav_to_file_system(&w_name[0],w_voice,w_note,w_start_block,total);
     request->send(200);
-    log_i("done");
+    // log_i("done");
     //wav_player_resume();
   }
 }

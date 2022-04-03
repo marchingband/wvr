@@ -69,6 +69,13 @@ void logRam(){
   Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
 }
 
+// void forceARP(){
+//   char *netif = netif_list;
+//   while(netif){
+//     netif = *((char **) netif);
+//   }
+// }
+
 struct metadata_t metadata;
 
 void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
@@ -136,4 +143,6 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
 
   log_pin_config();
   logRam();
+
+  // forceARP();
 }

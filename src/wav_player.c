@@ -87,6 +87,7 @@ struct buf_t {
   struct asr_t asr;
   // enum response_curve response_curve;
   struct vol_t stereo_volume;
+  struct vol_t target_stereo_volume;
   int16_t *buffer_a;
   int16_t *buffer_b;
   int16_t *buffer_head;
@@ -359,8 +360,10 @@ void IRAM_ATTR update_stereo_volume(uint8_t buf)
   uint8_t chan = bufs[buf].wav_player_event.channel;
   uint32_t left = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].left_vol * bufs[buf].volume;
   uint32_t right = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].right_vol * bufs[buf].volume;
-  bufs[buf].stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127*127
-  bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
+  bufs[buf].target_stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127*127
+  bufs[buf].target_stereo_volume.right = (uint8_t)(right / 2048383);
+  // bufs[buf].stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127*127
+  // bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
 }
 
 void IRAM_ATTR wav_player_task(void* pvParameters)
@@ -600,14 +603,31 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
                 scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
               output_buf[i] += (sample >> DAMPEN_BITS);
-              if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
+              // if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
+              if(bufs[buf].fade > 0) // fade out
               {
-                bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
-                bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
-                if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+                if(i % fade_factor == 0) // throttle fade out
                 {
-                  bufs[buf].done = true;
-                  break;
+                  bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+                  bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+                  if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+                  {
+                    bufs[buf].done = true;
+                    break;
+                  }
+                }
+              }
+              else if(i % 10 == 0) // if not fading, do volume changes, but throttle
+              {
+                if(bufs[buf].target_stereo_volume.right != bufs[buf].stereo_volume.right)
+                {
+                  int inc = bufs[buf].target_stereo_volume.right > bufs[buf].stereo_volume.right ? 1 : -1;
+                  bufs[buf].stereo_volume.right += inc;
+                }
+                if(bufs[buf].target_stereo_volume.left != bufs[buf].stereo_volume.left)
+                {
+                  int inc = bufs[buf].target_stereo_volume.left > bufs[buf].stereo_volume.left ? 1 : -1;
+                  bufs[buf].stereo_volume.left += inc;
                 }
               }
             }

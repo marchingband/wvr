@@ -30,7 +30,7 @@ extern "C"
 enum play_back_mode {
     ONE_SHOT,
     LOOP,
-    PING_PONG,
+    PING_PONG, // keep for back compatibility
     ASR_LOOP,
 };
 

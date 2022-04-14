@@ -47,6 +47,8 @@ static const char* TAG = "wav_player";
 #define MAX_READS_PER_LOOP 4 // default
 // #define MAX_READS_PER_LOOP 3
 
+#define VOLUME_CHANGE_THROTLE 20
+
 // from midi.c
 uint8_t channel_lut[16];
 struct pan_t channel_pan[16];
@@ -617,7 +619,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   }
                 }
               }
-              else if(i % 10 == 0) // if not fading, do volume changes, but throttle
+              else if(i % VOLUME_CHANGE_THROTLE == 0) // if not fading, do volume changes, but throttle
               {
                 if(bufs[buf].target_stereo_volume.right != bufs[buf].stereo_volume.right)
                 {
@@ -676,14 +678,30 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
                   scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                 output_buf[i] += (sample >> DAMPEN_BITS);
-                if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
+                if(bufs[buf].fade > 0) // fade out
                 {
-                  bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
-                  bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
-                  if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+                  if(i % fade_factor == 0) // throttle fade out
                   {
-                    bufs[buf].done = true;
-                    break;
+                    bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+                    bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+                    if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+                    {
+                      bufs[buf].done = true;
+                      break;
+                    }
+                  }
+                }
+                else if(i % VOLUME_CHANGE_THROTLE == 0) // if not fading, do volume changes, but throttle
+                {
+                  if(bufs[buf].target_stereo_volume.right != bufs[buf].stereo_volume.right)
+                  {
+                    int inc = bufs[buf].target_stereo_volume.right > bufs[buf].stereo_volume.right ? 1 : -1;
+                    bufs[buf].stereo_volume.right += inc;
+                  }
+                  if(bufs[buf].target_stereo_volume.left != bufs[buf].stereo_volume.left)
+                  {
+                    int inc = bufs[buf].target_stereo_volume.left > bufs[buf].stereo_volume.left ? 1 : -1;
+                    bufs[buf].stereo_volume.left += inc;
                   }
                 }
               }
@@ -787,6 +805,19 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                   output_buf[i] += (sample >> DAMPEN_BITS);
                   bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
+                  if(i % VOLUME_CHANGE_THROTLE == 0) // do volume changes, but throttle
+                  {
+                    if(bufs[buf].target_stereo_volume.right != bufs[buf].stereo_volume.right)
+                    {
+                      int inc = bufs[buf].target_stereo_volume.right > bufs[buf].stereo_volume.right ? 1 : -1;
+                      bufs[buf].stereo_volume.right += inc;
+                    }
+                    if(bufs[buf].target_stereo_volume.left != bufs[buf].stereo_volume.left)
+                    {
+                      int inc = bufs[buf].target_stereo_volume.left > bufs[buf].stereo_volume.left ? 1 : -1;
+                      bufs[buf].stereo_volume.left += inc;
+                    }
+                  }
                 }
               }
               else
@@ -800,6 +831,19 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
                     scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                   output_buf[i] += (sample >> DAMPEN_BITS);
+                  if(i % VOLUME_CHANGE_THROTLE == 0) // do volume changes, but throttle
+                  {
+                    if(bufs[buf].target_stereo_volume.right != bufs[buf].stereo_volume.right)
+                    {
+                      int inc = bufs[buf].target_stereo_volume.right > bufs[buf].stereo_volume.right ? 1 : -1;
+                      bufs[buf].stereo_volume.right += inc;
+                    }
+                    if(bufs[buf].target_stereo_volume.left != bufs[buf].stereo_volume.left)
+                    {
+                      int inc = bufs[buf].target_stereo_volume.left > bufs[buf].stereo_volume.left ? 1 : -1;
+                      bufs[buf].stereo_volume.left += inc;
+                    }
+                  }
                 }
               }
               bufs[buf].wav_position += this_write;

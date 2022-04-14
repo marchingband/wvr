@@ -47,7 +47,8 @@ static const char* TAG = "wav_player";
 #define MAX_READS_PER_LOOP 4 // default
 // #define MAX_READS_PER_LOOP 3
 
-#define VOLUME_CHANGE_THROTLE 20
+// #define VOLUME_CHANGE_THROTLE 20 // works but with tiny artifacts
+#define VOLUME_CHANGE_THROTLE 100 // very smooth and fast enough i think
 
 // from midi.c
 uint8_t channel_lut[16];
@@ -364,8 +365,6 @@ void IRAM_ATTR update_stereo_volume(uint8_t buf)
   uint32_t right = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].right_vol * bufs[buf].volume;
   bufs[buf].target_stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127*127
   bufs[buf].target_stereo_volume.right = (uint8_t)(right / 2048383);
-  // bufs[buf].stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127*127
-  // bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
 }
 
 void IRAM_ATTR wav_player_task(void* pvParameters)

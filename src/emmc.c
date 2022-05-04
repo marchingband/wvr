@@ -14,9 +14,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "ws_log.h"
 
 static const char* TAG = "emmc";
+
+SemaphoreHandle_t emmcMutex;
 
 esp_err_t ret;
 sdmmc_card_t card;
@@ -28,21 +31,24 @@ size_t current_block = 0;
 // utility functions for other files to import
 esp_err_t emmc_write(const void *source, size_t block, size_t size)
 {
-//   log_i("write block %d",block);
+  xSemaphoreTake(emmcMutex, portMAX_DELAY);
   ret = sdmmc_write_sectors(&card, (const void *)source, (size_t)block, (size_t)size);
-  // ret = sdmmc_write_sectors(&card, (char *)source, (size_t)block, (size_t)size);
+  xSemaphoreGive(emmcMutex);
   return(ret);
 }
 
 esp_err_t emmc_read(void *dst, size_t start_sector, size_t sector_count)
 {
+  xSemaphoreTake(emmcMutex, portMAX_DELAY);
   ret = sdmmc_read_sectors(&card, (void *)dst, (size_t)start_sector, (size_t)sector_count);
+  xSemaphoreGive(emmcMutex);
   return(ret);
 }
 
 
 void emmc_init(void)
 {
+	emmcMutex = xSemaphoreCreateMutex();
   sdmmc_host_t host = SDMMC_HOST_DEFAULT();
   sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
   host.flags = SDMMC_HOST_FLAG_4BIT;
@@ -76,7 +82,6 @@ void emmc_init(void)
 
 esp_err_t write_wav_to_emmc(char* source, size_t block, size_t size)
 {
-	// log_i("write wav block %d", block);
 	if(current_block==0)
 	{
 		// this is the first chunk from the client
@@ -93,8 +98,7 @@ esp_err_t write_wav_to_emmc(char* source, size_t block, size_t size)
 		if(position == 512)
 		{
 			// the buffer is full, print it to the emmc and reset
-			// log_i("%u",current_block);
-			ret = sdmmc_write_sectors(&card, file_buf, current_block, 1);
+			ret = emmc_write(file_buf, current_block, 1);
 			if (ret != ESP_OK) {
 				log_e( "Failed to write sector %d :: (%s)", current_block, esp_err_to_name(ret));
 				return ESP_FAIL;
@@ -119,8 +123,7 @@ esp_err_t close_wav_to_emmc(void)
 	if(position != 0) // buffer is not empty
 	{
 		// write the last little bit
-		// log_i("%u",current_block);
-		ret = sdmmc_write_sectors(&card, file_buf, current_block, 1);
+		ret = emmc_write(file_buf, current_block, 1);
 		if (ret != ESP_OK) {
 			log_e( "Failed to write sector %d :: (%s)", current_block, esp_err_to_name(ret));
 			return ESP_FAIL;

@@ -1,6 +1,6 @@
 # welcome to wvr
 
-Purchase a WVR : https://www.tindie.com/products/ultrapalace/wvr
+Purchase a WVR : https://www.tindie.com/products/ultrapalace/wvr  
 Join us on the WVR Forum : https://groups.google.com/g/wvr-audio  
 Find the Pinouts and download the schematics for WVR :  https://github.com/marchingband/wvr_hardware  
 Binaries for all the WVR boards are here : https://github.com/marchingband/wvr_binaries  

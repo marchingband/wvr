@@ -8,6 +8,8 @@ Code for the Web UI is here : https://github.com/marchingband/wvr_ui
 Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_backpack  
 If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/wvr_thames
 
+![wvr pinout diagram]([http://url/to/img.png](https://github.com/marchingband/wvr_hardware/blob/main/images/wvr_pinout.png))
+
 * [getting started](#getting-started)
 * [powering wvr](#powering-wvr)
 * [updating firmware](#updating-firmware)

@@ -1,5 +1,6 @@
 # welcome to wvr
 
+Purchase a WVR : https://www.tindie.com/products/ultrapalace/wvr
 Join us on the WVR Forum : https://groups.google.com/g/wvr-audio  
 Find the Pinouts and download the schematics for WVR :  https://github.com/marchingband/wvr_hardware  
 Binaries for all the WVR boards are here : https://github.com/marchingband/wvr_binaries  
@@ -30,7 +31,6 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * [setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
 * [using Arduino CLI](#using-arduino-cli)
 * [using FTDI](#using-ftdi)
-* [soldering the USB Backpack](#soldering-the-usb-backpack)
 
 
 # getting started
@@ -197,30 +197,3 @@ Congradulations! You have flashed a custom firmware to your WVR!
 
 # using FTDI
 to connect a usb->fdti module to your WVR, connect **D0** to **RX**, **D1** to **TX**, and **GND** to **GND**. Open the sketch examples/wvr_ftdi, where you will see ```wvr->useFTDI = true```. The ESP32 on the WVR needs to be booted into a special FTDI boot mode, to do this, ground **D6** and ground the small copper pad on the top of the WVR labeled "boot" (it's right next to the eMMC), and hit reset. You can release D6 and the boot pad now. The ESP32 is now in FTDI boot mode, and if you have a serial monitor attached the WVR, it should print ```waiting for downlaod```. Now you can use the **UPLOAD** button in the Arduin IDE, at the end of flashing it will print "hard reseting", now restart the WVR. If you open the Arduino Serial Console, you will see some logs form the WVR boot process. With FTDI, you can also use ```./wvr.sh ftdi``` to flash, and Arduino Serial Monitor (or any Serial monitor app you like) to get logs from WVR
-
-# soldering the USB Backpack
-Both the WVR and the USB Backpack have all the pins labeled, so you should be able to determine the correct orientation. The big USB jack on the backpack is on the same end as the small USB jack on the WVR. The 2 boards go back-to-back.
-
-If you have a WVR Dev Board, there is room to have the USB Backpack on the bottom, but, if you are using the WVR with USB Backpack on a breadboard, then the USB Backpack must be on top. This determines which way the pin headers go in.
-
-Place the pin headers into the WVR Dev Board, or into a breadboard. Place the 2 boards onto the pin headers. There will be JUST enough length that the pin header should almost reach through both boards.
-
-If you are using a breadboard, this can be tricky, because the WVR is a little too tall, and the pins don't quite go all the way in. You may need to be a bit creative here. You could use female pin headers to get some extra height if you have them. You may want to put some pieces of wire, or a toothpick, under the plastic parts of the pin headers, so everyting fits really snug and flush. You want to be able to apply a good amount of pressure with the soldering iron, and not have things move around. Soldering is so fun, especially when there are challenges! You've got this!
-
-here is an image (this shows the USB Backpack on top) : https://imgur.com/a/3H6OtFo
-
-Start with one corner (maybe the 5v pin), and touch the soldering iron so you are contacting both the pin header, and the pad, apply lots of pressure, and wait for 3 seconds. Use a thin solder if you have it! Now apply some solder, and the melted solder should wick down into the hole. We are hoping to get lots of solder all the way down, so it joins both boards, and the pin header. Apply more solder little by little, until the hole is full, and a small bulge is left on the top.
-
-Next, re-melt that first solder and with your other hand, press down firmly on the top board, then remove the iron while still pressing down with the other hand. We are hoping to get the boards nice and close and square, and everything in place before moving on.
-
-Now do the same for the opposite pin, on the opposite side (one of the ground pins marked "g"). At this point everything should be secure and look even. Keep going and solder all the pins.
-
-here is an image (this one has the WVR on top) : https://imgur.com/a/CyD6zfh
-
-Use a multimeter to check that there are no shorts between adjacent pins, and that all the pins are indeed connected to the pads on both boards.
-If the USB Backpack is on top, place one probe of your multimeter on the castellated edge of the WVR, and check for continuity with the pin header. Here is a photo of that procedure : https://imgur.com/a/iM4eVyv
-It is very helpful to have flux, in particular liquid flux, for this. If you find a short, or if you find that the two boards are not connected right, use lots of flux and reflow the pin well.
-
-Now follow these instructions to update the firmware : https://github.com/marchingband/wvr_usb_backpack
-
-Youre done!

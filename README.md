@@ -1,5 +1,7 @@
 # welcome to wvr
 
+![wvr pinout diagram](https://github.com/marchingband/wvr_hardware/blob/main/images/wvr_pinout.png)
+
 Purchase a WVR : https://www.tindie.com/products/ultrapalace/wvr  
 Join us on the WVR Forum : https://groups.google.com/g/wvr-audio  
 Find the Pinouts and download the schematics for WVR :  https://github.com/marchingband/wvr_hardware  
@@ -7,8 +9,6 @@ Binaries for all the WVR boards are here : https://github.com/marchingband/wvr_b
 Code for the Web UI is here : https://github.com/marchingband/wvr_ui  
 Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_backpack  
 If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/wvr_thames
-
-![wvr pinout diagram](https://github.com/marchingband/wvr_hardware/blob/main/images/wvr_pinout.png)
 
 * [getting started](#getting-started)
 * [powering wvr](#powering-wvr)

@@ -40,6 +40,8 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * On a computer, join the wifi network **WVR**, using the password **12345678**
 * Open Google Chrome (or another browser which [impliments the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open
 
+![wvr gui](https://github.com/marchingband/wvr_hardware/blob/main/images/gui_sounds.png)
+
 # powering wvr
 
 * **wvr basic** : plug in usb, or apply 5v and ground, or 3.3v and ground, to the power pins
@@ -70,6 +72,8 @@ Choose the newest binary (currently v3.0.0)
 
 Congradulations! You now have the most up-to-date firmware loaded onto your WVR
 
+![wvr gui](https://github.com/marchingband/wvr_hardware/blob/main/images/gui_firmware.png)
+
 # playing sounds
 
 * in the WVR UI, click on a note ... maybe ... E2.
@@ -90,6 +94,8 @@ Congradulations! You now have the most up-to-date firmware loaded onto your WVR
 * connect headphones or some line out to the WVR
 * using a wire (or a female jumper cable) connect the **GND** pin on the WVR to pin **D2**, and your sound should play.
 * Changes to the Pin Configuration will not take effect until you reset the WVR, so get in the habit of reseting your WVR as you make changes, after perforing a SYNC. WVR only takes a few seconds to boot and present WIFI, so it is not a real bottle neck in your workflow, your computer will not even notice that the network has been reset.
+
+![wvr gui](https://github.com/marchingband/wvr_hardware/blob/main/images/gui_pins.png)
 
 # midi control
 WVR will respond to the following midi events:  
@@ -119,6 +125,8 @@ Google Chrome currently considers Web MIDI to be a "powerful feature" and so acc
 In Google Chrome, enter **chrome://flags/#unsafely-treat-insecure-origin-as-secure** into the url bar, add **http://192.168.5.18** to the list, click **enable**, and then restart Google Chrome.  
 Now in the WVR Web UI, in the Global Screen (click the **WVR** button top and center), click the **Refresh** button at the bottom of the screen, under **Web MIDI**, and make sure the IAC Driver is listed to the right.  
 Your DAW should now stream MIDI data wirelessly to WVR.
+
+![wvr gui](https://github.com/marchingband/wvr_hardware/blob/main/images/gui_global.png)
 
 # understanding priority
 WVR can playback up to 18 stereo sounds at once. It mixes all the sounds into a stereo output. If you play very fast, or play dense chords, or have very long sounds, it's possible to ask the WVR to play back more then 18 sounds. When this happens, WVR runs an algorithm to figure out what to do. It will try to find an old, or an unimportant sound, stop playing that sound, and play the newly triggered sound instead. You can help it make this decision by giving some sounds higher **priority**. A lower priority sound will never stop a higher priority sound, only equal or lower priority. In the case where all 18 voices are busy playing high priority sounds, and a lower priority sound is triggered, WVR will not play the sound.

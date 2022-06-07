@@ -14,12 +14,12 @@
 
 WVR wvr;
 
-void midiHookMS20(uint8_t * msg){
+void midiHookMS20(uint8_t *msg){
   uint8_t code = (msg[0] >> 4) & 0b00001111;
   if(code == MIDI_CC)
   {
     uint8_t CC = msg[1] & 0b01111111;
-    uint8_t val = msg[2]  & 0b01111111;
+    uint8_t val = msg[2] & 0b01111111;
     if(CC == 77)
     {
       int selected_voice = (val >= 0 && val < 21) ? 0 :
@@ -28,15 +28,13 @@ void midiHookMS20(uint8_t * msg){
       wvr.setVoice(0, selected_voice);
     }
   }
-  return;
 }
 
 void setup() {
   wvr.useFTDI = false;
   wvr.useUsbMidi = true;
   wvr.begin();
-  // setMidiHook must run after wvr.begin()
-  wvr.setMidiHook(midiHookMS20);
+  wvr.setMidiHook(midiHookMS20); // setMidiHook must run after wvr.begin()
   wvr.wifiIsOn = get_metadata()->wifi_starts_on;
   log_i("wifi is %s", wvr.wifiIsOn ? "on" : "off");
 }

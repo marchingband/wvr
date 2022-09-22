@@ -507,7 +507,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               bufs[b].wav_player_event.voice == wav_player_event.voice &&
               bufs[b].wav_player_event.note == wav_player_event.note &&
               bufs[b].free == 0 &&
-              bufs[b].wav_data.note_off_meaning == HALT
+              (
+                bufs[b].wav_data.note_off_meaning == HALT   ||
+                bufs[b].wav_data.play_back_mode == ASR_LOOP || // ASR gets stopped either way
+                bufs[b].wav_data.play_back_mode == LOOP        // LOOP gets stopped either way
+              )
             )
           {
             bufs[b].fade=1;
@@ -656,7 +660,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
                   scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                 output_buf[i] += (sample >> DAMPEN_BITS);
-                if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
+                if( (bufs[buf].fade > 0) && (i % fade_factor == 0) ) // were fading and its time to decrement volumes
                 {
                   bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
                   bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
@@ -754,7 +758,16 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 should_copy = false;
               }
               size_t this_write_end = this_write + i;
-              update_stereo_volume(buf);
+              // update_stereo_volume(buf);
+              if(bufs[buf].fade == 0) // dont update stereo volume while fading
+              {
+                update_stereo_volume(buf);
+              }
+              else if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // starting a fade but the buf is not a linear response
+              {
+                convert_buf_linear(buf);
+              }
+              int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
               if(should_copy)
               {
                 for(; i<this_write_end; i++) // mix into output and copy to buffer_head
@@ -767,6 +780,21 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                   output_buf[i] += (sample >> DAMPEN_BITS);
                   bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
+                  // do fadeout but only if HALT
+                  if( 
+                    (bufs[buf].fade > 0) &&
+                    (bufs[buf].wav_data.note_off_meaning == HALT) &&
+                    (i % fade_factor == 0) // were fading and its time to decrement volumes
+                  )
+                  {
+                    bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+                    bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+                    if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+                    {
+                      bufs[buf].done = true;
+                      break;
+                    }
+                  }
                 }
               }
               else
@@ -780,6 +808,20 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
                     scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                   output_buf[i] += (sample >> DAMPEN_BITS);
+                  if( 
+                    (bufs[buf].fade > 0) &&
+                    (bufs[buf].wav_data.note_off_meaning == HALT) &&
+                    (i % fade_factor == 0) // were fading and its time to decrement volumes
+                  )
+                  {
+                    bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+                    bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+                    if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+                    {
+                      bufs[buf].done = true;
+                      break;
+                    }
+                  }
                 }
               }
               bufs[buf].wav_position += this_write;

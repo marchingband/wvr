@@ -33,6 +33,7 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * [setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
 * [using Arduino CLI](#using-arduino-cli)
 * [using FTDI](#using-ftdi)
+* [hardware considerations](#hardware-considerations)
 
 
 # getting started
@@ -207,3 +208,8 @@ Congradulations! You have flashed a custom firmware to your WVR!
 
 # using FTDI
 to connect a usb->fdti module to your WVR, connect **D0** to **RX**, **D1** to **TX**, and **GND** to **GND**. Open the sketch examples/wvr_ftdi, where you will see ```wvr->useFTDI = true```. The ESP32 on the WVR needs to be booted into a special FTDI boot mode, to do this, ground **D6** and ground the small copper pad on the top of the WVR labeled "boot" (it's right next to the eMMC), and hit reset. You can release D6 and the boot pad now. The ESP32 is now in FTDI boot mode, and if you have a serial monitor attached the WVR, it should print ```waiting for downlaod```. Now you can use the **UPLOAD** button in the Arduin IDE, at the end of flashing it will print "hard reseting", now restart the WVR. If you open the Arduino Serial Console, you will see some logs form the WVR boot process. With FTDI, you can also use ```./wvr.sh ftdi``` to flash, and Arduino Serial Monitor (or any Serial monitor app you like) to get logs from WVR
+
+# hardware considerations  
+* **Pin D6** is a "strapping pin" for the ESP32, it corresponds to **GPIO_0** on the ESP32. This is a feature of ESP32 which **cannot be disabled**. If **D6** is held **LOW** at boot by external circuitry, the ESP32 will enter bootloader mode, and the firmware will not run, it will wait for upload until reset.  
+* **Pins D6** and **D13** (**A0** and **A7**) are connected to **ADC peripheral 2**, which is shared with the WiFi radio. ADC readings on these pins will be inconsistent when made at a time when the WiFi radio is active. All the other Analog Input pins are attached to **ADC 1**, and are fine to use when WiFi is active.  
+* **D7 D8 D9** and **D10** do not have internal pullups available. This is a feature missing from the ESP32, so design your hardware with external pullups when needed.

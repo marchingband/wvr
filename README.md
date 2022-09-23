@@ -27,6 +27,7 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * [bulk uploading files](#bulk-uploading-files)
 * [bulk uploading racks](#bulk-uploading-racks)
 * [pitch interpolation](#pitch-interpolation)
+* [pitch interpolating a rack](#pitch-interpolating-a-rack)
 * [using fx](#using-fx)
 * [global settings](#global-settings)
 * [firmware manager](#firmware-manager)
@@ -158,6 +159,9 @@ If you **shift-click** on **select files** while a region of notes are selected,
 
 # pitch interpolation
 If you select a range of notes, and then **shift-command-click** a note, the note will turn red, and it becomes the **pitch interpolation target**. Click **select file** and select one file from the dialog. The selected file will be pitch interpolated across the range you have selected. The **pitch interpolation target** will maintain its pitch, and all the other notes you selected will be pitched up or down in relation to it. You can look at the **FX** tab to see how the algorithm has decided to pitch your notes.
+
+# pitch interpolating a rack
+If you follow the steps above for pitch interpolation, but instead of selecting a single file, you instead select multiple files in the dialog, then the selected files will be sorted alphanumerically, and made into a rack, that rack will then be copied to all selected notes, and pitch shifted just like in pitch interpolation.
 
 # using fx
 WVR uses the web browsers built-in audio engine to do a lot of work preparing samples before it sends audio data to the WVR. It converts any sample that you choose to a standard audio format of 44.1k 16bit stereo PCM. It also adds FX. Currently the WVR UI impliments Distortion, Reverb, Pitch Shift, Panning and Volume. These FX are rendered before being sent to WVR, so the processor on WVR doesn't need to do any extra signal processing. This does mean that the reverb and it's tail are hard coded into the sample. If you have a sample with reverb, you must set up the note to ignore note-off events, otherwise there will not be a reverb tail if the note off event occurs before the sound is finished playing. You cannot return to the UI later and modify the FX settings, after you have SYNC'd the data to WVR. To change the FX you would need to select the original sound file again from your computer, apply the FX in a new way, and hit SYNC again. Click **audition** to hear how the FX sound. Depending on your computer and web browser, this rendering process is sometimes buggy, it may freeze for a moment (or a few seconds) before playback begins.

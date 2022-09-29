@@ -26,6 +26,7 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * [using racks](#using-racks)
 * [bulk uploading files](#bulk-uploading-files)
 * [bulk uploading racks](#bulk-uploading-racks)
+* [save and load voice configuration](#save-and-load-voice-configuration)
 * [pitch interpolation](#pitch-interpolation)
 * [pitch interpolating a rack](#pitch-interpolating-a-rack)
 * [using fx](#using-fx)
@@ -152,10 +153,13 @@ When a key is lifted on a piano, and likewise, when a pin on the WVR moves from 
 The term "rack" is our word for multi-sample functionality. With a traditional midi instrument, the sound engine responds to velocity data by modulating the **volume** of the sounds it produces. In a multi-sampled instrument, instead, the engine responds to velocity by playing a different sample, presumably a sample that reflects a lighter or heavier touch. In the case of a drum sample, the engine should have samples of the same drum being struck with various amounts of force, for example. To create a rack for a given note, click **create rack** in the UI. Next it's a good idea to name this rack, so hit **name rack** and enter a name. You should have all your samples prepared in advance, so next, hit **number of layers** and let WVR know how many samples you have for this rack. Be careful because changing this number in the future clears the data. The UI will automatically set "break points" evenly for each sample, but you can click any layer, and modify the break point if you like. The formula "< 50" you see in the UI indicates that this is the sample that will be triggered if the velocity is below 50, but above the break point for the previous layer. In other words this number sets the upper bound for this layer. You can still use FX while in Rack mode, but the same FX will be applied to all the layers.
 
 # bulk uploading files
-You can use **shift-click** and **command-click** to select regions of notes (and regions of racks). If you click **select files** while a range is selected, then the file dialog that comes up will allow you to select multiple files. The files you select will be sorted alphanumerically, and placed in order into the notes you have selected.
+You can use **shift-click** and **command-click** to select regions of notes (and regions of racks), or ctrl+a to select all notes. If you click **select files** while a range is selected, then the file dialog that comes up will allow you to select multiple files. The files you select will be sorted alphanumerically, and placed in order into the notes you have selected.
 
 # bulk uploading racks 
 If you **shift-click** on **select files** while a region of notes are selected, a special file upload dialog will appear, which allows you to select a **directory**. This function allows you to bulk upload some racks. The structure of the folder that you select must be organized in a very specific way. It must be a folder of sub-folders. Each subfolder represents a rack, and contains all the files for that rack. It will use the name of the subfolder for the name of the rack, and it will create as many slots as there are files. It will then sort all the folders, and all the files in all the folders alphanumerically, and place them into racks in the notes that you have selected.
+
+# save and load voice configuration
+If you **shift-click** on a voice button (numbered 1-16 at the top on the home screen) a dialog will open that will let you download a .json file, this file represents all the config settings for that voice. You can rename it as you like with the .json suffix, and save it to your computer. If you **shift-alt-click** on the voice button, a dialog will open, where you can select a previously saved .json file to now load up all those config settings into that voice.
 
 # pitch interpolation
 If you select a range of notes, and then **shift-command-click** a note, the note will turn red, and it becomes the **pitch interpolation target**. Click **select file** and select one file from the dialog. The selected file will be pitch interpolated across the range you have selected. The **pitch interpolation target** will maintain its pitch, and all the other notes you selected will be pitched up or down in relation to it. You can look at the **FX** tab to see how the algorithm has decided to pitch your notes.

@@ -239,7 +239,7 @@ void init_wav_lut(void){
             wav_lut[i][j].length = 0;
             wav_lut[i][j].play_back_mode = ONE_SHOT;
             wav_lut[i][j].retrigger_mode = RETRIGGER;
-            wav_lut[i][j].response_curve = RESPONSE_SQUARE_ROOT;
+            wav_lut[i][j].response_curve = RESPONSE_LINEAR;
             wav_lut[i][j].note_off_meaning = HALT;
             wav_lut[i][j].priority = 0;
             wav_lut[i][j].mute_group = 0;
@@ -259,7 +259,7 @@ void init_wav_lut(void){
             voice[j].length=0;
             voice[j].play_back_mode = ONE_SHOT;
             voice[j].retrigger_mode = RETRIGGER;
-            voice[j].response_curve = RESPONSE_SQUARE_ROOT;
+            voice[j].response_curve = RESPONSE_LINEAR;
             voice[j].note_off_meaning = HALT;
             voice[j].priority = 0;
             voice[j].mute_group = 0;

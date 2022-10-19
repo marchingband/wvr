@@ -9,9 +9,11 @@
 midiXparser midiParser;
 midiXparser usbMidiParser;
 midiXparser webMidiParser;
+midiXparser bleMidiParser;
 uint8_t *msg;
 uint8_t *usb_msg;
 uint8_t *web_msg;
+uint8_t *ble_msg;
 uint8_t sysex_byte;
 
 void handle_sysex(void)
@@ -38,6 +40,7 @@ void midi_parser_init(void)
     midiParser.setMidiMsgFilter( midiXparser::channelVoiceMsgTypeMsk | midiXparser::sysExMsgTypeMsk );
     usbMidiParser.setMidiMsgFilter( midiXparser::channelVoiceMsgTypeMsk | midiXparser::sysExMsgTypeMsk );
     webMidiParser.setMidiMsgFilter( midiXparser::channelVoiceMsgTypeMsk | midiXparser::sysExMsgTypeMsk );
+    bleMidiParser.setMidiMsgFilter( midiXparser::channelVoiceMsgTypeMsk | midiXparser::sysExMsgTypeMsk );
 }
 
 extern "C" uint8_t* midi_parse(uint8_t in)
@@ -120,6 +123,34 @@ extern "C" uint8_t* web_midi_parse(uint8_t in)
     else if(webMidiParser.isSysExMode() && webMidiParser.isByteCaptured()) // sysex data
     {
         sysex_byte = webMidiParser.getByte();
+    }
+    return NULL;
+}
+
+extern "C" uint8_t* ble_midi_parse(uint8_t in)
+{
+    if ( bleMidiParser.parse( in ) )  // Do we received a channel voice msg ?
+    {
+        if ( 
+                bleMidiParser.isMidiStatus(midiXparser::noteOnStatus) || 
+                bleMidiParser.isMidiStatus(midiXparser::noteOffStatus) || 
+                bleMidiParser.isMidiStatus(midiXparser::programChangeStatus) || 
+                bleMidiParser.isMidiStatus(midiXparser::controlChangeStatus) 
+            ) 
+        {
+            ble_msg = bleMidiParser.getMidiMsg();
+            return ble_msg;
+        }
+        else if(bleMidiParser.getMidiMsgType() == midiXparser::sysExMsgTypeMsk) // sysex EOX
+        {
+            int len = bleMidiParser.getSysExMsgLen();
+            if(len == 1)
+                handle_sysex();
+        }
+    }
+    else if(bleMidiParser.isSysExMode() && bleMidiParser.isByteCaptured()) // sysex data
+    {
+        sysex_byte = bleMidiParser.getByte();
     }
     return NULL;
 }

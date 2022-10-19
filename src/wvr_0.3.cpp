@@ -18,6 +18,7 @@
 #include "file_system.h"
 #include "WVR.h"
 #include "gpio.h"
+#include "ble.h"
 
 struct wav_lu_t **wav_lut;
 
@@ -34,6 +35,7 @@ extern "C" void rpc_init(void);
 void bootFromEmmc(int index);
 void boot_into_recovery_mode(void);
 int check_for_recovery_mode();
+int check_for_ble_pin();
 void dev_board_init();
 void rgb_init(void);
 void neopixel_test(void);
@@ -110,6 +112,8 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
     }
   }
 
+  int ble_active = check_for_ble_pin();
+
   clean_up_rack_directory();
 
   dac_init();
@@ -121,16 +125,22 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   midi_parser_init();
   logSize("midi parser");
 
-  wav_player_start();
+  // wav_player_start();
   logSize("wav player");
 
-  server_begin();
-  logSize("server");
+  // start server only if not BLE_MODE
+  if(ble_active){
+    log_i("BLE MODE ACTIVATED");
+    ble_init();
+  } else {
+    server_begin();
+    logSize("server");
+  }
 
-  button_init();
+  // button_init();
   logSize("button");
   
-  wvr_gpio_init(useFTDI, useUsbMidi);
+  // wvr_gpio_init(useFTDI, useUsbMidi);
   logSize("gpio");
 
   rpc_init();
@@ -138,10 +148,10 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
 
   if(get_metadata()->wifi_starts_on == 0)
   {
-    server_pause();
+    // server_pause();
   }
 
-  log_pin_config();
+  // log_pin_config();
   logRam();
 
   // forceARP();

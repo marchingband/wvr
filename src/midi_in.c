@@ -285,7 +285,7 @@ static void handle_channel_sustain_release(channel)
     }
 }
 
-static void handle_midi(uint8_t *msg)
+void handle_midi(uint8_t *msg)
 {
     // send it through the midi filter hook
     // log_i("midi %d %d %d",msg[0],msg[1],msg[2]);

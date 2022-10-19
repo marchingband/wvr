@@ -66,7 +66,8 @@
 // july 10 / 2021
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v1.x.x 
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_16"; // v4.x.x
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c

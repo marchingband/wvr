@@ -125,7 +125,7 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   midi_parser_init();
   logSize("midi parser");
 
-  // wav_player_start();
+  wav_player_start();
   logSize("wav player");
 
   // start server only if not BLE_MODE
@@ -137,10 +137,10 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
     logSize("server");
   }
 
-  // button_init();
+  button_init();
   logSize("button");
   
-  // wvr_gpio_init(useFTDI, useUsbMidi);
+  wvr_gpio_init(useFTDI, useUsbMidi);
   logSize("gpio");
 
   rpc_init();
@@ -148,10 +148,10 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
 
   if(get_metadata()->wifi_starts_on == 0)
   {
-    // server_pause();
+    server_pause();
   }
 
-  // log_pin_config();
+  log_pin_config();
   logRam();
 
   // forceARP();

@@ -1,3 +1,42 @@
+/*
+#include <NimBLEDevice.h>
+
+BLEServer *_server;
+BLEAdvertising *_advertising;
+BLECharacteristic *_characteristic;
+
+voidinit(void)
+{
+    BLEDevice::init("WVR");
+    _server = BLEDevice::createServer();
+    _server->setCallbacks(new MyServerCallbacks(this));
+    _server->advertiseOnDisconnect(true);
+
+    auto service = _server->createService(BLEUUID(SERVICE_UUID));
+    _characteristic = service->createCharacteristic(
+        BLEUUID(CHARACTERISTIC_UUID),
+        NIMBLE_PROPERTY::READ |
+            NIMBLE_PROPERTY::WRITE |
+            NIMBLE_PROPERTY::NOTIFY |
+            NIMBLE_PROPERTY::WRITE_NR);
+     _characteristic->setCallbacks(new MyCharacteristicCallbacks(this));
+
+    auto _security = new NimBLESecurity();
+    _security->setAuthenticationMode(ESP_LE_AUTH_BOND);
+
+    // Start the service
+    service->start();
+
+    // Start advertising
+    _advertising = _server->getAdvertising();
+    _advertising->addServiceUUID(service->getUUID());
+    _advertising->setAppearance(0x00);
+    _advertising->start();
+}
+
+
+*/
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
@@ -8,19 +47,22 @@
 #include "midi_in.h"
 #include "midi.h"
 
+#define BLE_STACK_SIZE 4096
+
 uint8_t ble_msg_in[3];
 
-TaskHandle_t ble_task_handle;
-BaseType_t ble_task_return;
+TaskHandle_t ble_task_return;
+
+StaticTask_t xBleTaskBuffer;
+StackType_t xBleStack[ BLE_STACK_SIZE ];
+// StackType_t *xBleStack;
 
 void ble_connect_task(void *arg)
 {
-    log_i("init ble task");
     for(;;)
     {
-        log_i("ble task loop");
         ble_poll_for_connection();
-        vTaskDelay(500);
+        vTaskDelay(3000);
     }
     vTaskDelete(NULL);
 }
@@ -34,15 +76,28 @@ void ble_init(void)
     BLEMidiClient.setNoteOffCallback(handleNoteOff);
     BLEMidiClient.setControlChangeCallback(handleControlChange);
     BLEMidiClient.setProgramChangeCallback(handleProgramChange);
+
+    // xBleStack = (StackType_t *)ps_malloc(BLE_STACK_SIZE);
+    // xBleStack = (StackType_t *)heap_caps_malloc(BLE_STACK_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT | MALLOC_CAP_32BIT);
+    // if(xBleStack == NULL){
+    //     log_e("BLE stack failed to allocate");
+    // }
+
     log_i("start ble task");
-    ble_task_return = xTaskCreatePinnedToCore(&ble_connect_task, "ble_task", 1024 * 4, NULL, 20, &ble_task_handle, (BaseType_t)0);
-    if(ble_task_return == pdPASS)
-    {
-        log_e("created ble_connect_task");
-    } else {
-        log_e("failed to create ble_connect_task");
-    }
-    log_i("ble task started");
+    // BaseType_t ble_handle = xTaskCreatePinnedToCore(&ble_connect_task, "ble_task", 1024 * 2, NULL, 20, NULL, (BaseType_t)0);
+    // if(ble_handle != pdPASS){
+    //     log_i("ble task failed");
+    // } else {
+    //     log_i("ble task succedded");
+    // }
+    ble_task_return = xTaskCreateStatic(
+                   &ble_connect_task,
+                   "ble_task",
+                   BLE_STACK_SIZE,  
+                   NULL,
+                   10,
+                   xBleStack,    
+                   &xBleTaskBuffer );
 }
 
 void ble_poll_for_connection(void)
@@ -57,27 +112,28 @@ void ble_poll_for_connection(void)
                 log_i("Connection established");
             else {
                 log_i("Connection failed");
-                // delay(3000);    // We wait 3s before attempting a new connection
             }
         }
-    } else {
-        log_i("ble is connected");
     }
 }
 
 void handleNoteOn(uint8_t channel, uint8_t note, uint8_t velocity, uint16_t timestamp){
+    log_i("note-on");
     handleMidiIn(channel, MIDI_NOTE_ON, note, velocity);
 }
 
 void handleNoteOff(uint8_t channel, uint8_t note, uint8_t velocity, uint16_t timestamp){
+    log_i("note-off");
     handleMidiIn(channel, MIDI_NOTE_OFF, note, velocity);
 }
 
 void handleControlChange(uint8_t channel, uint8_t controller, uint8_t value, uint16_t timestamp){
+    log_i("cc");
     handleMidiIn(channel, MIDI_PROGRAM_CHANGE, controller, value);
 }
 
 void handleProgramChange(uint8_t channel, uint8_t program, uint16_t timestamp){
+    log_i("pc");
     handleMidiIn(channel, MIDI_PROGRAM_CHANGE, program, 0);
 }
 

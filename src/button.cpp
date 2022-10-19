@@ -183,5 +183,6 @@ void init_touch_pad(int pin, void *event)
 
 void button_init(){
     gpio_queue_handle = xQueueCreate(10, sizeof(button_event_t));
-    xTaskCreate(gpioTask, "gpio_task", 2048, NULL, 3, &gpio_task_handle);
+    xTaskCreate(gpioTask, "gpio_task", 1024, NULL, 3, &gpio_task_handle);
+    // xTaskCreate(gpioTask, "gpio_task", 2048, NULL, 3, &gpio_task_handle);
 }

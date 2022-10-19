@@ -109,5 +109,6 @@ void rpc_init(void)
     // rpc_in_queue = xQueueCreate(20, sizeof(struct rpc_event_t));
     rpc_out_queue = xQueueCreate(20, sizeof(struct rpc_event_t));
     // task_return = xTaskCreate(rpc_in_task,"rpc_in_task", 1024, NULL, 1, rpc_in_task_handle);
-    task_return = xTaskCreatePinnedToCore(rpc_out_task,"rpc_out_task", 1024 * 4, NULL, 2, rpc_out_task_handle,0);
+    // task_return = xTaskCreatePinnedToCore(rpc_out_task,"rpc_out_task", 1024 * 4, NULL, 2, rpc_out_task_handle,0);
+    task_return = xTaskCreatePinnedToCore(rpc_out_task,"rpc_out_task", 1024, NULL, 2, rpc_out_task_handle,0);
 }

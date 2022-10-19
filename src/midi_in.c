@@ -444,20 +444,22 @@ void reset_midi_controllers(void)
     }
 }
 
+#define MIDI_TASK_STACK_DEPTH 2048
+
 void midi_init(bool useUsbMidi)
 {
     reset_midi_controllers();
     init_gpio();
     init_uart();
     midi_hook = midi_hook_default;
-    xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", 4096, NULL, 3, NULL, 0);
-    web_midi_queue = xQueueCreate(64, sizeof(uint8_t));
-    xTaskCreatePinnedToCore(web_midi_task, "web_midi_task", 4096, NULL, 3, NULL, 0);
+    xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", MIDI_TASK_STACK_DEPTH, NULL, 3, NULL, 0);
+    // web_midi_queue = xQueueCreate(64, sizeof(uint8_t));
+    // xTaskCreatePinnedToCore(web_midi_task, "web_midi_task", MIDI_TASK_STACK_DEPTH, NULL, 3, NULL, 0);
     if(useUsbMidi)
     {
         init_gpio_usb();
         init_uart_usb();
-        xTaskCreatePinnedToCore(read_usb_uart_task, "read_usb_uart_task", 4096, NULL, 3, NULL, 0);
+        xTaskCreatePinnedToCore(read_usb_uart_task, "read_usb_uart_task", MIDI_TASK_STACK_DEPTH, NULL, 3, NULL, 0);
     }
     // xTaskCreatePinnedToCore(read_uart_task, "read_uart_task", 4096, NULL, 3, NULL, 1);
 }

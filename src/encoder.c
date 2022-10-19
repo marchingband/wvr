@@ -8,6 +8,8 @@
 // #define GPIO_MASK ((1ULL<<ROT_ENC_A_GPIO) | (1ULL<<ROT_ENC_B_GPIO))
 #define ESP_INTR_FLAG_DEFAULT 0
 
+static const char* tag = "encoder";
+
 static uint32_t enc_a_gpio = 0;
 static uint32_t enc_b_gpio = 0;
 static uint64_t GPIO_MASK = 0;

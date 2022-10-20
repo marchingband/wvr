@@ -18,7 +18,7 @@
 #include "file_system.h"
 #include "WVR.h"
 #include "gpio.h"
-#include "ble.h"
+// #include "ble.h"
 
 struct wav_lu_t **wav_lut;
 
@@ -131,7 +131,7 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   // start server only if not BLE_MODE
   if(ble_active){
     log_i("BLE MODE ACTIVATED");
-    ble_init();
+    // ble_init();
   } else {
     server_begin();
     logSize("server");

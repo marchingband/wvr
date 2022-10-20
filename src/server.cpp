@@ -637,13 +637,13 @@ void server_begin() {
   IPAddress gateway = IPAddress (192, 168, 5, 20);
   IPAddress NMask = IPAddress (255, 255, 255, 0);
 
-  WiFi.softAPConfig(IP, gateway, NMask);
+  // WiFi.softAPConfig(IP, gateway, NMask);
 
   WiFi.softAP(metadata->ssid, metadata->passphrase);
   log_i("set ssid :%s, set passphrase: %s",metadata->ssid, metadata->passphrase);
  
   //  again??
-  WiFi.softAPConfig(IP, gateway, NMask);
+  // WiFi.softAPConfig(IP, gateway, NMask);
 
   IPAddress myIP = WiFi.softAPIP();
   Serial.print("AP IP address: ");

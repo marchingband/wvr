@@ -53,8 +53,8 @@ uint8_t ble_msg_in[3];
 
 TaskHandle_t ble_task_return;
 
-StaticTask_t xBleTaskBuffer;
-StackType_t xBleStack[ BLE_STACK_SIZE ];
+const StaticTask_t xBleTaskBuffer;
+const StackType_t xBleStack[ BLE_STACK_SIZE ];
 // StackType_t *xBleStack;
 
 void ble_connect_task(void *arg)

@@ -323,8 +323,7 @@ void handle_midi(uint8_t *msg)
                 wav_player_event.velocity = msg[2]  & 0b01111111;
                 wav_player_event.channel = channel;
                 xQueueSendToBack(wav_player_queue,(void *) &wav_player_event, portMAX_DELAY);                  
-                // log_i("%d: note:%d velocity:%d channel:%d voice:%d code:%d",
-                //     i,
+                // log_i("note:%d velocity:%d channel:%d voice:%d code:%d",
                 //     wav_player_event.note,
                 //     wav_player_event.velocity,
                 //     wav_player_event.channel,

@@ -18,7 +18,8 @@
 #include "file_system.h"
 #include "WVR.h"
 #include "gpio.h"
-// #include "ble.h"
+#include "ble.h"
+#include "esp_bt.h"
 
 struct wav_lu_t **wav_lut;
 
@@ -128,11 +129,15 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   wav_player_start();
   logSize("wav player");
 
+//    esp_bluedroid_disable();
+//  esp_bluedroid_deinit();
+//  esp_bt_controller_disable();
+//  esp_bt_controller_deinit();
+//  esp_bt_mem_release(ESP_BT_MODE_BTDM);
+
   // start server only if not BLE_MODE
-  if(ble_active){
-    log_i("BLE MODE ACTIVATED");
-    // ble_init();
-  } else {
+  if(!ble_active){
+    esp_bt_mem_release(ESP_BT_MODE_BTDM);
     server_begin();
     logSize("server");
   }
@@ -153,6 +158,12 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
 
   log_pin_config();
   logRam();
+
+  if(ble_active){
+    log_i("BLE MODE ACTIVATED");
+    ble_init();
+  }
+
 
   // forceARP();
 }

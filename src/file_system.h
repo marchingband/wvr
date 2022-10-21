@@ -104,6 +104,8 @@ struct metadata_t {
     char passphrase[20];
     uint8_t wifi_power;
     uint8_t midi_channel; // 0 is omni
+    uint8_t ble;
+    uint8_t ble_strapping_pin;
 };
 
 struct vol_t {

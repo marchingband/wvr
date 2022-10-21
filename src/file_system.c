@@ -211,7 +211,9 @@ void init_metadata(void){
         .ssid = "WVR",
         .passphrase = "12345678",
         .wifi_power = 8,
-        .midi_channel = 0
+        .midi_channel = 0,
+        .ble = 0,
+        .ble_strapping_pin = 6,
     };
     memcpy(new_metadata.tag, waver_tag, METADATA_TAG_LENGTH);
     write_metadata(new_metadata);
@@ -921,6 +923,8 @@ void add_metadata_json(cJSON * RESPONSE_ROOT){
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiPower",metadata.wifi_power);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiStartsOn",metadata.wifi_starts_on);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"midiChannel",metadata.midi_channel);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"ble",metadata.ble);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"bleStrappingPin",metadata.ble_strapping_pin);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkName",metadata.ssid);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkPassword",metadata.passphrase);
 }
@@ -1313,6 +1317,8 @@ void updateMetadata(cJSON *config){
     metadata.global_volume = cJSON_GetObjectItemCaseSensitive(json, "globalVolume")->valueint;
     metadata.should_check_strapping_pin = cJSON_GetObjectItemCaseSensitive(json, "shouldCheckStrappingPin")->valueint;
     metadata.recovery_mode_straping_pin = cJSON_GetObjectItemCaseSensitive(json, "recoveryModeStrappingPin")->valueint;
+    metadata.ble = cJSON_GetObjectItemCaseSensitive(json, "ble")->valueint;
+    metadata.ble_strapping_pin = cJSON_GetObjectItemCaseSensitive(json, "bleStrappingPin")->valueint;
     metadata.wifi_starts_on = cJSON_GetObjectItemCaseSensitive(json, "wifiStartsOn")->valueint;
     metadata.wlog_verbosity = cJSON_GetObjectItemCaseSensitive(json, "wLogVerbosity")->valueint;
     metadata.wifi_power = cJSON_GetObjectItemCaseSensitive(json, "wifiPower")->valueint;
@@ -1320,16 +1326,18 @@ void updateMetadata(cJSON *config){
     memcpy(&metadata.ssid,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring,20);
     memcpy(&metadata.passphrase,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring,20);
     write_metadata(metadata);
-    wlog_i("gv:%d scsp:%d rmsp:%d wso:%d wlv:%d wfp:%d mdc%d",
+    log_d("gv:%d scsp:%d rmsp:%d wso:%d wlv:%d wfp:%d mdc%d ble%d bsp%d",
         metadata.global_volume,
         metadata.should_check_strapping_pin,
         metadata.recovery_mode_straping_pin,
         metadata.wifi_starts_on,
         metadata.wlog_verbosity,
         metadata.wifi_power,
-        metadata.midi_channel
+        metadata.midi_channel,
+        metadata.ble,
+        metadata.ble_strapping_pin
     );
-    wlog_i("updated and saved metadata");
+    log_d("updated and saved metadata");
     cJSON_Delete(json);
 }
 

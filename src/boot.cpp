@@ -165,11 +165,17 @@ int check_for_ble_pin()
     // gpio_reset_pin(gpio_pins[new_metadata->ble_straping_pin]);
     // pinMode(wvr_pins[new_metadata->ble_straping_pin], INPUT_PULLUP);
     // int res = digitalRead(wvr_pins[new_metadata->ble_straping_pin]);
-    gpio_reset_pin(GPIO_NUM_36); // D7
-    pinMode(36, INPUT_PULLUP);
-    int res = digitalRead(36);
-    log_i("ble pin %d reads %s", 36, res ? "high" : "low");
+    metadata_t *new_metadata = get_metadata();
+    if(!new_metadata->ble)
+    {
+        // do a normal boot
+        log_i("should check ble pin is false");
+        return 0;
+    }
+    gpio_reset_pin(gpio_pins[new_metadata->ble_strapping_pin]);
+    pinMode(wvr_pins[new_metadata->ble_strapping_pin], INPUT_PULLUP);
+    int res = digitalRead(wvr_pins[new_metadata->ble_strapping_pin]);
+    log_i("ble strapping pin %d reads %s",new_metadata->ble_strapping_pin, res ? "high" : "low");
     int should_activate_ble = ( res == 0 );
-    gpio_reset_pin(GPIO_NUM_36); // D7
     return(should_activate_ble);
 }

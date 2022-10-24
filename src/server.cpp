@@ -518,14 +518,24 @@ void handleBackupEMMC(AsyncWebServerRequest *request){
 }
 
 void handleRestoreEMMC(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+  if(index == 0){
+    Serial.println("Starting eMMC restore.");
+  }
   feedLoopWDT();
   restore_emmc(data, len);
   feedLoopWDT();
+  // if(loop_num++ % 100 == 0)
+  // {
+  //   Serial.print(".");
+  //   feedLoopWDT();
+  // }
   if(index + len == total){
     //done
     feedLoopWDT();
+    Serial.println("closing eMMC restore.");
     close_restore_emmc();
-    request->send(200, "text/plain", "done upload wav");
+    Serial.println("done eMMC restore.");
+    request->send(200, "text/plain", "done emmc restore");
   }
 }
 
@@ -634,7 +644,7 @@ void server_begin() {
   WiFi.mode(WIFI_AP);
 
   IPAddress IP = IPAddress (192, 168, 5, 18);
-  IPAddress gateway = IPAddress (192, 168, 5, 20);
+  IPAddress gateway = IPAddress (192, 168, 5, 17);
   IPAddress NMask = IPAddress (255, 255, 255, 0);
 
   WiFi.softAPConfig(IP, gateway, NMask);

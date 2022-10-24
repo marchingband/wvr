@@ -1,7 +1,7 @@
 #ifndef WVR_0_3_H
 #define WVR_0_3_H
 
-#define VERSION_CODE "3.7.0"
+#define VERSION_CODE "3.7.2"
 
 void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin);
 

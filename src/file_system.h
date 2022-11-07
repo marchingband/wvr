@@ -17,7 +17,7 @@ extern "C"
 #define DEFAULT_DEBOUNCE_MS 60
 #define DEFAULT_VELOCITY 127
 
-#define NUM_VOICES 16
+#define NUM_VOICES 32
 #define NUM_NOTES 128
 
 #include "midi_in.h"

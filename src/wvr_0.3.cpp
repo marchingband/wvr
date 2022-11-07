@@ -62,11 +62,40 @@ void logSize(char* name){
   heap_remaining = free;
 }
 
-void logRam(){
-  Serial.printf("Total heap: %d\n", ESP.getHeapSize());
-  Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
-  Serial.printf("Total PSRAM: %d\n", ESP.getPsramSize());
-  Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
+size_t count_heap;
+size_t count_psram;
+
+void logRamInit(){
+  count_heap = ESP.getHeapSize();
+  count_psram = ESP.getPsramSize();
+  size_t heap_left = ESP.getFreeHeap();
+  size_t psram_left = ESP.getFreePsram();
+  size_t heap_used = count_heap - heap_left;
+  size_t psram_used = count_psram - psram_left;
+
+  Serial.printf("\n----------------------------------------------\n");
+  Serial.printf("| startup    | heap        | psram       |\n");
+  Serial.printf("| total      | %-11d | %-11d |\n", count_heap, count_psram );
+  Serial.printf("| used       | %-11d | %-11d |\n", heap_used, psram_used );
+  Serial.printf("| left       | %-11d | %-11d |\n", heap_left, psram_left );
+  Serial.printf("----------------------------------------------\n\n");
+
+  count_heap = heap_left;
+  count_psram = psram_left;
+}
+
+void logRam(const char *name){
+  size_t heap_left = ESP.getFreeHeap();
+  size_t psram_left = ESP.getFreePsram();
+  size_t heap_used = count_heap - heap_left;
+  size_t psram_used = count_psram - psram_left;
+  count_heap = heap_left;
+  count_psram = psram_left;
+  Serial.printf("\n----------------------------------------------\n");
+  Serial.printf("| %-10s | heap        | psram       |\n", name);
+  Serial.printf("| used       | %-11d | %-11d |\n", heap_used, psram_used );
+  Serial.printf("| left       | %-11d | %-11d |\n", heap_left, psram_left );
+  Serial.printf("----------------------------------------------\n\n");
 }
 
 // void forceARP(){
@@ -80,7 +109,8 @@ struct metadata_t metadata;
 
 void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   Serial.begin(115200);
-  logRam();
+  logRamInit();
+  logRam("wvr_init()");
   log_i("arduino setup running on core %u",xPortGetCoreID());
   log_i("cpu speed %d", ESP.getCpuFreqMHz());
   log_i("Flash Speed = %d Flash mode = %d", ESP.getFlashChipSpeed(), (int)ESP.getFlashChipMode());
@@ -90,13 +120,13 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
 	memoryHook.malloc_fn = ps_malloc;
 	memoryHook.free_fn = free;
 	cJSON_InitHooks(&memoryHook);
-  logSize("begin");
+  logRam("begin");
 
   emmc_init();
-  logSize("emmc");
+  logRam("emmc");
 
   file_system_init();
-  logSize("file system");
+  logRam("file system");
 
   if(checkRecoveryModePin)
   {
@@ -113,28 +143,28 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   clean_up_rack_directory();
 
   dac_init();
-  logSize("dac");
+  logRam("dac");
 
   midi_init(useUsbMidi);
-  logSize("midi");
+  logRam("midi");
 
   midi_parser_init();
-  logSize("midi parser");
+  logRam("midi parser");
 
   wav_player_start();
-  logSize("wav player");
+  logRam("wav player");
 
   server_begin();
-  logSize("server");
+  logRam("server");
 
   button_init();
-  logSize("button");
+  logRam("button");
   
   wvr_gpio_init(useFTDI, useUsbMidi);
-  logSize("gpio");
+  logRam("gpio");
 
   rpc_init();
-  logSize("rpc");
+  logRam("rpc");
 
   if(get_metadata()->wifi_starts_on == 0)
   {
@@ -142,7 +172,7 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   }
 
   log_pin_config();
-  logRam();
+  logRam("done");
 
   // forceARP();
 }

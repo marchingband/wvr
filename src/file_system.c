@@ -66,7 +66,8 @@
 // july 10 / 2021
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v1.x.x 
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_16"; // 32 voices
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -435,6 +436,8 @@ void read_website_lut_from_disk(void){
 }
 
 void read_rack_lut_from_disk(void){
+    // size_t ram_needed = RACK_DIRECTORY_BLOCKS * SECTOR_SIZE;
+    // log_i("request %d bytes for rack_lut buffer", ram_needed);
     struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
     if(buf == NULL){log_e("failed to alloc rack_file_t buf for reading");};
     emmc_read(buf, RACK_DIRECTORY_START_BLOCK, RACK_DIRECTORY_BLOCKS);

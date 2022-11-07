@@ -101,6 +101,6 @@ uint8_t WVR::getVoice(int channel)
 
 void WVR::setVoice(int channel, int voice)
 {
-    get_channel_lut()[channel] = (voice & 0b00001111);
+    get_channel_lut()[channel] = (voice & 0b00011111);
 }
 

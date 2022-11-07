@@ -55,7 +55,7 @@ void on_press_per_config(int pin_num)
             xQueueSendToBack(wav_player_queue, (void *)&wav_player_event, portMAX_DELAY);
             break;
         case BANK_UP:
-            channel_lut[0] += (channel_lut[0] < 15);
+            channel_lut[0] += (channel_lut[0] < (NUM_VOICES - 1));
             break;
         case BANK_DOWN:
             channel_lut[0] -= (channel_lut[0] > 0);

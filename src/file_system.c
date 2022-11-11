@@ -33,17 +33,21 @@
 
 #define NUM_WAV_LUT_ENTRIES 65536 // uint16_t max
 #define WAV_LUT_START_BLOCK (PIN_CONFIG_START_BLOCK + PIN_CONFIG_BLOCKS)
-#define BYTES_PER_VOICE ( NUM_NOTES * sizeof(struct wav_file_t) )
-#define BLOCKS_PER_VOICE ( BYTES_PER_VOICE / SECTOR_SIZE + (BYTES_PER_VOICE % SECTOR_SIZE != 0) )
-#define WAV_LUT_BLOCKS_PER_VOICE BLOCKS_PER_VOICE
-#define WAV_LUT_SIZE_IN_BLOCKS ( NUM_VOICES * BLOCKS_PER_VOICE )
+#define WAV_LUT_BYTES (NUM_WAV_LUT_ENTRIES * sizeof(wav_file_t)) // 4,194,304
+#define WAV_LUT_BLOCKS (NUM_WAV_LUT_ENTRIES / SECTOR_SIZE) // 8,192
+
+#define WAV_MATRIX_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_SIZE_IN_BLOCKS)
+#define WAV_MATRIX_ENTRIES ( NUM_VOICES * NUM_NOTES * NUM_LAYERS * NUM_ROBINS ) // 262,144
+#define BYTES_PER_MATRIX_VOICE ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS * sizeof(uint16_t) ) // 32,768
+#define WAV_MATRIX_BYTES ( WAV_MATRIX_ENTRIES * sizeof(uint16_t) ) // 520,192
+#define WAV_MATRIX_BLOCKS ( WAV_MATRIX_BYTES / SECTOR_SIZE + (WAV_MATRIX_BYTES % SECTOR_SIZE != 0) ) // 1,016
 
 // #define LAST_BLOCK 16773216 // 16777216 is 8GB / 512, I saved 2MB (4000 blocks) at the end for corruption?
 #define EMMC_CAPACITY_BYTES 7818182656
 #define EMMC_CAPACITY BLOCKS  15269888
 #define LAST_BLOCK            15265888 // 16777216 is 8GB / 512, I saved (4000 blocks) at the end for corruption?
 
-#define FILE_STORAGE_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_SIZE_IN_BLOCKS)
+#define FILE_STORAGE_START_BLOCK (WAV_MATRIX_START_BLOCK + WAV_MATRIX_BLOCKS)
 #define FILE_STORAGE_END_BLOCK LAST_BLOCK
 
 // july 10 / 2021
@@ -58,48 +62,44 @@ esp_err_t emmc_write(const void *source, size_t block, size_t size);
 esp_err_t emmc_read(void *dst, size_t start_sector, size_t sector_count);
 
 struct metadata_t metadata;
-struct wav_lu_t **wav_lut;
+struct wav_lu_t *wav_lut;
+struct uint16_t ****wav_mtx;
 struct firmware_t *firmware_lut;
 struct website_t *website_lut;
 struct rack_lu_t *rack_lut;
 struct pin_config_t *pin_config_lut;
 
-uint16_t *wav_lookup;
-
 void file_system_init(void)
 {
-    // alloc_luts();
-    // log_i("metadata_t is %d bytes", sizeof(struct metadata_t));
     log_i("\nwav_lu_t-> %d\nwav_file_t-> %d\nrack_lu_t-> %d\nrack_file_t-> %d\nplay_back_mode-> %d\nretrigger_mode=> %d\nnote_off_meaning-> %d, response_curve-> %d", 
         sizeof(struct wav_lu_t), sizeof(struct wav_file_t), sizeof(struct rack_lu_t), sizeof(struct rack_file_t),
         sizeof(enum play_back_mode), sizeof(enum retrigger_mode), sizeof(note_off_meaning), sizeof(response_curve)
         );
-    wav_lookup = (uint16_t *)ps_malloc(2621440);
-    if(wav_lookup == NULL){
-        log_i("failed to alloc wav_lookup");
-    } else {
-        log_i("did not fail to alloc wav_lookup");
-    }
-    if(wav_lut == NULL){
-        wav_lut = (struct wav_lu_t**)ps_malloc(NUM_VOICES * sizeof(struct wav_lu_t*));
-        if(wav_lut == NULL){log_e("failed to alloc wav_lut");}
+    // wav_lookup = (uint16_t *)ps_malloc(2621440);
+    if(wav_mtx == NULL){
+        wav_mtx = (uint16_t****)ps_malloc(NUM_VOICES * sizeof(uint16_t *));
+        if(wav_mtx == NULL){log_e("failed to alloc wav_mtx");}
         for(size_t i=0;i<NUM_VOICES;i++)
         {
-            wav_lut[i] = (struct wav_lu_t*)ps_malloc(NUM_NOTES * sizeof(struct wav_lu_t));
-            if(wav_lut[i] == NULL){log_e("failed to alloc wav_lut voice number %d", i);}
+            wav_mtx[i] = (uint16_t*)ps_malloc(NUM_NOTES * sizeof(uint16_t *));
+            if(wav_mtx[i] == NULL){log_e("failed to alloc wav_mtx voice number %d", i);}
+            for(size_t j=0; j<NUM_NOTES ;j++){
+                wav_mtx[i][j] = (uint16_t*)ps_malloc(NUM_LAYERS * sizeof(uint16_t *));
+                if(wav_mtx[i][j] == NULL){log_e("failed to alloc wav_mtx voice %d note %d", i, j);}
+                for(size_t k=0; k<NUM_LAYERS; k++){
+                    wav_mtx[i][j][k] = (uint16_t*)ps_malloc(NUM_CHOICES * sizeof(uint16_t *));
+                    if(wav_mtx[i][j][k] == NULL){log_e("failed to alloc wav_mtx voice %d note %d layer %d", i, j, k);}
+                }
+            }
         }
+    }
+    if(wav_lut == NULL){
+        wav_lut = (struct wav_lu_t *)ps_malloc(NUM_WAV_LUT_ENTRIES * sizeof(struct wav_lu_t));
+        if(wav_lut == NULL){log_e("failed to alloc for wav_lut");}
     }
     if(firmware_lut == NULL){
         firmware_lut = (struct firmware_t *)ps_malloc(MAX_FIRMWARES * sizeof(struct firmware_t));
         if(firmware_lut == NULL){log_e("failed to alloc firmware wav_lut");}
-    }
-    if(website_lut == NULL){
-        website_lut = (struct website_t *)ps_malloc(MAX_WEBSITES * sizeof(struct website_t));
-        if(website_lut == NULL){log_e("failed to alloc website wav_lut");}
-    }
-    if(rack_lut == NULL){
-        rack_lut = (struct rack_lu_t *)ps_malloc(NUM_RACK_DIRECTORY_ENTRIES * sizeof(struct rack_lu_t));
-        if(rack_lut == NULL){log_e("failed to alloc rack wav_lut");}
     }
     if(pin_config_lut == NULL){
         pin_config_lut = (struct pin_config_t *)ps_malloc(PIN_CONFIG_BLOCKS * SECTOR_SIZE);
@@ -110,43 +110,15 @@ void file_system_init(void)
     while(!ret){
         init_metadata();
         init_wav_lut();
+        init_wav_matrix();
         init_firmware_lut();
-        init_website_lut();
-        init_rack_lut();
         init_pin_config_lut();
         log_i("retrying lut_init()");
         ret = try_read_metadata();
     }
     read_wav_lut_from_disk();
     read_firmware_lut_from_disk();
-    read_website_lut_from_disk();
-    read_rack_lut_from_disk();
     read_pin_config_lut_from_disk();
-}
-
-void alloc_luts(void){
-    if(wav_lut == NULL){
-        wav_lut = (struct wav_lu_t**)ps_malloc(NUM_VOICES * sizeof(struct wav_lu_t*));
-        if(wav_lut == NULL){log_e("failed to alloc wav_lut");}
-        for(size_t i=0;i<NUM_VOICES;i++)
-        {
-            wav_lut[i] = (struct wav_lu_t*)ps_malloc(NUM_NOTES * sizeof(struct wav_lu_t));
-            if(wav_lut[i] == NULL){log_e("failed to alloc wav_lut voice number %d", i);}
-        }
-    }
-    if(firmware_lut == NULL){
-        firmware_lut = (struct firmware_t *)ps_malloc(MAX_FIRMWARES * sizeof(struct firmware_t));
-        if(firmware_lut == NULL){log_e("failed to alloc firmware wav_lut");}
-    }
-    if(website_lut == NULL){
-        website_lut = (struct website_t *)ps_malloc(MAX_WEBSITES * sizeof(struct website_t));
-        if(website_lut == NULL){log_e("failed to alloc website wav_lut");}
-    }
-    if(rack_lut == NULL){
-        rack_lut = (struct rack_lu_t *)ps_malloc(NUM_RACK_DIRECTORY_ENTRIES * sizeof(struct rack_lu_t));
-        if(rack_lut == NULL){log_e("failed to alloc rack wav_lut");}
-    }
-
 }
 
 int try_read_metadata(){
@@ -191,13 +163,8 @@ void write_metadata(struct metadata_t m){
 void init_metadata(void){
     struct metadata_t new_metadata = {    
         .num_voices = NUM_VOICES,                 
-        .file_system_start = WAV_LUT_START_BLOCK,           
-        .file_system_size = WAV_LUT_SIZE_IN_BLOCKS * SECTOR_SIZE,    
-        .file_storage_start_block = FILE_STORAGE_START_BLOCK,
         .num_firmwares = 10,
-        .num_websites = 10,
         .current_firmware_index = -1,
-        .current_website_index = -1,
         .recovery_mode_straping_pin = 5, // button 1 on dev board,
         .should_check_strapping_pin = 1, // default to should check
         .global_volume = 127,
@@ -225,92 +192,82 @@ void init_pin_config_lut(void){
 
 void init_wav_lut(void){
     log_i("making empty wav wav_lut");
-    for(size_t i=0; i<NUM_VOICES; i++)
+    // place empty lut in ram
+    for(size_t i=0; i<NUM_WAV_LUT_ENTRIES; i++)
     {
-        for(size_t j=0; j<NUM_NOTES; j++)
-        {
-            wav_lut[i][j].isRack = -1;
-            wav_lut[i][j].empty = 1;
-            wav_lut[i][j].start_block = 0;
-            wav_lut[i][j].length = 0;
-            wav_lut[i][j].play_back_mode = ONE_SHOT;
-            wav_lut[i][j].retrigger_mode = RETRIGGER;
-            wav_lut[i][j].response_curve = RESPONSE_LINEAR;
-            wav_lut[i][j].note_off_meaning = HALT;
-            wav_lut[i][j].priority = 0;
-            wav_lut[i][j].mute_group = 0;
-            wav_lut[i][j].loop_start = 0;
-            wav_lut[i][j].loop_end = 0;
-        }
+        wav_lut[i].empty = 1;
+        wav_lut[i].start_block = 0;
+        wav_lut[i].length = 0;
+        wav_lut[i].play_back_mode = ONE_SHOT;
+        wav_lut[i].retrigger_mode = RETRIGGER;
+        wav_lut[i].response_curve = RESPONSE_LINEAR;
+        wav_lut[i].note_off_meaning = HALT;
+        wav_lut[i].priority = 0;
+        wav_lut[i].mute_group = 0;
+        wav_lut[i].loop_start = 0;
+        wav_lut[i].loop_end = 0;
+        wav_lut[i].breakpoint = 0;
+        wav_lut[i].chance = 0;
     }
-    // log_i("writting blank filesystem into %d blocks", BLOCKS_PER_VOICE * NUM_VOICES);
-    struct wav_file_t *voice = (struct wav_file_t *)ps_malloc(BLOCKS_PER_VOICE * SECTOR_SIZE);
+    // write it to disk
+    struct wav_file_t *buf = (struct wav_file_t *)ps_malloc(EMMC_BUF_SIZE);
     char *blank = "";
-    for(int i=0;i<NUM_VOICES;i++)
+    for(int i=0; i<NUM_WAV_FILE_T_PER_EMMC_BUF; i++) // how many times must we repeat
     {
-        for(int j=0;j<NUM_NOTES;j++){
-            voice[j].isRack= -1;
-            voice[j].empty=1;
-            voice[j].start_block=0;
-            voice[j].length=0;
-            voice[j].play_back_mode = ONE_SHOT;
-            voice[j].retrigger_mode = RETRIGGER;
-            voice[j].response_curve = RESPONSE_LINEAR;
-            voice[j].note_off_meaning = HALT;
-            voice[j].priority = 0;
-            voice[j].mute_group = 0;
-            voice[j].loop_start = 0;
-            voice[j].loop_end = 0;
-            voice[j].RFU = 0;
-            memcpy(voice[j].name, blank, 1);
-        }
+        buf[i].empty=1;
+        buf[i].start_block=0;
+        buf[i].length=0;
+        buf[i].play_back_mode = ONE_SHOT;
+        buf[i].retrigger_mode = RETRIGGER;
+        buf[i].response_curve = RESPONSE_LINEAR;
+        buf[i].note_off_meaning = HALT;
+        buf[i].priority = 0;
+        buf[i].mute_group = 0;
+        buf[i].loop_start = 0;
+        buf[i].loop_end = 0;
+        buf[i].breakpoint = 0;
+        buf[i].chance = 0;
+        buf[i].RFU = 0;
+        memcpy(voice[i].name, blank, 1);
+    }
+    // write to disk
+    for(int i=0; i<WAV_LUT_BLOCKS / EMMC_BUF_BLOCKS; i++){ // 1024 times
         ESP_ERROR_CHECK(emmc_write(
-                voice, 
-                WAV_LUT_START_BLOCK + (i * BLOCKS_PER_VOICE), 
-                BLOCKS_PER_VOICE 
+                buf, 
+                WAV_LUT_START_BLOCK + ( i * EMMC_BUF_BLOCKS), 
+                EMMC_BUF_BLOCKS
             ));
     }
-    free(voice);
-    // log_i("successfully wrote %d blocks", NUM_WAV_LUT_ENTRIES / ( SECTOR_SIZE / sizeof(struct wav_lu_t)) );
-    // log_i("thats %d bytes of empty wav_lu_ts", NUM_WAV_LUT_ENTRIES * sizeof(struct wav_lu_t));
+    free(buf);
+    log_i("done writting blank wav_lut to disk");
 }
 
-void init_rack_lut(void){
-    log_i("rack dir is from %u to %u",RACK_DIRECTORY_START_BLOCK, RACK_DIRECTORY_START_BLOCK + RACK_DIRECTORY_BLOCKS );
-    char *empty_string = "";
-    struct rack_lu_t blank = {
-        .num_layers=0,
-        .layers={},
-        .break_points={},
-        .free=1
-    };
-    struct rack_file_t blank_file = {
-        .num_layers=0,
-        .layers={},
-        .break_points={},
-        .free=1
-    };
-    memcpy(blank_file.name, empty_string, 1);
-    for(size_t i=0; i<MAX_RACK_LAYERS; i++)
-    {
-        blank.layers[i].isRack=-1;
-        blank.layers[i].empty=1;
-        blank_file.layers[i].isRack=-1;
-        blank_file.layers[i].empty=1;
+void init_wav_matrix(void){
+    // put a million 0s in ram
+    for(size_t i=0; i<NUM_VOICES; i++){
+        for(size_t j=0; j<NUM_NOTES; j++){
+            for(size_t k=0; k<NUM_LAYERS; k++){
+                for(size_t l=0; l<NUM_ROBINS; l++){
+                    wav_mtx[i][j][k][l] = 0;
+                }
+            }
+        }
     }
-    // maybe need to initialze the wav_file_t and wav_lu_t better?
-    for(int j=0; j < NUM_RACK_DIRECTORY_ENTRIES; j++){
-        rack_lut[j] = blank;
+    // write a million 0s to disk
+    uint16_t *buf = (uint16_t *)ps_malloc(EMMC_BUF_SIZE);
+    // fill it up
+    for(int i=0; i<NUM_UIN16_T_PER_EMMC_BUF; i++){
+        buf[i] = 0;
     }
-    struct rack_file_t *buf = (struct rack_file_t*)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-    if(buf == NULL){log_e("failed to alloc rack_file_t buf");};
-    for(int k=0; k < NUM_RACK_DIRECTORY_ENTRIES; k++){
-        buf[k] = blank_file;
+    // write it to disk a billion times
+    for(int i=0; i<WAV_MATRIX_BYTES / EMMC_BUF_SIZE; i++){ // 127 times
+        ESP_ERROR_CHECK(emmc_write(
+                buf, 
+                WAV_MATRIX_START_BLOCK + (i * EMMC_BUF_BLOCKS), 
+                EMMC_BUF_BLOCKS
+            ));
     }
-    emmc_write(buf, RACK_DIRECTORY_START_BLOCK, RACK_DIRECTORY_BLOCKS);
-    // log_i("wrote %u blocks of racks starting at block %u", RACK_DIRECTORY_BLOCKS, RACK_DIRECTORY_START_BLOCK);
-    free(buf);
-    // write_rack_lut_to_disk();
+    log_i("finished writting wav_mtx to disk");
 }
 
 void init_firmware_lut(void){
@@ -345,70 +302,69 @@ void write_firmware_lut_to_disk(void){
     free(buf);
 }
 
-void init_website_lut(void){
-    // log_i("making empty website wav_lut");
-    char *empty_string = "";
-    struct website_t blank = {
-        .length=0,
-        .start_block=0,
-        .index=0,
-        .free=1,
-        .corrupt=1,
-    };
-    memcpy(blank.name, empty_string, 1);
-    for(int i=0;i<MAX_WEBSITES;i++){
-        website_lut[i] = blank;
-        website_lut[i].start_block = WEBSITE_DIRECTORY_START_BLOCK + (i * MAX_WEBSITE_SIZE_IN_BLOCKS);
-        website_lut[i].index = i;
+void read_wav_lut_from_disk(void)
+{
+    struct wav_file_t *buf = (struct wav_file_t *)ps_malloc(EMMC_BUF_SIZE);
+    if(buf == NULL){log_e("failed to alloc buf");};
+    for(int i=0; i<NUM_WAV_LUT_ENTRIES / NUM_WAV_FILE_T_PER_EMMC_BUF; i++)// 1024 times
+    {
+        ESP_ERROR_CHECK(emmc_read(
+                buf, 
+                WAV_LUT_START_BLOCK + (i * EMMC_BUF_BLOCKS), 
+                EMMC_BUF_BLOCKS
+            ));
+        size_t base_index = i * NUM_WAV_FILE_T_PER_EMMC_BUF;
+        for(int j=0; j<NUM_WAV_FILE_T_PER_EMMC_BUF; j++)
+        {
+            wav_lut[base_index + i].empty = buf[i].empty;
+            wav_lut[base_index + i].start_block = buf[i].start_block;
+            wav_lut[base_index + i].length = buf[i].length;
+            wav_lut[base_index + i].play_back_mode = buf[i].play_back_mode;
+            wav_lut[base_index + i].retrigger_mode = buf[i].retrigger_mode;
+            wav_lut[base_index + i].note_off_meaning = buf[i].note_off_meaning;
+            wav_lut[base_index + i].response_curve = buf[i].response_curve;
+            wav_lut[base_index + i].priority = buf[i].priority;
+            wav_lut[base_index + i].mute_group = buf[i].mute_group;
+            wav_lut[base_index + i].loop_start = buf[i].loop_start;
+            wav_lut[base_index + i].loop_end = buf[i].loop_end;
+            wav_lut[base_index + i].breakpoint = buf[i].breakpoint;
+            wav_lut[base_index + i].chance = buf[i].chance;
+        }
     }
-    write_website_lut_to_disk();
-}
-
-void write_website_lut_to_disk(void){
-    // log_i("writting website wav_lut to disk");
-    struct website_t *buf = (struct website_t*)ps_malloc(WEBSITE_LUT_BLOCKS * SECTOR_SIZE);
-    if(buf == NULL){log_i("failed to alloc website_t buf");};
-    // log_i("allocated buffer of %u blocks for %u websites to write to disk", WEBSITE_LUT_BLOCKS, MAX_WEBSITES);
-    for(int i=0; i< MAX_WEBSITES; i++){
-        buf[i] = website_lut[i];
-    }
-    emmc_write(buf,WEBSITE_LUT_START_BLOCK,WEBSITE_LUT_BLOCKS);
-    // log_i("wrote %u blocks of websites starting at block %u", WEBSITE_LUT_BLOCKS, WEBSITE_LUT_START_BLOCK);
     free(buf);
 }
 
-void read_wav_lut_from_disk(void)
-{
-    // read through the voices one at a time
-    struct wav_file_t *voice = (struct wav_file_t *)ps_malloc(BLOCKS_PER_VOICE * SECTOR_SIZE);
-    if(voice == NULL){log_e("failed to alloc voice");};
-    for(int i=0;i<NUM_VOICES;i++)
+void read_wav_matrix_from_disk(void){
+    struct uint16_t *buf = (uint16_t *)ps_malloc(BYTES_PER_LUT_VOICE);
+    if(buf == NULL){log_e("failed to alloc buf");};
+    for(int i=0; i<WAV_MATRIX_ENTRIES / NUM_UIN16_T_PER_EMMC_BUF; i++)// 128 times
     {
-        // feedLoopWDT();
         ESP_ERROR_CHECK(emmc_read(
-                voice, 
-                WAV_LUT_START_BLOCK + (i * BLOCKS_PER_VOICE), 
-                BLOCKS_PER_VOICE
+                buf, 
+                WAV_MATRIX_START_BLOCK + (i * EMMC_BUF_BLOCKS), 
+                EMMC_BUF_BLOCKS
             ));
-        for(int j=0;j<NUM_NOTES;j++)
+        size_t base_index = i * NUM_UIN16_T_PER_EMMC_BUF;
+        for(int j=0; j<NUM_WAV_FILE_T_PER_EMMC_BUF; j++)
         {
-            // feedLoopWDT();
-            wav_lut[i][j].isRack = voice[j].isRack;
-            wav_lut[i][j].empty = voice[j].empty;
-            wav_lut[i][j].start_block = voice[j].start_block;
-            wav_lut[i][j].length = voice[j].length;
-            wav_lut[i][j].play_back_mode = voice[j].play_back_mode;
-            wav_lut[i][j].retrigger_mode = voice[j].retrigger_mode;
-            wav_lut[i][j].note_off_meaning = voice[j].note_off_meaning;
-            wav_lut[i][j].response_curve = voice[j].response_curve;
-            wav_lut[i][j].priority = voice[j].priority;
-            wav_lut[i][j].mute_group = voice[j].mute_group;
-            wav_lut[i][j].loop_start = voice[j].loop_start;
-            wav_lut[i][j].loop_end = voice[j].loop_end;
+            wav_lut[base_index + i].empty = buf[i].empty;
+            wav_lut[base_index + i].start_block = buf[i].start_block;
+            wav_lut[base_index + i].length = buf[i].length;
+            wav_lut[base_index + i].play_back_mode = buf[i].play_back_mode;
+            wav_lut[base_index + i].retrigger_mode = buf[i].retrigger_mode;
+            wav_lut[base_index + i].note_off_meaning = buf[i].note_off_meaning;
+            wav_lut[base_index + i].response_curve = buf[i].response_curve;
+            wav_lut[base_index + i].priority = buf[i].priority;
+            wav_lut[base_index + i].mute_group = buf[i].mute_group;
+            wav_lut[base_index + i].loop_start = buf[i].loop_start;
+            wav_lut[base_index + i].loop_end = buf[i].loop_end;
+            wav_lut[base_index + i].breakpoint = buf[i].breakpoint;
+            wav_lut[base_index + i].chance = buf[i].chance;
         }
     }
-    free(voice);
+    free(buf);
 }
+
 
 void read_firmware_lut_from_disk(void){
     struct firmware_t *buf = (struct firmware_t *)ps_malloc(FIRMWARE_LUT_BLOCKS * SECTOR_SIZE);

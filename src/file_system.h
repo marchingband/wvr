@@ -10,15 +10,24 @@ extern "C"
 
 #define MAX_FIRMWARE_SIZE 2097152 //2MB
 #define MAX_FIRMWARE_SIZE_IN_BLOCKS (MAX_FIRMWARE_SIZE / SECTOR_SIZE + (MAX_FIRMWARE_SIZE % SECTOR_SIZE !=1))
-#define MAX_WEBSITE_SIZE 2097152 //2MB
-#define MAX_WEBSITE_SIZE_IN_BLOCKS (MAX_WEBSITE_SIZE / SECTOR_SIZE + (MAX_WEBSITE_SIZE % SECTOR_SIZE !=1))
-#define MAX_RACK_LAYERS 32
+
+#define MAX_RACK_LAYERS 16
 #define NUM_PIN_CONFIGS 14
 #define DEFAULT_DEBOUNCE_MS 60
 #define DEFAULT_VELOCITY 127
 
 #define NUM_VOICES 16
 #define NUM_NOTES 128
+#define NUM_LAYERS 16
+#define NUM_ROBINS 8
+
+#define NUM_WAV_FILE_T_PER_SECTOR = (SECTOR_SIZE / sizeof(struct wav_file_t)) // 8
+
+#define EMMC_BUF_BLOCKS 8 // seems good
+#define EMMC_BUF_SIZE  (SECTOR_SIZE * SECTORS_PER_EMMC_BUF) // 4096
+#define NUM_WAV_FILE_T_PER_EMMC_BUF (EMMC_BUF_SIZE / sizeof(struct wav_file_t)) // 64
+#define NUM_UIN16_T_PER_EMMC_BUF ( EMMC_BUF_SIZE / sizeof(uint16_t)) // 2048
+
 
 #include "midi_in.h"
 #include "cJSON.h"
@@ -87,13 +96,8 @@ struct pin_config_t {
 struct metadata_t {
     char tag[METADATA_TAG_LENGTH];      
     size_t num_voices;                  
-    size_t file_system_start;           
-    size_t file_system_size;            
-    size_t file_storage_start_block;
     size_t num_firmwares;    
-    size_t num_websites;
     int current_firmware_index;
-    int current_website_index;
     size_t recovery_firmware_size;
     int recovery_mode_straping_pin;
     uint8_t global_volume;
@@ -114,7 +118,8 @@ struct vol_t {
 struct wav_lu_t {
     size_t length;
     size_t start_block;
-    int isRack;
+    size_t loop_start;
+    size_t loop_end;
     enum play_back_mode play_back_mode;
     enum retrigger_mode retrigger_mode;
     enum note_off_meaning note_off_meaning;
@@ -122,15 +127,17 @@ struct wav_lu_t {
     uint8_t priority; // 0 to 15
     uint8_t mute_group;
     uint8_t empty;
-    size_t loop_start;
-    size_t loop_end;
+    uint8_t breakpoint;
+    uint8_t chance;
+    uint16_t RFU;
 };
 
 struct wav_file_t {
     char name[24];
     size_t length;
     size_t start_block;
-    int isRack;
+    size_t loop_start;
+    size_t loop_end;
     enum play_back_mode play_back_mode;
     enum retrigger_mode retrigger_mode;
     enum note_off_meaning note_off_meaning;
@@ -138,8 +145,8 @@ struct wav_file_t {
     uint8_t priority; // 0 to 15
     uint8_t mute_group; // 0 to 15
     uint8_t empty;
-    size_t loop_start;
-    size_t loop_end;
+    uint8_t breakpoint;
+    uint8_t chance;
     int RFU;
 };
 
@@ -150,30 +157,6 @@ struct firmware_t {
     size_t index;
     uint8_t free;
     uint8_t corrupt;
-};
-
-struct website_t {
-    char name[24];
-    size_t length;
-    size_t start_block;
-    size_t index;
-    uint8_t free;
-    uint8_t corrupt;
-};
-
-struct rack_lu_t {
-    uint8_t num_layers;
-    struct wav_lu_t layers[MAX_RACK_LAYERS];
-    uint8_t break_points[MAX_RACK_LAYERS + 1];
-    uint8_t free;
-};
-
-struct rack_file_t {
-    char name[24];
-    uint8_t num_layers;
-    struct wav_file_t layers[MAX_RACK_LAYERS];
-    uint8_t break_points[MAX_RACK_LAYERS + 1];
-    uint8_t free;
 };
 
 static struct pin_config_t default_pin_config_array[14] = {

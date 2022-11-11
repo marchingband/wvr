@@ -28,6 +28,9 @@ extern "C"
 #define NUM_WAV_FILE_T_PER_EMMC_BUF (EMMC_BUF_SIZE / sizeof(struct wav_file_t)) // 64
 #define NUM_UIN16_T_PER_EMMC_BUF ( EMMC_BUF_SIZE / sizeof(uint16_t)) // 2048
 
+#define NUM_WAV_FILE_T_PER_SECTOR = (SECTOR_SIZE / sizeof(struct wav_file_t))
+#define NUM_UINT16_T_PER_SECTOR = (SECTOR_SIZE / sizeof(uint16_t))
+
 #define WAV_PER_VOICE = ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS )
 #define WAV_PER_NOTE = ( NUM_LAYERS * NUM_ROBINS )
 #define WAV_PER_LAYER = NUM_ROBINS

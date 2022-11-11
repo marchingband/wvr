@@ -458,33 +458,33 @@ void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,siz
     wav_lut[index].empty = 0;
 
     // write lut data to disk
-    // calculate its lut chunk
-    size_t lut_chunk = index / NUM_WAV_FILE_T_PER_EMMC_BUF;
-    size_t lut_chunk_index = index % NUM_WAV_FILE_T_PER_EMMC_BUF;
-    size_t lut_chunk_start_block = WAV_LUT_START_BLOCK + lut_chunk;
+    // calculate its sector and offset
+    size_t lut_sector = index / NUM_WAV_FILE_T_PER_SECTOR;
+    size_t lut_sector_index = index % NUM_WAV_FILE_T_PER_SECTOR;
+    size_t lut_sector_start_block = WAV_LUT_START_BLOCK + lut_sector;
     // write the lut chunk
-    struct wav_file_t *lut_chunk_data = (struct wav_file_t*)ps_malloc(EMMC_BUF_SIZE);
-    ESP_ERROR_CHECK(emmc_read(lut_chunk_data, lut_chunk_start_block, EMMC_BUF_BLOCKS));
-    lut_chunk_data[lut_chunk_index].start_block = start_block;
-    lut_chunk_data[lut_chunk_index].size = size;
-    lut_chunk_data[lut_chunk_index].empty = 0;
-    bzero(lut_chunk_data[lut_chunk_index].name, 24);
-    strncpy(lut_chunk_data[lut_chunk_index].name, name, 23);
-    ESP_ERROR_CHECK(emmc_write(lut_chunk_data, lut_chunk_start_block, EMMC_BUF_BLOCKS));
-    free(lut_chunk_data);
+    struct wav_file_t *lut_sector_data = (struct wav_file_t*)ps_malloc(SECTOR_SIZE);
+    ESP_ERROR_CHECK(emmc_read(lut_sector_data, lut_sector_start_block, 1));
+    lut_sector_data[lut_sector_index].start_block = start_block;
+    lut_sector_data[lut_sector_index].size = size;
+    lut_sector_data[lut_sector_index].empty = 0;
+    bzero(lut_sector_data[lut_sector_index].name, 24);
+    strncpy(lut_sector_data[lut_sector_index].name, name, 23);
+    ESP_ERROR_CHECK(emmc_write(lut_sector_data, lut_sector_start_block, 1));
+    free(lut_sector_data);
 
     // write mtx data to disk
-    // calculate its mtx chunk
+    // calculate its sector and offset
     size_t mtx_index = voice * WAV_PER_VOICE + note * WAV_PER_NOTE + layer * WAV_PER_LAYER + robin;
-    size_t mtx_chunk = mtx_index / NUM_UIN16_T_PER_EMMC_BUF;
-    size_t mtx_chunk_index = mtx_index % NUM_UIN16_T_PER_EMMC_BUF;
-    size_t mtx_chunk_start_block = WAV_MATRIX_START_BLOCK + mtx_chunk;
+    size_t mtx_sector = mtx_index / NUM_UINT16_T_PER_SECTOR;
+    size_t mtx_sector_index = mtx_index % NUM_UINT16_T_PER_SECTOR;
+    size_t mtx_sector_start_block = WAV_MATRIX_START_BLOCK + mtx_sector;
     // write to disk
-    uint16_t *mtx_chunk_data = (uint16_t *)ps_malloc(EMMC_BUF_SIZE);
-    ESP_ERROR_CHECK(emmc_read(mtx_chunk_data, mtx_chunk_start_block, EMMC_BUF_BLOCKS));
-    mtx_chunk_data[mtx_chunk_index] = index;
-    ESP_ERROR_CHECK(emmc_write(mtx_chunk_data, mtx_chunk_start_block, EMMC_BUF_BLOCKS));
-    free(mtx_chunk_data);
+    uint16_t *mtx_sector_data = (uint16_t *)ps_malloc(SECTOR_SIZE);
+    ESP_ERROR_CHECK(emmc_read(mtx_sector_data, mtx_sector_start_block, 1));
+    mtx_sector_data[mtx_sector_index] = index;
+    ESP_ERROR_CHECK(emmc_write(mtx_sector_data, mtx_sector_start_block, 1));
+    free(mtx_sector_data);
 }
 
 size_t find_gap_in_file_system(size_t size){

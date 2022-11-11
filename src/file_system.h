@@ -28,6 +28,10 @@ extern "C"
 #define NUM_WAV_FILE_T_PER_EMMC_BUF (EMMC_BUF_SIZE / sizeof(struct wav_file_t)) // 64
 #define NUM_UIN16_T_PER_EMMC_BUF ( EMMC_BUF_SIZE / sizeof(uint16_t)) // 2048
 
+#define WAV_PER_VOICE = ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS )
+#define WAV_PER_NOTE = ( NUM_LAYERS * NUM_ROBINS )
+#define WAV_PER_LAYER = NUM_ROBINS
+
 
 #include "midi_in.h"
 #include "cJSON.h"

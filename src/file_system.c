@@ -39,8 +39,9 @@
 #define WAV_MATRIX_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_SIZE_IN_BLOCKS)
 #define WAV_MATRIX_ENTRIES ( NUM_VOICES * NUM_NOTES * NUM_LAYERS * NUM_ROBINS ) // 262,144
 #define BYTES_PER_MATRIX_VOICE ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS * sizeof(uint16_t) ) // 32,768
-#define WAV_MATRIX_BYTES ( WAV_MATRIX_ENTRIES * sizeof(uint16_t) ) // 520,192
-#define WAV_MATRIX_BLOCKS ( WAV_MATRIX_BYTES / SECTOR_SIZE + (WAV_MATRIX_BYTES % SECTOR_SIZE != 0) ) // 1,016
+#define BLOCKS_PER_MATRIX_VOICE ( BYTES_PER_MATRIX_VOICE / SECTOR_SIZE ) // 64
+#define WAV_MATRIX_BYTES ( WAV_MATRIX_ENTRIES * sizeof(uint16_t) ) // 524,288
+#define WAV_MATRIX_BLOCKS ( WAV_MATRIX_BYTES / SECTOR_SIZE + (WAV_MATRIX_BYTES % SECTOR_SIZE != 0) ) // 1,024
 
 // #define LAST_BLOCK 16773216 // 16777216 is 8GB / 512, I saved 2MB (4000 blocks) at the end for corruption?
 #define EMMC_CAPACITY_BYTES 7818182656
@@ -335,8 +336,23 @@ void read_wav_lut_from_disk(void)
 }
 
 void read_wav_matrix_from_disk(void){
-    struct uint16_t *buf = (uint16_t *)ps_malloc(BYTES_PER_LUT_VOICE);
-    if(buf == NULL){log_e("failed to alloc buf");};
+    uint16_t *buf = (uint16_t *)ps_malloc(BYTES_PER_MATRIX_VOICE);
+    if(buf == NULL){log_e("failed to alloc buf");}
+    for(int voice=0; voice< NUM_VOICES; voice ++){
+        ESP_ERROR_CHECK(emmc_read(
+            buf, 
+            WAV_MATRIX_START_BLOCK + (voice * BLOCKS_PER_MATRIX_VOICE), 
+            BYTES_PER_MATRIX_VOICE
+        ));
+        size_t index = 0;
+        for(int i=0; i<NUM_NOTES; i++){
+            for(int j=0; j<NUM_LAYERS; j++){
+                for( int k=0; k<NUM_ROBINS; k++){
+                    wav_mtx[voice][i][j][k] = buf[index++];
+                }
+            }
+        }
+    }
     for(int i=0; i<WAV_MATRIX_ENTRIES / NUM_UIN16_T_PER_EMMC_BUF; i++)// 128 times
     {
         ESP_ERROR_CHECK(emmc_read(
@@ -365,45 +381,12 @@ void read_wav_matrix_from_disk(void){
     free(buf);
 }
 
-
 void read_firmware_lut_from_disk(void){
     struct firmware_t *buf = (struct firmware_t *)ps_malloc(FIRMWARE_LUT_BLOCKS * SECTOR_SIZE);
     if(buf == NULL){log_e("failed to alloc firware_t buf for reading");};
     emmc_read(buf, FIRMWARE_LUT_START_BLOCK, FIRMWARE_LUT_BLOCKS);
     for(int i=0; i<MAX_FIRMWARES; i++ ){
         firmware_lut[i] = buf[i];
-    }
-    free(buf);
-}
-
-void read_website_lut_from_disk(void){
-    struct website_t *buf = (struct website_t *)ps_malloc(WEBSITE_LUT_BLOCKS * SECTOR_SIZE);
-    if(buf == NULL){log_e("failed to alloc website_t buf for reading");};
-    emmc_read(buf, WEBSITE_LUT_START_BLOCK, WEBSITE_LUT_BLOCKS);
-    for(int i=0; i<MAX_WEBSITES; i++ ){
-        website_lut[i] = buf[i];
-    }
-    free(buf);
-}
-
-void read_rack_lut_from_disk(void){
-    struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-    if(buf == NULL){log_e("failed to alloc rack_file_t buf for reading");};
-    emmc_read(buf, RACK_DIRECTORY_START_BLOCK, RACK_DIRECTORY_BLOCKS);
-    for(int i=0; i<NUM_RACK_DIRECTORY_ENTRIES; i++ ){
-        for(int j=0;j<buf[i].num_layers;j++){
-            rack_lut[i].layers[j].start_block = buf[i].layers[j].start_block;
-            rack_lut[i].layers[j].length = buf[i].layers[j].length;
-            rack_lut[i].layers[j].isRack = buf[i].layers[j].isRack;
-            rack_lut[i].layers[j].empty = buf[i].layers[j].empty;
-        }
-        if(buf[i].num_layers > 0){
-            for(int k=0;k<buf[i].num_layers + 1;k++){
-                rack_lut[i].break_points[k] = buf[i].break_points[k];
-            }
-        }
-        rack_lut[i].num_layers = buf[i].num_layers;
-        rack_lut[i].free = buf[i].free;
     }
     free(buf);
 }
@@ -416,11 +399,6 @@ void read_pin_config_lut_from_disk(void){
         pin_config_lut[i] = buf[i];
     }
     free(buf);
-    // for(int i=0;i<14;i++)
-    // {
-    //     wlog_i("%d",pin_config_lut[i].gpio_num);
-    //     wlog_i("%d",pin_config_lut[i].velocity);
-    // }
 }
 
 void log_bank(int bank)
@@ -444,136 +422,75 @@ struct wav_lu_t null_wav_file = {
 
 struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_t velocity)
 {
-    struct wav_lu_t file = wav_lut[voice][note];
-    if(file.isRack == -1){
-    // it is not a rack
-        return(file);
-    }
-    // is a rack
-    struct rack_lu_t rack = rack_lut[file.isRack];
-    if(velocity < rack.break_points[0]){
-    // is below the bottom threshold
-        return(null_wav_file);
-    }
-    for(int i=1; i<=rack.num_layers; i++){
-        if(velocity <= rack.break_points[i]){
-            // add the mode enums from the parent note
-            struct wav_lu_t wav = rack.layers[i-1];
-            wav.play_back_mode = wav_lut[voice][note].play_back_mode;
-            wav.retrigger_mode = wav_lut[voice][note].retrigger_mode;
-            wav.note_off_meaning = wav_lut[voice][note].note_off_meaning;
-            wav.response_curve = wav_lut[voice][note].response_curve;
-            wav.priority = wav_lut[voice][note].priority;
-            wav.mute_group = wav_lut[voice][note].mute_group;
-            wav.loop_start = wav_lut[voice][note].loop_start;
-            wav.loop_end = wav_lut[voice][note].loop_end;
-            return wav;
+    uint16_t **note = wav_mtx[voice][note];
+    for(int i=0; i<NUM_LAYERS; i++){
+        if(note[i][0].breakpoint < velocity)
+            continue;
+        uint16_t *layer = note[i];
+        uint8_t luck = next_rand();
+        for(int j=0; j<NUM_ROBINS; j++){
+            if(luck <= wav_mtx[voice][note][i][j])
+                return wav_lut[wav_mtx[voice][note][i][j]];
         }
+        return null_wav_file;
     }
-    // its above the top threshold
-    return(null_wav_file);
 }
 
 void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,size_t size)
 {
     log_i("adding wav name:%s voice:%d, note:%d, start_block:%d, size:%d",
         name,voice,note,start_block,size);
-    size_t voice_start_block = WAV_LUT_START_BLOCK + (BLOCKS_PER_VOICE * voice);
-    struct wav_file_t *voice_data = (struct wav_file_t*)ps_malloc(BLOCKS_PER_VOICE * SECTOR_SIZE);
-    if(voice_data==NULL){log_e("not enough ram to alloc voice_data");}
-    ESP_ERROR_CHECK(emmc_read(voice_data,voice_start_block,BLOCKS_PER_VOICE));
-    voice_data[note].start_block = start_block;
-    voice_data[note].length = size;
-    voice_data[note].empty = 0;
-    bzero(voice_data[note].name, 24);
-    strncpy(voice_data[note].name, name, 23);
-    ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
-    read_wav_lut_from_disk();
-    free(voice_data);
-}
-
-void add_rack_to_file_system(char *name, int voice, int note, size_t start_block, size_t size, int layer, const char *json)
-{
-    log_i("adding rack layer:%u name:%s voice:%d, note:%d, start_block:%d, size:%d",
-        layer,name,voice,note,start_block,size);
-    size_t voice_start_block = WAV_LUT_START_BLOCK + (BLOCKS_PER_VOICE * voice);
-    struct wav_file_t *voice_data = (struct wav_file_t*)ps_malloc(BYTES_PER_VOICE);
-    if(voice_data==NULL){log_e("not enough ram to alloc voice_data");}
-    ESP_ERROR_CHECK(emmc_read(voice_data,voice_start_block,BLOCKS_PER_VOICE));
-    // if its currently listed as a non-rack hit
-    if(voice_data[note].isRack == -1){
-        voice_data[note].isRack = get_empty_rack();
-        log_i("got fresh rack %u",voice_data[note].isRack);
-        if(voice_data[note].isRack == -1){
-            log_e("all out of rack slots");
-            free(voice_data);
-            return;
+    // get the existing mtx entry
+    uint16_t index = wav_mtx[voice][note][layer][robin];
+    // if it's empty, fill it
+    if(index == 0){
+        index = next_wav_index();
+        if(index == 0){
+            log_e("no more filehandles available!");
+            return
         }
+        // write index to mtx in ram
+        wav_mtx[voice][note][layer][robin] = index;
     }
-    int rack_index = voice_data[note].isRack;
-    voice_data[note].empty = 0;
-    // memcpy(voice_data[note].name,name,24);
-    ESP_ERROR_CHECK(emmc_write(voice_data,voice_start_block,BLOCKS_PER_VOICE));
-    add_wav_to_rack(name, rack_index, start_block, size, layer, json);
-    read_wav_lut_from_disk();
-    read_rack_lut_from_disk();
-    free(voice_data);
-}
+    // write data to lut in ram
+    wav_lut[index].start_block = start_block;
+    wav_lut[index].size = size;
+    wav_lut[index].empty = 0;
 
-int get_empty_rack(void){
-    for(int i=0;i<NUM_RACK_DIRECTORY_ENTRIES;i++){
-        if(rack_lut[i].free){
-            log_i("got fresh rack %d", i);
-            return(i);
-        }
-    }
-    return(-1);
-}
+    // write lut data to disk
+    // calculate its lut chunk
+    size_t lut_chunk = index / NUM_WAV_FILE_T_PER_EMMC_BUF;
+    size_t lut_chunk_index = index % NUM_WAV_FILE_T_PER_EMMC_BUF;
+    size_t lut_chunk_start_block = WAV_LUT_START_BLOCK + lut_chunk;
+    // write the lut chunk
+    struct wav_file_t *lut_chunk_data = (struct wav_file_t*)ps_malloc(EMMC_BUF_SIZE);
+    ESP_ERROR_CHECK(emmc_read(lut_chunk_data, lut_chunk_start_block, EMMC_BUF_BLOCKS));
+    lut_chunk_data[lut_chunk_index].start_block = start_block;
+    lut_chunk_data[lut_chunk_index].size = size;
+    lut_chunk_data[lut_chunk_index].empty = 0;
+    bzero(lut_chunk_data[lut_chunk_index].name, 24);
+    strncpy(lut_chunk_data[lut_chunk_index].name, name, 23);
+    ESP_ERROR_CHECK(emmc_write(lut_chunk_data, lut_chunk_start_block, EMMC_BUF_BLOCKS));
+    free(lut_chunk_data);
 
-void add_wav_to_rack(char* name, int rack_index, size_t start_block, size_t size, int layer, const char *json_string){
-    log_i("name %s, start_block %u, size %u, layer %u",name,start_block,size,layer);
-    // fill out the wav entry for that layer
-    const cJSON *json = cJSON_Parse(json_string);
-    struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-    if(buf == NULL){log_i("malloc rack_file_t buf failed");}
-    ESP_ERROR_CHECK(emmc_read(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
-    struct wav_file_t *wav_entry = &buf[rack_index].layers[layer];
-    wav_entry->empty = 0;
-    wav_entry->start_block = start_block;
-    wav_entry->length = size;
-    wav_entry->isRack = -2; // is a rack member
-    bzero(wav_entry->name, 24);
-    strncpy(wav_entry->name, name, 23);
-
-    // set all the config data for the rack even if its redundant
-    struct rack_file_t rack = buf[rack_index];
-    rack.free = 0;
-    const cJSON *rack_name = cJSON_GetObjectItemCaseSensitive(json, "name");
-    bzero(&rack.name, 24);
-    strncpy(&rack.name, rack_name->valuestring, 23);
-    const cJSON *break_points = cJSON_GetObjectItemCaseSensitive(json, "breakPoints");
-    const cJSON *point = NULL;
-    int layers = 0;
-    cJSON_ArrayForEach(point,break_points)
-    {
-        // log_i("point:%u",point->valueint);
-        rack.break_points[layers] = point->valueint;
-        layers++;
-    }
-    // there is one more num break-points then num layers
-    rack.num_layers = layers - 1;
-    // log_i("layers : %u",layers - 1);
-    buf[rack_index] = rack;
-    ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
-    free(buf);
-    cJSON_Delete(json);
-    // write_rack_lut_to_disk();
-    // read_rack_lut_from_disk();
+    // write mtx data to disk
+    // calculate its mtx chunk
+    size_t mtx_index = voice * WAV_PER_VOICE + note * WAV_PER_NOTE + layer * WAV_PER_LAYER + robin;
+    size_t mtx_chunk = mtx_index / NUM_UIN16_T_PER_EMMC_BUF;
+    size_t mtx_chunk_index = mtx_index % NUM_UIN16_T_PER_EMMC_BUF;
+    size_t mtx_chunk_start_block = WAV_MATRIX_START_BLOCK + mtx_chunk;
+    // write to disk
+    uint16_t *mtx_chunk_data = (uint16_t *)ps_malloc(EMMC_BUF_SIZE);
+    ESP_ERROR_CHECK(emmc_read(mtx_chunk_data, mtx_chunk_start_block, EMMC_BUF_BLOCKS));
+    mtx_chunk_data[mtx_chunk_index] = index;
+    ESP_ERROR_CHECK(emmc_write(mtx_chunk_data, mtx_chunk_start_block, EMMC_BUF_BLOCKS));
+    free(mtx_chunk_data);
 }
 
 size_t find_gap_in_file_system(size_t size){
     size_t num_wavs;
     struct wav_lu_t *data = get_all_wav_files(&num_wavs);
+    // if no wavs, data is NULL, and num_wavs is 0, search_directory handles it
     size_t address = search_directory(
         data,
         num_wavs,
@@ -587,64 +504,38 @@ size_t find_gap_in_file_system(size_t size){
 struct wav_lu_t *get_all_wav_files(size_t *len){
     // count the total wavs on file looking at the racks and the normal wav_lut
     size_t num_wavs = 0;
-    for(int i=0;i<NUM_VOICES;i++){
-        for(int j=0;j<NUM_NOTES;j++){
-            if(wav_lut[i][j].empty){
-                continue;
-            }
-            if(wav_lut[i][j].isRack == -1){
-                // log_i("adding a non-rack wav");
-                num_wavs++;
-            } else {
-                size_t num_layers = rack_lut[wav_lut[i][j].isRack].num_layers;
-                for(int k=0;k<num_layers;k++){
-                    if(rack_lut[wav_lut[i][j].isRack].layers[k].empty == 0){
-                        // log_i("adding a rack wav i:%u j:%u k:%u",i,j,k);
-                        num_wavs++;
-                    }
-                }
-            }
-        }
+    for(int i=0;i<NUM_WAV_LUT_ENTRIES;i++){
+        num_wavs += ( wav_lut[i].empty == 0 );
     }
-    *len = num_wavs;
-    log_i("found %u wavs on disk",num_wavs);
+    *len = num_wavs; // send that data back
+    log_i("found %u wavs on disk", num_wavs);
 
     // make a buffer for them all
-    struct wav_lu_t *data = NULL;
-    if(num_wavs > 0){
-        data = (struct wav_lu_t *)ps_malloc(num_wavs * sizeof(struct wav_lu_t));
-        if(data == NULL){
-            log_e("couldnt malloc data buffer");
-        }
-    }
+    if(num_wavs == 0)
+        return NULL;
+
+    struct wav_lu_t *data = (struct wav_lu_t *)ps_malloc(num_wavs * sizeof(struct wav_lu_t));
+    if(data == NULL)
+        log_e("failed malloc buf");
 
     // put in all the data
     size_t index = 0;
     for(int i=0;i<NUM_VOICES;i++){
         for(int j=0;j<NUM_NOTES;j++){
-            if(wav_lut[i][j].empty){
-                continue;
-            }
-            int rack_index = wav_lut[i][j].isRack;
-            if( rack_index== -1){
-                // its just a normal file
-                data[index] = wav_lut[i][j];
-                index++;
-            } else {
-                //its a rack
-                // log_i("got a rack");
-                int layers = rack_lut[rack_index].num_layers;
-                for(int k=0;k<layers;k++){
-                    struct wav_lu_t rack_item = rack_lut[rack_index].layers[k];
-                    if(rack_item.empty == 0){
-                        data[index].start_block = rack_item.start_block;
-                        data[index].length = rack_item.length;
-                        index++;
+            for(int k=0; k<NUM_LAYER; k++){
+                for(int l=0; l<NUM_ROBINS; l++){
+                    if(wav_mtx[i][j][k][l].empty == 0){
+                        data[index++] = wav_mtx[i][j][k][l];
+                        if(index >= num_wavs){
+                            log_e("error, index %d is out of range %d", index, num_wavs);
+                            return NULL;
+                        }
                     }
                 }
             }
         }
     }
+
     return(data);
 }
 
@@ -660,7 +551,7 @@ size_t search_directory(struct wav_lu_t *data,  size_t num_used_entries, size_t 
     }
 
     // sort the files by position
-    qsort(data,num_used_entries,sizeof(struct wav_lu_t),sort_lut);
+    qsort(data, num_used_entries, sizeof(struct wav_lu_t), sort_lut);
 
     // make an array to hold the gaps (there is always one more gap then wav) and an index to keep track
     size_t num_gap_entries = num_used_entries +1;
@@ -951,21 +842,8 @@ void add_website_json(cJSON *RESPONSE_ROOT){
 
 struct firmware_t recovery_firmware;
 
-struct firmware_t *get_firmware_slot(int index){
-    if(index == -1) // recovery firmware
-    {
-        // recovery_firmware.name = "default firmware";
-        recovery_firmware.length = metadata.recovery_firmware_size;
-        recovery_firmware.start_block = RECOVERY_FIRMWARE_START_BLOCK;
-        recovery_firmware.index = 123;
-        recovery_firmware.free = 0;
-        recovery_firmware.corrupt = 0;
-        return &recovery_firmware;
-    }
-    else
-    {
-        return &firmware_lut[index];
-    }
+struct firmware_t *get_firmware_slot(uint8_t index){
+    return &firmware_lut[index];
 }
 
 int write_firmware_to_emmc(char slot, uint8_t* source, size_t size){
@@ -981,18 +859,6 @@ void close_firmware_to_emmc(char index){
     write_firmware_lut_to_disk();
 }
 
-int write_recovery_firmware_to_emmc(uint8_t* source, size_t size){
-    size_t block = RECOVERY_FIRMWARE_START_BLOCK;
-    int ret = write_wav_to_emmc((char *)source, block, size);
-    return(ret);
-}
-
-void close_recovery_firmware_to_emmc(size_t recovery_firmware_size){
-    close_wav_to_emmc();
-    metadata.recovery_firmware_size = recovery_firmware_size;
-    write_metadata(metadata);
-}
-
 void restore_emmc(uint8_t* source, size_t size)
 {
     size_t block = 0;
@@ -1002,55 +868,6 @@ void restore_emmc(uint8_t* source, size_t size)
 void close_restore_emmc()
 {
     close_wav_to_emmc();
-}
-
-struct website_t *get_website_slot(char index){
-    return(&website_lut[index]);
-}
-
-int write_website_to_emmc(char slot, uint8_t* source, size_t size){
-    size_t block = website_lut[slot].start_block;
-    int ret = write_wav_to_emmc((char *)source, block, size);
-    return(ret);
-}
-
-void close_website_to_emmc(char index){
-    close_wav_to_emmc();
-    website_lut[index].free = 0;
-    website_lut[index].corrupt = 0;
-    write_website_lut_to_disk();
-}
-
-size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, size_t total){
-    uint8_t *buf;
-    size_t bytes_read = 0;
-    size_t sector;
-    size_t bytes_left_in_sector;
-    size_t pointer;
-    if(bytes_read==0){
-        buf = (uint8_t *)ps_malloc(SECTOR_SIZE);
-        sector = start_block;
-        bytes_left_in_sector = 0;
-    }
-    if(bytes_left_in_sector == 0){
-        emmc_read(buf,sector,1);
-        sector++;
-        bytes_left_in_sector = SECTOR_SIZE;
-        pointer = 0;
-    }
-    size_t will_write = toWrite < bytes_left_in_sector ? toWrite : bytes_left_in_sector;
-    for(size_t i=0;i<will_write;i++){
-        buffer[i] = buf[pointer+i];
-        bytes_left_in_sector--;
-        bytes_read++;
-    }
-    pointer += will_write;
-    if(bytes_read == total){
-        free(buf);
-        bytes_read=0;
-        bytes_left_in_sector = 0;
-    }
-    return will_write;
 }
 
 void updateSingleVoiceConfig(char *json, int num_voice){
@@ -1149,41 +966,6 @@ void updateSingleVoiceConfig(char *json, int num_voice){
     // free(rack_data);
 }
 
-void updateRackConfig(cJSON *note, struct rack_file_t *buf){
-    int rack_num = cJSON_GetObjectItemCaseSensitive(note, "isRack")->valueint;
-    cJSON *rack = cJSON_GetObjectItemCaseSensitive(note, "rack");
-    cJSON *break_points = cJSON_GetObjectItemCaseSensitive(rack, "break_points");
-    cJSON *point = NULL;
-    struct rack_file_t rack_file = buf[rack_num];
-    // set the data in the rack file
-    rack_file.free = 0;
-    bzero(&rack_file.name, 24);
-    strncpy(&rack_file.name, cJSON_GetObjectItemCaseSensitive(rack, "name")->valuestring, 23);
-    // update the breakpoints and layer count
-    int layer = 0;
-    cJSON_ArrayForEach(point,break_points)
-    {
-        feedLoopWDT();
-        rack_file.break_points[layer] = point->valueint;
-        layer++;
-    }
-    rack_file.num_layers = layer - 1;
-    buf[rack_num] = rack_file;
-    feedLoopWDT();
-}
-
-void clear_rack(int isRack)
-{
-    log_i("clearing a rack that is being overwritten by a non-rack");
-    struct rack_file_t *buf = (struct rack_file_t *)ps_malloc(RACK_DIRECTORY_BLOCKS * SECTOR_SIZE);
-    if(buf == NULL){log_i("malloc rack_file_t buf failed");}
-    ESP_ERROR_CHECK(emmc_read(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
-    buf[isRack].free = 1;
-    buf[isRack].num_layers = 0;
-    ESP_ERROR_CHECK(emmc_write(buf,RACK_DIRECTORY_START_BLOCK,RACK_DIRECTORY_BLOCKS));
-    free(buf);
-}
-
 void updatePinConfig(cJSON *config){
     cJSON *json = cJSON_Parse(config);
     cJSON *pin = NULL;
@@ -1205,39 +987,6 @@ void updatePinConfig(cJSON *config){
     feedLoopWDT();
     wlog_i("wrote pin config to disk");
     cJSON_Delete(json);
-}
-
-void clean_up_rack_directory(void)
-{
-    bool used[128] = {false};
-    bool should_init_rack_lut = false;
-    for(int i=0; i<NUM_VOICES; i++)
-    {
-        for(int j=0; j<NUM_NOTES; j++)
-        {
-            if(wav_lut[i][j].empty == 0 && wav_lut[i][j].isRack > -1)
-            {
-                used[wav_lut[i][j].isRack] = true;
-            }
-        }
-    }
-    for(int i=0; i<128; i++)
-    {
-        if(used[i] == false)
-        {
-            if(rack_lut[i].free == false)
-            {
-                // it's unused but marked as not free
-                log_i("recovering rack %d", i);
-                clear_rack(i);
-                should_init_rack_lut = true;
-            }
-        }
-    }
-    if(should_init_rack_lut)
-    {
-        read_rack_lut_from_disk();
-    }
 }
 
 void log_pin_config(void)

@@ -82,6 +82,11 @@ struct pin_config_t *pin_config_lut;
 
 void file_system_init(void)
 {
+    log_i("\nwav_lu_t-> %d\nwav_file_t-> %d\nrack_lu_t-> %d\nrack_file_t-> %d\nplay_back_mode-> %d\nretrigger_mode=> %d\nnote_off_meaning-> %d, response_curve-> %d", 
+        sizeof(struct wav_lu_t), sizeof(struct wav_file_t), sizeof(struct rack_lu_t), sizeof(struct rack_file_t),
+        sizeof(enum play_back_mode), sizeof(enum retrigger_mode), sizeof(enum note_off_meaning), sizeof(enum response_curve)
+        );
+
     // alloc_luts();
     // log_i("metadata_t is %d bytes", sizeof(struct metadata_t));
     if(wav_lut == NULL){

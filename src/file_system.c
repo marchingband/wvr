@@ -1,3 +1,4 @@
+#include "Arduino.h"
 #include "string.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -22,51 +23,34 @@
 #define FIRMWARE_LUT_SIZE (sizeof(struct firmware_t) * MAX_FIRMWARES)
 #define FIRMWARE_LUT_BLOCKS (FIRMWARE_LUT_SIZE / SECTOR_SIZE + (FIRMWARE_LUT_SIZE % SECTOR_SIZE !=0))
 
-#define WEBSITE_LUT_START_BLOCK (FIRMWARE_LUT_START_BLOCK + FIRMWARE_LUT_BLOCKS)
-#define MAX_WEBSITES 10
-#define WEBSITE_LUT_SIZE (sizeof(struct website_t) * MAX_WEBSITES)
-#define WEBSITE_LUT_BLOCKS (WEBSITE_LUT_SIZE / SECTOR_SIZE + (WEBSITE_LUT_SIZE % SECTOR_SIZE !=0))
-
-#define FIRMWARE_DIRECTORY_START_BLOCK (WEBSITE_LUT_START_BLOCK + WEBSITE_LUT_BLOCKS)
+#define FIRMWARE_DIRECTORY_START_BLOCK (FIRMWARE_LUT_START_BLOCK + FIRMWARE_LUT_BLOCKS)
 #define FIRMWARE_DIRECTORY_SIZE (MAX_FIRMWARES * MAX_FIRMWARE_SIZE)
 #define FIRMWARE_DIRECTORY_BLOCKS (FIRMWARE_DIRECTORY_SIZE / SECTOR_SIZE + (FIRMWARE_DIRECTORY_SIZE % SECTOR_SIZE !=0))
 
-#define WEBSITE_DIRECTORY_START_BLOCK (FIRMWARE_DIRECTORY_START_BLOCK + FIRMWARE_DIRECTORY_BLOCKS)
-#define WEBSITE_DIRECTORY_SIZE (MAX_WEBSITES * MAX_WEBSITE_SIZE)
-#define WEBSITE_DIRECTORY_BLOCKS (WEBSITE_DIRECTORY_SIZE / SECTOR_SIZE + (WEBSITE_DIRECTORY_SIZE % SECTOR_SIZE !=0))
-
-#define PIN_CONFIG_START_BLOCK (WEBSITE_DIRECTORY_START_BLOCK + WEBSITE_DIRECTORY_BLOCKS)
+#define PIN_CONFIG_START_BLOCK (FIRMWARE_DIRECTORY_START_BLOCK + FIRMWARE_DIRECTORY_BLOCKS)
 #define PIN_CONFIG_SIZE (NUM_PIN_CONFIGS * sizeof(struct pin_config_t))
 #define PIN_CONFIG_BLOCKS (PIN_CONFIG_SIZE / SECTOR_SIZE + (PIN_CONFIG_SIZE % SECTOR_SIZE !=0))
 
-#define NUM_WAV_LUT_ENTRIES ( NUM_VOICES * NUM_NOTES )
+#define NUM_WAV_LUT_ENTRIES 65536 // uint16_t max
 #define WAV_LUT_START_BLOCK (PIN_CONFIG_START_BLOCK + PIN_CONFIG_BLOCKS)
 #define BYTES_PER_VOICE ( NUM_NOTES * sizeof(struct wav_file_t) )
 #define BLOCKS_PER_VOICE ( BYTES_PER_VOICE / SECTOR_SIZE + (BYTES_PER_VOICE % SECTOR_SIZE != 0) )
 #define WAV_LUT_BLOCKS_PER_VOICE BLOCKS_PER_VOICE
 #define WAV_LUT_SIZE_IN_BLOCKS ( NUM_VOICES * BLOCKS_PER_VOICE )
 
-#define NUM_RACK_DIRECTORY_ENTRIES 128
-#define RACK_DIRECTORY_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_SIZE_IN_BLOCKS)
-#define RACK_DIRECTORY_SIZE (NUM_RACK_DIRECTORY_ENTRIES * sizeof(struct rack_file_t))
-#define RACK_DIRECTORY_BLOCKS (RACK_DIRECTORY_SIZE / SECTOR_SIZE + (RACK_DIRECTORY_SIZE % SECTOR_SIZE != 0))
-
 // #define LAST_BLOCK 16773216 // 16777216 is 8GB / 512, I saved 2MB (4000 blocks) at the end for corruption?
 #define EMMC_CAPACITY_BYTES 7818182656
 #define EMMC_CAPACITY BLOCKS  15269888
 #define LAST_BLOCK            15265888 // 16777216 is 8GB / 512, I saved (4000 blocks) at the end for corruption?
-                   
-#define RECOVERY_FIRMWARE_BLOCKS_RESERVED 4000 // 2MB / 512 
-#define RECOVERY_FIRMWARE_START_BLOCK (LAST_BLOCK - RECOVERY_FIRMWARE_BLOCKS_RESERVED)
-#define RECOVERY_FIRMWARE_SIZE 2000
 
-#define FILE_STORAGE_START_BLOCK (RACK_DIRECTORY_START_BLOCK + RACK_DIRECTORY_BLOCKS)
-#define FILE_STORAGE_END_BLOCK (RECOVERY_FIRMWARE_START_BLOCK - 1)
+#define FILE_STORAGE_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_SIZE_IN_BLOCKS)
+#define FILE_STORAGE_END_BLOCK LAST_BLOCK
 
 // july 10 / 2021
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v1.x.x 
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_16"; // v4.x.x
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -80,10 +64,22 @@ struct website_t *website_lut;
 struct rack_lu_t *rack_lut;
 struct pin_config_t *pin_config_lut;
 
+uint16_t *wav_lookup;
+
 void file_system_init(void)
 {
     // alloc_luts();
     // log_i("metadata_t is %d bytes", sizeof(struct metadata_t));
+    log_i("\nwav_lu_t-> %d\nwav_file_t-> %d\nrack_lu_t-> %d\nrack_file_t-> %d\nplay_back_mode-> %d\nretrigger_mode=> %d\nnote_off_meaning-> %d, response_curve-> %d", 
+        sizeof(struct wav_lu_t), sizeof(struct wav_file_t), sizeof(struct rack_lu_t), sizeof(struct rack_file_t),
+        sizeof(enum play_back_mode), sizeof(enum retrigger_mode), sizeof(note_off_meaning), sizeof(response_curve)
+        );
+    wav_lookup = (uint16_t *)ps_malloc(2621440);
+    if(wav_lookup == NULL){
+        log_i("failed to alloc wav_lookup");
+    } else {
+        log_i("did not fail to alloc wav_lookup");
+    }
     if(wav_lut == NULL){
         wav_lut = (struct wav_lu_t**)ps_malloc(NUM_VOICES * sizeof(struct wav_lu_t*));
         if(wav_lut == NULL){log_e("failed to alloc wav_lut");}

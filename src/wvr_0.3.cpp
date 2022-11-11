@@ -95,8 +95,12 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   emmc_init();
   logSize("emmc");
 
+  logRam();
+
   file_system_init();
   logSize("file system");
+
+  logRam();
 
   if(checkRecoveryModePin)
   {

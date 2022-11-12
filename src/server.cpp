@@ -296,58 +296,15 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
   }
 }
 
-char r_name[24];
-int r_voice;
-int r_note;
-int r_layer;
-const char *r_rack_json;
-size_t r_start_block;
-
-void handleRack(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
-  if(index==0){
-    //start
-    //wav_player_pause();
-    strcpy(&r_name[0], request->getHeader("name")->value().c_str());
-    sscanf(request->getHeader("voice")->value().c_str(), "%d", &r_voice);
-    sscanf(request->getHeader("note")->value().c_str(), "%d", &r_note);
-    sscanf(request->getHeader("layer")->value().c_str(), "%d", &r_layer);
-    r_rack_json = request->getHeader("rack-json")->value().c_str();
-    r_start_block = find_gap_in_file_system(total);
-    if(r_start_block == 0)
-    {
-      //error no mem
-      request->send(507);
-    }
-  }
-  if(r_start_block == 0)
-  {
-    feedLoopWDT();
-    return;
-  }
-  //always
-  feedLoopWDT();
-  write_wav_to_emmc(data, r_start_block, len);
-  w_bytes_read += len;
-  if(index + len == total){
-    //done
-    close_wav_to_emmc();
-    add_rack_to_file_system(&r_name[0],r_voice,r_note,r_start_block,total,r_layer,r_rack_json);
-    //wav_player_resume();
-  }
-}
-
 int f_bytes_read = 0;
 
 char f_firmware_slot;
-size_t f_gui_size;
 size_t f_firmware_size;
-char f_gui_name[24];
 char f_firmware_name[24];
 
 void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   //once
   if(index==0){
-    //wav_player_pause();
     AsyncWebHeader* firmware_slot_string = request->getHeader("slot-index");
     sscanf(firmware_slot_string->value().c_str(), "%d", &f_firmware_slot);
     AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
@@ -378,67 +335,23 @@ void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len
     log_i("done");
     log_i("wrote %u bytes",f_bytes_read);
     f_bytes_read = 0;
-    // request->send(200, "text/plain", "all done firmware");
-    //wav_player_resume();
   }
 }
 
-int rf_bytes_read = 0;
-size_t rf_firmware_size;
-
-void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
-  //once
-  if(index==0){
-    //wav_player_pause();
-    AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
-    sscanf(firmware_size_string->value().c_str(), "%d", &rf_firmware_size);
-  }
-  if(rf_firmware_size > MAX_FIRMWARE_SIZE){
-    request->send(400, "text/plain", "FILES TOO LARGE");
-    return;
-  }
-
-  Serial.print(".");
-  feedLoopWDT();
-  write_recovery_firmware_to_emmc(data, len);
-  rf_bytes_read += len;
-
-  //done
-  if(index + len == total){
-    feedLoopWDT();
-    close_recovery_firmware_to_emmc(total);
-    feedLoopWDT();
-    log_i("done");
-    log_i("wrote %u bytes",rf_bytes_read);
-    rf_bytes_read = 0;
-    // request->send(200, "text/plain", "all done recovery firmware");
-    //wav_player_resume();
-  }
+void handleGetVoiceData(AsyncWebServerRequest *request){
+  // int numVoice;
+  // AsyncWebHeader* voice_string = request->getHeader("voice");
+  // sscanf(voice_string->value().c_str(), "%d", &numVoice);
+  get_wav_data();
+  request->send(204);
 }
 
-void handleVoiceJSON(AsyncWebServerRequest *request){
-  // wav_player_pause();
-  int numVoice;
-  // log_i("start : %d", ESP.getFreeHeap());
-  AsyncWebHeader* voice_string = request->getHeader("voice");
-  sscanf(voice_string->value().c_str(), "%d", &numVoice);
-  char *json = print_voice_json(numVoice);
-  feedLoopWDT();
-  size_t size = strlen(json);
-  AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-    feedLoopWDT();
-    size_t toWrite = min(size - index, maxLen);
-    memcpy(buffer, json + index, toWrite);
-    // if(index + toWrite == size){
-    // }
-    return toWrite;
-  });
-  response->addHeader("size",String(size));
-  feedLoopWDT();
-  request->send(response);
-  free(json);
-  feedLoopWDT();
-  // log_i("end : %d", ESP.getFreeHeap());
+void handleRecoveryGetVoiceData(AsyncWebServerRequest *request){
+  // int numVoice;
+  // AsyncWebHeader* voice_string = request->getHeader("voice");
+  // sscanf(voice_string->value().c_str(), "%d", &numVoice);
+  // get_wav_data();
+  request->send(204);
 }
 
 void handleRecoveryVoiceJSON(AsyncWebServerRequest *request){
@@ -550,38 +463,6 @@ void handleRestoreEMMC(AsyncWebServerRequest *request, uint8_t *data, size_t len
   }
 }
 
-void handleEmmcGUI(AsyncWebServerRequest *request){
-  size_t size = website_lut[metadata->current_website_index].length;
-  size_t start_block = website_lut[metadata->current_website_index].start_block;
-  request->send("text/html", size, [size,start_block](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-    feedLoopWDT();
-    size_t toWrite = min(size - index, maxLen);
-    size_t written = get_website_chunk(start_block, toWrite, buffer, size);
-    // memcpy(buffer, buf, toWrite);
-    return written;
-  });
-}
-
-void handleMain(AsyncWebServerRequest *request){
-  size_t size = sizeof(HTML) / sizeof(char);
-  request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-    feedLoopWDT();
-    size_t toWrite = min(size - index, maxLen);
-    memcpy(buffer, HTML + index, toWrite);
-    return toWrite;
-  });
-}
-
-// void handleRecovery(AsyncWebServerRequest *request){
-//   size_t size = sizeof(RECOVERY_HTML) / sizeof(char);
-//   request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-//     feedLoopWDT();
-//     size_t toWrite = min(size - index, maxLen);
-//     memcpy(buffer, RECOVERY_HTML + index, toWrite);
-//     return toWrite;
-//   });
-// }
-
 void handleBundle(AsyncWebServerRequest *request){
   const char *type = "text/javascript";
   AsyncWebServerResponse *response = request->beginResponse_P(200, type, BUNDLE, BUNDLE_LEN);
@@ -594,13 +475,6 @@ void handleFavicon(AsyncWebServerRequest *request){
   AsyncWebServerResponse *response = request->beginResponse_P(200, type, FAVICON, sizeof(FAVICON));
   // response->addHeader("Content-Encoding", "gzip");
   request->send(response);
-}
-
-void handleRPC(AsyncWebServerRequest *request){
-  cJSON* json = cJSON_Parse(request->getHeader("json")->value().c_str());
-  on_rpc_in(json);
-  // char *res = on_rpc_in(json);
-  request->send(200, "text/html", "done");
 }
 
 void handleBootFromEmmc(AsyncWebServerRequest *request){
@@ -704,33 +578,15 @@ void server_begin() {
   );
 
   server.on(
-    "/main",
+    "/getVoiceData",
     HTTP_GET,
-    handleMain
-  );
-
-  server.wstwst(
-    "/wstest",
-    HTTP_GET,
-    handleWSTest
+    handleGetVoiceData
   );
 
   server.on(
     "/emmc",
     HTTP_GET,
     handleEmmcGUI
-  );
-
-  // server.on(
-  //   "/fsjson",
-  //   HTTP_GET,
-  //   handleFsjson
-  // );
-
-  server.on(
-    "/voicejson",
-    HTTP_GET,
-    handleVoiceJSON
   );
 
   server.on(
@@ -769,22 +625,6 @@ void server_begin() {
     handleWav
   );
 
-  // server.on(
-  //   "/updateVoiceConfig",
-  //   HTTP_POST,
-  //   [](AsyncWebServerRequest * request){request->send(204);},
-  //   NULL,
-  //   handleUpdateVoiceConfig
-  // );
-
-  server.on(
-    "/updateSingleVoiceConfig",
-    HTTP_POST,
-    [](AsyncWebServerRequest * request){request->send(204);},
-    NULL,
-    handleUpdateSingleVoiceConfig
-  );
-
   server.on(
     "/updatePinConfig",
     HTTP_POST,
@@ -810,31 +650,9 @@ void server_begin() {
   );
 
   server.on(
-    "/updaterecoveryfirmware",
-    HTTP_POST,
-    [](AsyncWebServerRequest * request){request->send(204);},
-    NULL,
-    handleNewRecoveryFirmware
-  );
-
-  server.on(
     "/bootFromEmmc",
     HTTP_GET,
     handleBootFromEmmc
-  );
-
-  server.on(
-    "/addrack",
-    HTTP_POST,
-    [](AsyncWebServerRequest *request){request->send(204);},
-    NULL,
-    handleRack
-  );
-
-  server.on(
-    "/rpc",
-    HTTP_GET,
-    handleRPC
   );
 
   server.on(
@@ -854,7 +672,6 @@ void server_begin() {
     HTTP_GET,
     handleDeleteFirmware
   );
-
 
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
@@ -948,14 +765,6 @@ void recovery_server_begin() {
   );
 
   server.on(
-    "/updaterecoveryfirmware",
-    HTTP_POST,
-    [](AsyncWebServerRequest * request){request->send(204);},
-    NULL,
-    handleNewRecoveryFirmware
-  );
-
-  server.on(
     "/bootFromEmmc",
     HTTP_GET,
     handleBootFromEmmc
@@ -988,9 +797,9 @@ void recovery_server_begin() {
   );
 
   server.on(
-    "/voicejson",
+    "/getVoiceData",
     HTTP_GET,
-    handleRecoveryVoiceJSON
+    handleRecoveryGetVoiceData
   );
 
   server.begin();

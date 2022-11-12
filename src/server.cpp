@@ -615,6 +615,13 @@ void handleEmmcReset(AsyncWebServerRequest *request){
   request->send(204);
 }
 
+void handleWSTest(AsyncWebServerRequest *request){
+  //wav_player_pause();
+  uint16_t *wav_mtx = get_wav_mtx();
+  uint8_t * bytePtr = (uint8_t*) &wav_mtx;
+  request->send(204);
+}
+
 void handlePlayWav(AsyncWebServerRequest *request){
 
   uint8_t voice;
@@ -689,6 +696,12 @@ void server_begin() {
     "/main",
     HTTP_GET,
     handleMain
+  );
+
+  server.wstwst(
+    "/wstest",
+    HTTP_GET,
+    handleWSTest
   );
 
   server.on(

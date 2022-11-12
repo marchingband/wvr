@@ -6,6 +6,11 @@ extern "C"
 {
 #endif
 
+#include "midi_in.h"
+#include "cJSON.h"
+#include "wav_player.h"
+#include "wvr_pins.h"
+
 #define SECTOR_SIZE 512
 
 #define MAX_FIRMWARE_SIZE 2097152 //2MB
@@ -21,25 +26,12 @@ extern "C"
 #define NUM_LAYERS 16
 #define NUM_ROBINS 8
 
-#define NUM_WAV_FILE_T_PER_SECTOR = (SECTOR_SIZE / sizeof(struct wav_file_t)) // 8
+#define NUM_WAV_FILE_T_PER_SECTOR (SECTOR_SIZE / sizeof(struct wav_file_t)) // 8
+#define NUM_UINT16_T_PER_SECTOR (SECTOR_SIZE / sizeof(uint16_t))
 
-#define EMMC_BUF_BLOCKS 8 // seems good
-#define EMMC_BUF_SIZE  (SECTOR_SIZE * SECTORS_PER_EMMC_BUF) // 4096
-#define NUM_WAV_FILE_T_PER_EMMC_BUF (EMMC_BUF_SIZE / sizeof(struct wav_file_t)) // 64
-#define NUM_UIN16_T_PER_EMMC_BUF ( EMMC_BUF_SIZE / sizeof(uint16_t)) // 2048
-
-#define NUM_WAV_FILE_T_PER_SECTOR = (SECTOR_SIZE / sizeof(struct wav_file_t))
-#define NUM_UINT16_T_PER_SECTOR = (SECTOR_SIZE / sizeof(uint16_t))
-
-#define WAV_PER_VOICE = ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS )
-#define WAV_PER_NOTE = ( NUM_LAYERS * NUM_ROBINS )
-#define WAV_PER_LAYER = NUM_ROBINS
-
-
-#include "midi_in.h"
-#include "cJSON.h"
-#include "wav_player.h"
-#include "wvr_pins.h"
+#define WAV_PER_VOICE ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS )
+#define WAV_PER_NOTE ( NUM_LAYERS * NUM_ROBINS )
+#define WAV_PER_LAYER NUM_ROBINS
 
 #define METADATA_TAG_LENGTH 12
 

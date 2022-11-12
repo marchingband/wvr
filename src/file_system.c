@@ -36,7 +36,7 @@
 #define WAV_LUT_BYTES (NUM_WAV_LUT_ENTRIES * sizeof(wav_file_t)) // 4,194,304
 #define WAV_LUT_BLOCKS (NUM_WAV_LUT_ENTRIES / SECTOR_SIZE) // 8,192
 
-#define WAV_MATRIX_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_SIZE_IN_BLOCKS)
+#define WAV_MATRIX_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_BLOCKS)
 #define WAV_MATRIX_ENTRIES ( NUM_VOICES * NUM_NOTES * NUM_LAYERS * NUM_ROBINS ) // 262,144
 #define BYTES_PER_MATRIX_VOICE ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS * sizeof(uint16_t) ) // 32,768
 #define BLOCKS_PER_MATRIX_VOICE ( BYTES_PER_MATRIX_VOICE / SECTOR_SIZE ) // 64
@@ -64,7 +64,7 @@ esp_err_t emmc_read(void *dst, size_t start_sector, size_t sector_count);
 
 struct metadata_t metadata;
 struct wav_lu_t *wav_lut;
-struct uint16_t ****wav_mtx;
+uint16_t ****wav_mtx;
 struct firmware_t *firmware_lut;
 struct website_t *website_lut;
 struct rack_lu_t *rack_lut;
@@ -72,10 +72,10 @@ struct pin_config_t *pin_config_lut;
 
 void file_system_init(void)
 {
-    log_i("\nwav_lu_t-> %d\nwav_file_t-> %d\nrack_lu_t-> %d\nrack_file_t-> %d\nplay_back_mode-> %d\nretrigger_mode=> %d\nnote_off_meaning-> %d, response_curve-> %d", 
-        sizeof(struct wav_lu_t), sizeof(struct wav_file_t), sizeof(struct rack_lu_t), sizeof(struct rack_file_t),
-        sizeof(enum play_back_mode), sizeof(enum retrigger_mode), sizeof(note_off_meaning), sizeof(response_curve)
-        );
+    // log_i("\nwav_lu_t-> %d\nwav_file_t-> %d\nrack_lu_t-> %d\nrack_file_t-> %d\nplay_back_mode-> %d\nretrigger_mode=> %d\nnote_off_meaning-> %d, response_curve-> %d", 
+    //     sizeof(struct wav_lu_t), sizeof(struct wav_file_t), sizeof(struct rack_lu_t), sizeof(struct rack_file_t),
+    //     sizeof(enum play_back_mode), sizeof(enum retrigger_mode), sizeof(note_off_meaning), sizeof(response_curve)
+    //     );
     // wav_lookup = (uint16_t *)ps_malloc(2621440);
     if(wav_mtx == NULL){
         wav_mtx = (uint16_t****)ps_malloc(NUM_VOICES * sizeof(uint16_t *));
@@ -88,7 +88,7 @@ void file_system_init(void)
                 wav_mtx[i][j] = (uint16_t*)ps_malloc(NUM_LAYERS * sizeof(uint16_t *));
                 if(wav_mtx[i][j] == NULL){log_e("failed to alloc wav_mtx voice %d note %d", i, j);}
                 for(size_t k=0; k<NUM_LAYERS; k++){
-                    wav_mtx[i][j][k] = (uint16_t*)ps_malloc(NUM_CHOICES * sizeof(uint16_t *));
+                    wav_mtx[i][j][k] = (uint16_t*)ps_malloc(NUM_ROBINS * sizeof(uint16_t *));
                     if(wav_mtx[i][j][k] == NULL){log_e("failed to alloc wav_mtx voice %d note %d layer %d", i, j, k);}
                 }
             }
@@ -210,10 +210,11 @@ void init_wav_lut(void){
         wav_lut[i].breakpoint = 0;
         wav_lut[i].chance = 0;
     }
+
     // write it to disk
-    struct wav_file_t *buf = (struct wav_file_t *)ps_malloc(EMMC_BUF_SIZE);
+    struct wav_file_t *buf = (struct wav_file_t *)ps_malloc(SECTOR_SIZE);
     char *blank = "";
-    for(int i=0; i<NUM_WAV_FILE_T_PER_EMMC_BUF; i++) // how many times must we repeat
+    for(int i=0; i<NUM_WAV_FILE_T_PER_SECTOR; i++) // how many times must we repeat
     {
         buf[i].empty=1;
         buf[i].start_block=0;
@@ -229,14 +230,14 @@ void init_wav_lut(void){
         buf[i].breakpoint = 0;
         buf[i].chance = 0;
         buf[i].RFU = 0;
-        memcpy(voice[i].name, blank, 1);
+        memcpy(buf[i].name, blank, 1);
     }
     // write to disk
-    for(int i=0; i<WAV_LUT_BLOCKS / EMMC_BUF_BLOCKS; i++){ // 1024 times
+    for(int i=0; i<WAV_LUT_BLOCKS; i++){ // 1024 times
         ESP_ERROR_CHECK(emmc_write(
                 buf, 
-                WAV_LUT_START_BLOCK + ( i * EMMC_BUF_BLOCKS), 
-                EMMC_BUF_BLOCKS
+                WAV_LUT_START_BLOCK + i, 
+                1
             ));
     }
     free(buf);
@@ -255,17 +256,17 @@ void init_wav_matrix(void){
         }
     }
     // write a million 0s to disk
-    uint16_t *buf = (uint16_t *)ps_malloc(EMMC_BUF_SIZE);
+    uint16_t *buf = (uint16_t *)ps_malloc(SECTOR_SIZE);
     // fill it up
-    for(int i=0; i<NUM_UIN16_T_PER_EMMC_BUF; i++){
+    for(int i=0; i<NUM_UINT16_T_PER_SECTOR; i++){
         buf[i] = 0;
     }
     // write it to disk a billion times
-    for(int i=0; i<WAV_MATRIX_BYTES / EMMC_BUF_SIZE; i++){ // 127 times
+    for(int i=0; i<WAV_MATRIX_BLOCKS; i++){
         ESP_ERROR_CHECK(emmc_write(
                 buf, 
-                WAV_MATRIX_START_BLOCK + (i * EMMC_BUF_BLOCKS), 
-                EMMC_BUF_BLOCKS
+                WAV_MATRIX_START_BLOCK + i, 
+                1
             ));
     }
     log_i("finished writting wav_mtx to disk");
@@ -305,77 +306,39 @@ void write_firmware_lut_to_disk(void){
 
 void read_wav_lut_from_disk(void)
 {
-    struct wav_file_t *buf = (struct wav_file_t *)ps_malloc(EMMC_BUF_SIZE);
-    if(buf == NULL){log_e("failed to alloc buf");};
-    for(int i=0; i<NUM_WAV_LUT_ENTRIES / NUM_WAV_FILE_T_PER_EMMC_BUF; i++)// 1024 times
+    struct wav_file_t *buf = (struct wav_file_t *)ps_malloc(SECTOR_SIZE);
+    for(int i=0; i<WAV_LUT_BLOCKS; i++)
     {
-        ESP_ERROR_CHECK(emmc_read(
-                buf, 
-                WAV_LUT_START_BLOCK + (i * EMMC_BUF_BLOCKS), 
-                EMMC_BUF_BLOCKS
-            ));
-        size_t base_index = i * NUM_WAV_FILE_T_PER_EMMC_BUF;
-        for(int j=0; j<NUM_WAV_FILE_T_PER_EMMC_BUF; j++)
+        ESP_ERROR_CHECK(emmc_read(buf, WAV_LUT_START_BLOCK + i, 1));
+        size_t base_index = i * NUM_WAV_FILE_T_PER_SECTOR;
+        for(int j=0; j<NUM_WAV_FILE_T_PER_SECTOR; j++)
         {
-            wav_lut[base_index + i].empty = buf[i].empty;
-            wav_lut[base_index + i].start_block = buf[i].start_block;
-            wav_lut[base_index + i].length = buf[i].length;
-            wav_lut[base_index + i].play_back_mode = buf[i].play_back_mode;
-            wav_lut[base_index + i].retrigger_mode = buf[i].retrigger_mode;
-            wav_lut[base_index + i].note_off_meaning = buf[i].note_off_meaning;
-            wav_lut[base_index + i].response_curve = buf[i].response_curve;
-            wav_lut[base_index + i].priority = buf[i].priority;
-            wav_lut[base_index + i].mute_group = buf[i].mute_group;
-            wav_lut[base_index + i].loop_start = buf[i].loop_start;
-            wav_lut[base_index + i].loop_end = buf[i].loop_end;
-            wav_lut[base_index + i].breakpoint = buf[i].breakpoint;
-            wav_lut[base_index + i].chance = buf[i].chance;
+            wav_lut[base_index + j].empty               = buf[j].empty;
+            wav_lut[base_index + j].start_block         = buf[j].start_block;
+            wav_lut[base_index + j].length              = buf[j].length;
+            wav_lut[base_index + j].play_back_mode      = buf[j].play_back_mode;
+            wav_lut[base_index + j].retrigger_mode      = buf[j].retrigger_mode;
+            wav_lut[base_index + j].note_off_meaning    = buf[j].note_off_meaning;
+            wav_lut[base_index + j].response_curve      = buf[j].response_curve;
+            wav_lut[base_index + j].priority            = buf[j].priority;
+            wav_lut[base_index + j].mute_group          = buf[j].mute_group;
+            wav_lut[base_index + j].loop_start          = buf[j].loop_start;
+            wav_lut[base_index + j].loop_end            = buf[j].loop_end;
+            wav_lut[base_index + j].breakpoint          = buf[j].breakpoint;
+            wav_lut[base_index + j].chance              = buf[j].chance;
         }
     }
     free(buf);
 }
 
 void read_wav_matrix_from_disk(void){
-    uint16_t *buf = (uint16_t *)ps_malloc(BYTES_PER_MATRIX_VOICE);
-    if(buf == NULL){log_e("failed to alloc buf");}
-    for(int voice=0; voice< NUM_VOICES; voice ++){
-        ESP_ERROR_CHECK(emmc_read(
-            buf, 
-            WAV_MATRIX_START_BLOCK + (voice * BLOCKS_PER_MATRIX_VOICE), 
-            BYTES_PER_MATRIX_VOICE
-        ));
-        size_t index = 0;
-        for(int i=0; i<NUM_NOTES; i++){
-            for(int j=0; j<NUM_LAYERS; j++){
-                for( int k=0; k<NUM_ROBINS; k++){
-                    wav_mtx[voice][i][j][k] = buf[index++];
-                }
-            }
-        }
-    }
-    for(int i=0; i<WAV_MATRIX_ENTRIES / NUM_UIN16_T_PER_EMMC_BUF; i++)// 128 times
-    {
-        ESP_ERROR_CHECK(emmc_read(
-                buf, 
-                WAV_MATRIX_START_BLOCK + (i * EMMC_BUF_BLOCKS), 
-                EMMC_BUF_BLOCKS
-            ));
-        size_t base_index = i * NUM_UIN16_T_PER_EMMC_BUF;
-        for(int j=0; j<NUM_WAV_FILE_T_PER_EMMC_BUF; j++)
-        {
-            wav_lut[base_index + i].empty = buf[i].empty;
-            wav_lut[base_index + i].start_block = buf[i].start_block;
-            wav_lut[base_index + i].length = buf[i].length;
-            wav_lut[base_index + i].play_back_mode = buf[i].play_back_mode;
-            wav_lut[base_index + i].retrigger_mode = buf[i].retrigger_mode;
-            wav_lut[base_index + i].note_off_meaning = buf[i].note_off_meaning;
-            wav_lut[base_index + i].response_curve = buf[i].response_curve;
-            wav_lut[base_index + i].priority = buf[i].priority;
-            wav_lut[base_index + i].mute_group = buf[i].mute_group;
-            wav_lut[base_index + i].loop_start = buf[i].loop_start;
-            wav_lut[base_index + i].loop_end = buf[i].loop_end;
-            wav_lut[base_index + i].breakpoint = buf[i].breakpoint;
-            wav_lut[base_index + i].chance = buf[i].chance;
+    uint16_t *buf = (uint16_t *)ps_malloc(SECTOR_SIZE);
+    uint16_t *mtx_arr = (uint16_t *)wav_mtx; // cast the wav_mtx as a 1D array
+    for(int i=0; i< WAV_MATRIX_BLOCKS; i++){
+        ESP_ERROR_CHECK(emmc_read(buf, WAV_MATRIX_START_BLOCK + i, 1));
+        size_t base_index = i * NUM_UINT16_T_PER_SECTOR;
+        for(int j=0; j<NUM_UINT16_T_PER_SECTOR; j++){
+            mtx_arr[base_index + j] = buf[j];
         }
     }
     free(buf);

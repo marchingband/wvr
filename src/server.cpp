@@ -83,15 +83,26 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
     // Serial.printf("ws[%s][%u] pong[%u]: %s\n", server->url(), client->id(), len, (len)?(char*)data:"");
   } else if(type == WS_EVT_DATA){
     AwsFrameInfo * info = (AwsFrameInfo*)arg;
-    String msg = "";
+    static uint8_t voice_num = 0;
     if(info->final && info->index == 0 && info->len == len){
-      //the whole message is in a single frame and we got all of it's data
-      // ws_root = cJSON_Parse((char *)data);
-      // on_rpc_in(ws_root);
+      //the whole message is in a single frame and we got all of it's data so its midi
       for(int i=0; i<len; i++){
         // log_i("got midi %d index:%d", data[i], i);
         xQueueSendToBack(web_midi_queue, (void *)&data[i], portMAX_DELAY);
       }
+    } else {
+      //its voice data
+      if(info->index == 0) // first frame
+      {
+        voice_num = data[0]; // ws sends the voice first
+        log_i("got voice data for voice %d", voice_num);
+      }
+      update_voice_data(
+          voice_num, 
+          info->index - 1, // remove the voice num byte 
+          info->len,
+          data[index == 0 ? 1 : 0] // remove the voice num byte
+        )
     }
   }
 }

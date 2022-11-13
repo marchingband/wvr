@@ -331,6 +331,7 @@ void read_pin_config_lut_from_disk(void);
 uint16_t next_wav_index(void);
 void add_pin_config_json(cJSON *RESPONSE_ROOT);
 void clean_up_file_system(void);
+void add_wav_to_file_system(char *name, int voice, int note, int layer, int robin, size_t start_block, size_t size);
 
 #ifdef __cplusplus
 }

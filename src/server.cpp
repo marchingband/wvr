@@ -25,7 +25,7 @@
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
 extern "C" esp_err_t close_wav_to_emmc(void);
-extern "C" void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,size_t size);
+extern "C" void add_wav_to_file_system(char *name, int voice, int note, int layer, int robin, size_t start_block, size_t size);
 extern "C" size_t place_wav(struct lut_t *_data,  size_t num_data_entries, size_t start, size_t end, size_t file_size);
 extern "C" void updatePinConfig(char* json);
 extern "C" void updateMetadata(char* json);
@@ -104,13 +104,23 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
           voice_num, 
           info->index - 1, // remove the voice num byte 
           info->len,
-          data[info->index == 0 ? 1 : 0] // remove the voice num byte
+          &data[info->index == 0 ? 1 : 0] // remove the voice num byte
         );
     }
   }
 }
 
 int loop_num = 0;
+
+void handleMain(AsyncWebServerRequest *request){
+  size_t size = sizeof(HTML) / sizeof(char);
+  request->send("text/html", size, [size](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+    feedLoopWDT();
+    size_t toWrite = min(size - index, maxLen);
+    memcpy(buffer, HTML + index, toWrite);
+    return toWrite;
+  });
+}
 
 void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
   if(!index){
@@ -217,6 +227,8 @@ int w_bytes_read = 0;
 char w_name[21];
 int w_voice;
 int w_note;
+int w_layer;
+int w_robin;
 int w_size;
 size_t w_start_block;
 
@@ -236,8 +248,13 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     // log_i("voice %d", w_voice);
     AsyncWebHeader* note_string = request->getHeader("note");
     sscanf(note_string->value().c_str(), "%d", &w_note);
-    // log_i("note %d", w_note);
-    // log_i("%s w_size %d w_voice %d w_note %d", w_name, w_size, w_voice, w_note);
+
+    AsyncWebHeader* layer_string = request->getHeader("layer");
+    sscanf(layer_string->value().c_str(), "%d", &w_layer);
+
+    AsyncWebHeader* robin_string = request->getHeader("robin");
+    sscanf(robin_string->value().c_str(), "%d", &w_robin);
+
     w_start_block = find_gap_in_file_system(w_size);
     // log_i("w_start_block %d",w_start_block);
     if(w_start_block == 0)
@@ -260,7 +277,7 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     //done
     // log_i("close %d");
     close_wav_to_emmc();
-    add_wav_to_file_system(&w_name[0],w_voice,w_note,w_start_block,total);
+    add_wav_to_file_system(&w_name[0], w_voice, w_note, w_layer, w_robin, w_start_block,total);
     request->send(200);
     // log_i("done");
     //wav_player_resume();
@@ -451,12 +468,12 @@ void handleEmmcReset(AsyncWebServerRequest *request){
   request->send(204);
 }
 
-void handleWSTest(AsyncWebServerRequest *request){
-  //wav_player_pause();
-  uint16_t *wav_mtx = get_wav_mtx();
-  uint8_t * bytePtr = (uint8_t*) &wav_mtx;
-  request->send(204);
-}
+// void handleWSTest(AsyncWebServerRequest *request){
+//   //wav_player_pause();
+//   uint16_t *wav_mtx = get_wav_mtx();
+//   uint8_t * bytePtr = (uint8_t*) &wav_mtx;
+//   request->send(204);
+// }
 
 void handlePlayWav(AsyncWebServerRequest *request){
 
@@ -532,12 +549,6 @@ void server_begin() {
     "/getVoiceData",
     HTTP_GET,
     handleGetVoiceData
-  );
-
-  server.on(
-    "/emmc",
-    HTTP_GET,
-    handleEmmcGUI
   );
 
   server.on(

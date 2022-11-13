@@ -114,9 +114,9 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
     }
   }
 
-  log_i("start cleaning up filesystem");
-  clean_up_file_system();
-  log_i("done cleaning up filesystem");
+  // log_i("start cleaning up filesystem");
+  // clean_up_file_system();
+  // log_i("done cleaning up filesystem");
 
   dac_init();
   logSize("dac");
@@ -132,6 +132,9 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
 
   server_begin();
   logSize("server");
+
+  gen_random_numbers();
+  logSize("random number");
 
   button_init();
   logSize("button");

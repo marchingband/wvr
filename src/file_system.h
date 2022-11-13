@@ -26,6 +26,8 @@ extern "C"
 #define NUM_LAYERS 16
 #define NUM_ROBINS 8
 
+#define NUM_RANDOM_NUMBERS 256
+
 #define NUM_WAV_FILE_T_PER_SECTOR (SECTOR_SIZE / sizeof(struct wav_file_t)) // 8
 #define NUM_UINT16_T_PER_SECTOR (SECTOR_SIZE / sizeof(uint16_t))
 
@@ -295,15 +297,15 @@ void init_firmware_lut(void);
 void write_firmware_lut_to_disk(void);
 void read_wav_lut_from_disk(void);
 void read_firmware_lut_from_disk(void);
-struct firmware_t *get_firmware_slot(int index);
+struct firmware_t *get_firmware_slot(uint8_t index);
 int write_firmware_to_emmc(char slot, uint8_t *source, size_t size);
 void close_firmware_to_emmc(char index);
 void add_metadata_json(cJSON * root);
 void add_firmware_json(cJSON * root);
 size_t get_website_chunk(size_t start_block, size_t toWrite, uint8_t *buffer, size_t total);
-struct wav_lu_t *get_all_wav_files(size_t *len);
+uint16_t *get_all_wav_files(size_t *len);
 int sort_lut(const void * a, const void * b);
-size_t search_directory(struct wav_lu_t *_data,  size_t num_data_entries, size_t start, size_t end, size_t file_size);
+size_t search_directory(uint16_t*data,  size_t num_used_entries, size_t start, size_t end, size_t file_size);
 void current_bank_up(void);
 void current_bank_down(void);
 struct metadata_t *get_metadata(void);
@@ -321,6 +323,13 @@ void update_voice_data(uint8_t voice_num, uint64_t index, uint64_t len, uint8_t 
 void update_robin(uint8_t voice, size_t index, size_t offset, size_t len, uint8_t *data);
 void write_wav_data(void);
 void write_wav(uint16_t index);
+void gen_random_numbers(void);
+uint8_t next_rand(void);
+void init_pin_config_lut(void);
+void init_wav_matrix(void);
+void read_pin_config_lut_from_disk(void);
+uint16_t next_wav_index(void);
+void add_pin_config_json(cJSON *RESPONSE_ROOT);
 
 #ifdef __cplusplus
 }

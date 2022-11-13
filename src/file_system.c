@@ -12,6 +12,7 @@
 #include "ws_log.h"
 #include "cJSON.h"
 #include "esp_heap_caps.h"
+#include "emmc.h"
 
 // #define METADATA_START_BLOCK 2
 #define METADATA_START_BLOCK 1
@@ -51,6 +52,8 @@
 #define FILE_STORAGE_START_BLOCK (WAV_MATRIX_START_BLOCK + WAV_MATRIX_BLOCKS)
 #define FILE_STORAGE_END_BLOCK LAST_BLOCK
 
+#define WAV_DATA_MSG_LEN (sizeof(struct wav_file_t) + 2)
+
 // july 10 / 2021
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v1.x.x 
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
@@ -58,53 +61,48 @@
 char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_16"; // v4.x.x
 static const char* TAG = "file_system";
 
-// declare prototypes from emmc.c
-esp_err_t emmc_write(const void *source, size_t block, size_t size);
-esp_err_t emmc_read(void *dst, size_t start_sector, size_t sector_count);
+// declare handle to WS
+void sendBinary(uint8_t *data, size_t len);
 
 struct metadata_t metadata;
 struct wav_lu_t *wav_lut;
 uint16_t ****wav_mtx;
 struct firmware_t *firmware_lut;
 struct website_t *website_lut;
-struct rack_lu_t *rack_lut;
 struct pin_config_t *pin_config_lut;
+uint32_t random_numbers[NUM_RANDOM_NUMBERS];
 
 void file_system_init(void)
 {
-    // log_i("\nwav_lu_t-> %d\nwav_file_t-> %d\nrack_lu_t-> %d\nrack_file_t-> %d\nplay_back_mode-> %d\nretrigger_mode=> %d\nnote_off_meaning-> %d, response_curve-> %d", 
-    //     sizeof(struct wav_lu_t), sizeof(struct wav_file_t), sizeof(struct rack_lu_t), sizeof(struct rack_file_t),
-    //     sizeof(enum play_back_mode), sizeof(enum retrigger_mode), sizeof(note_off_meaning), sizeof(response_curve)
-    //     );
     // wav_lookup = (uint16_t *)ps_malloc(2621440);
     if(wav_mtx == NULL){
         wav_mtx = (uint16_t****)ps_malloc(NUM_VOICES * sizeof(uint16_t *));
-        if(wav_mtx == NULL){log_e("failed to alloc wav_mtx");}
-        for(size_t i=0;i<NUM_VOICES;i++)
+        if(wav_mtx == NULL) log_e("failed to alloc wav_mtx");
+        for(size_t i=0; i<NUM_VOICES; i++)
         {
-            wav_mtx[i] = (uint16_t*)ps_malloc(NUM_NOTES * sizeof(uint16_t *));
-            if(wav_mtx[i] == NULL){log_e("failed to alloc wav_mtx voice number %d", i);}
+            wav_mtx[i] = (uint16_t***)ps_malloc(NUM_NOTES * sizeof(uint16_t *));
+            if(wav_mtx[i] == NULL) log_e("failed to alloc wav_mtx voice number %d", i);
             for(size_t j=0; j<NUM_NOTES ;j++){
-                wav_mtx[i][j] = (uint16_t*)ps_malloc(NUM_LAYERS * sizeof(uint16_t *));
-                if(wav_mtx[i][j] == NULL){log_e("failed to alloc wav_mtx voice %d note %d", i, j);}
+                wav_mtx[i][j] = (uint16_t**)ps_malloc(NUM_LAYERS * sizeof(uint16_t *));
+                if(wav_mtx[i][j] == NULL) log_e("failed to alloc wav_mtx voice %d note %d", i, j);
                 for(size_t k=0; k<NUM_LAYERS; k++){
                     wav_mtx[i][j][k] = (uint16_t*)ps_malloc(NUM_ROBINS * sizeof(uint16_t *));
-                    if(wav_mtx[i][j][k] == NULL){log_e("failed to alloc wav_mtx voice %d note %d layer %d", i, j, k);}
+                    if(wav_mtx[i][j][k] == NULL) log_e("failed to alloc wav_mtx voice %d note %d layer %d", i, j, k);
                 }
             }
         }
     }
     if(wav_lut == NULL){
         wav_lut = (struct wav_lu_t *)ps_malloc(NUM_WAV_LUT_ENTRIES * sizeof(struct wav_lu_t));
-        if(wav_lut == NULL){log_e("failed to alloc for wav_lut");}
+        if(wav_lut == NULL){log_e("failed to alloc");}
     }
     if(firmware_lut == NULL){
         firmware_lut = (struct firmware_t *)ps_malloc(MAX_FIRMWARES * sizeof(struct firmware_t));
-        if(firmware_lut == NULL){log_e("failed to alloc firmware wav_lut");}
+        if(firmware_lut == NULL){log_e("failed to alloc");}
     }
     if(pin_config_lut == NULL){
         pin_config_lut = (struct pin_config_t *)ps_malloc(PIN_CONFIG_BLOCKS * SECTOR_SIZE);
-        if(pin_config_lut == NULL){log_e("failed to alloc rack wav_lut");}
+        if(pin_config_lut == NULL){log_e("failed to alloc");}
     }
 
     int ret = try_read_metadata();
@@ -120,6 +118,7 @@ void file_system_init(void)
     read_wav_lut_from_disk();
     read_firmware_lut_from_disk();
     read_pin_config_lut_from_disk();
+    gen_random_numbers();
 }
 
 int try_read_metadata(){
@@ -162,9 +161,7 @@ void write_metadata(struct metadata_t m){
 }
 
 void init_metadata(void){
-    struct metadata_t new_metadata = {    
-        .num_voices = NUM_VOICES,                 
-        .num_firmwares = 10,
+    struct metadata_t new_metadata = {                    
         .current_firmware_index = -1,
         .recovery_mode_straping_pin = 5, // button 1 on dev board,
         .should_check_strapping_pin = 1, // default to should check
@@ -214,7 +211,7 @@ void init_wav_lut(void){
     // write it to disk
     struct wav_file_t *buf = (struct wav_file_t *)ps_malloc(SECTOR_SIZE);
     char *blank = "";
-    for(int i=0; i<NUM_WAV_FILE_T_PER_SECTOR; i++) // how many times must we repeat
+    for(int i=0; i<NUM_WAV_FILE_T_PER_SECTOR; i++)
     {
         buf[i].empty=1;
         buf[i].start_block=0;
@@ -364,6 +361,35 @@ void read_pin_config_lut_from_disk(void){
     free(buf);
 }
 
+uint16_t next_wav_index(void){
+    for(int i=0; i<NUM_WAV_LUT_ENTRIES; i++){
+        if(wav_lut[i].empty == 1)
+            return i;
+    }
+    log_e("out of wav file slots!");
+    return 0;
+}
+
+void gen_random_numbers(void){
+    uint32_t *buf = (uint32_t*)ps_malloc(NUM_RANDOM_NUMBERS * sizeof(uint32_t));
+    esp_fill_random(buf, NUM_RANDOM_NUMBERS * sizeof(uint32_t));
+    for(int i=0; i<NUM_RANDOM_NUMBERS; i++){
+        float fraction = buf[i] / 0xffffffff;
+        float percent = fraction * 100;
+        uint8_t out = (uint8_t)percent;
+        random_numbers[i] = out;
+        log_i("%d",out);
+    }
+    free(buf);
+}
+
+uint8_t next_rand(void){
+    static uint8_t index = 0;
+    if(index == NUM_RANDOM_NUMBERS)
+        index = 0;
+    return random_numbers[index++];
+}
+
 void write_wav_data(void){
     for(int i=0; i<NUM_VOICES; i++){
         for(int j=0; j<NUM_NOTES; j++){
@@ -379,7 +405,8 @@ void write_wav_data(void){
     }
 }
 
-uint8_t wav_data_msg[sizeof(struct wav_file_t) + 2]; // buffer for the index and the wav data
+
+uint8_t wav_data_msg[WAV_DATA_MSG_LEN]; // buffer for the index and the wav data
 
 void write_wav(uint16_t index){
     struct wav_file_t *buf = ps_malloc(SECTOR_SIZE);
@@ -393,21 +420,7 @@ void write_wav(uint16_t index){
     for(int i=0; i<sizeof(struct wav_file_t); i++){
         wav_data_msg[i + 2] = wav_array[i];
     }
-    ws.binaryAll(wav_data_msg);
-}
-
-void log_bank(int bank)
-{
-    for(size_t j=0; j < NUM_NOTES; j++)
-    {
-        // log_i("v%d n%d = {rack:%d,empty:%d,startblk:%d,lnth:%d",
-                // bank,j,
-                // wav_lut[bank][j].isRack,
-                // wav_lut[bank][j].empty,
-                // wav_lut[bank][j].start_block,
-                // wav_lut[bank][j].length
-            // );
-    }
+    sendBinary(wav_data_msg, WAV_DATA_MSG_LEN);
 }
 
 struct wav_lu_t null_wav_file = {
@@ -455,37 +468,37 @@ void add_wav_to_file_system(char *name, int voice, int note, int layer, int robi
 
     // write lut data to disk
     // calculate its sector and offset
-    size_t lut_sector = index / NUM_WAV_FILE_T_PER_SECTOR;
-    size_t lut_sector_index = index % NUM_WAV_FILE_T_PER_SECTOR;
-    size_t lut_sector_start_block = WAV_LUT_START_BLOCK + lut_sector;
+    size_t lut_sector_index = index / NUM_WAV_FILE_T_PER_SECTOR;
+    size_t lut_sector_offset = index % NUM_WAV_FILE_T_PER_SECTOR;
+    size_t lut_sector_start_block = WAV_LUT_START_BLOCK + lut_sector_index;
     // write the lut chunk
     struct wav_file_t *lut_sector_data = (struct wav_file_t*)ps_malloc(SECTOR_SIZE);
     ESP_ERROR_CHECK(emmc_read(lut_sector_data, lut_sector_start_block, 1));
-    lut_sector_data[lut_sector_index].start_block = start_block;
-    lut_sector_data[lut_sector_index].length = size;
-    lut_sector_data[lut_sector_index].empty = 0;
-    bzero(lut_sector_data[lut_sector_index].name, 24);
-    strncpy(lut_sector_data[lut_sector_index].name, name, 23);
+    lut_sector_data[lut_sector_offset].start_block = start_block;
+    lut_sector_data[lut_sector_offset].length = size;
+    lut_sector_data[lut_sector_offset].empty = 0;
+    bzero(lut_sector_data[lut_sector_offset].name, 24);
+    strncpy(lut_sector_data[lut_sector_offset].name, name, 23);
     ESP_ERROR_CHECK(emmc_write(lut_sector_data, lut_sector_start_block, 1));
     free(lut_sector_data);
 
     // write mtx data to disk
     // calculate its sector and offset
     size_t mtx_index = voice * WAV_PER_VOICE + note * WAV_PER_NOTE + layer * WAV_PER_LAYER + robin;
-    size_t mtx_sector = mtx_index / NUM_UINT16_T_PER_SECTOR;
-    size_t mtx_sector_index = mtx_index % NUM_UINT16_T_PER_SECTOR;
-    size_t mtx_sector_start_block = WAV_MATRIX_START_BLOCK + mtx_sector;
+    size_t mtx_sector_index = mtx_index / NUM_UINT16_T_PER_SECTOR;
+    size_t mtx_sector_offset = mtx_index % NUM_UINT16_T_PER_SECTOR;
+    size_t mtx_sector_start_block = WAV_MATRIX_START_BLOCK + mtx_sector_index;
     // write to disk
     uint16_t *mtx_sector_data = (uint16_t *)ps_malloc(SECTOR_SIZE);
     ESP_ERROR_CHECK(emmc_read(mtx_sector_data, mtx_sector_start_block, 1));
-    mtx_sector_data[mtx_sector_index] = index;
+    mtx_sector_data[mtx_sector_offset] = index;
     ESP_ERROR_CHECK(emmc_write(mtx_sector_data, mtx_sector_start_block, 1));
     free(mtx_sector_data);
 }
 
 size_t find_gap_in_file_system(size_t size){
     size_t num_wavs;
-    struct wav_lu_t *data = get_all_wav_files(&num_wavs);
+    uint16_t *data = get_all_wav_files(&num_wavs);
     // if no wavs, data is NULL, and num_wavs is 0, search_directory handles it
     size_t address = search_directory(
         data,
@@ -497,8 +510,8 @@ size_t find_gap_in_file_system(size_t size){
     return(address);
 }
 
-struct wav_lu_t *get_all_wav_files(size_t *len){
-    // count the total wavs on file looking at the racks and the normal wav_lut
+uint16_t *get_all_wav_files(size_t *len){
+    // count the total wavs on file
     size_t num_wavs = 0;
     for(int i=0;i<NUM_WAV_LUT_ENTRIES;i++){
         num_wavs += ( wav_lut[i].empty == 0 );
@@ -510,9 +523,8 @@ struct wav_lu_t *get_all_wav_files(size_t *len){
     if(num_wavs == 0)
         return NULL;
 
-    struct wav_lu_t *data = (struct wav_lu_t *)ps_malloc(num_wavs * sizeof(struct wav_lu_t));
-    if(data == NULL)
-        log_e("failed malloc buf");
+    uint16_t *data = (uint16_t *)ps_malloc(num_wavs * sizeof(uint16_t));
+    if(data == NULL) log_e("failed malloc buf");
 
     // put in all the data
     size_t index = 0;
@@ -521,8 +533,7 @@ struct wav_lu_t *get_all_wav_files(size_t *len){
             for(int k=0; k<NUM_LAYERS; k++){
                 for(int l=0; l<NUM_ROBINS; l++){
                     if(wav_mtx[i][j][k][l] != 0){ // there is data
-                        uint16_t wav_index = wav_mtx[i][j][k][l];
-                        data[index++] = wav_lut[wav_index];
+                        data[index++] = wav_mtx[i][j][k][l];
                         if(index >= num_wavs){
                             log_e("error, index %d is out of range %d", index, num_wavs);
                             return NULL;
@@ -537,10 +548,14 @@ struct wav_lu_t *get_all_wav_files(size_t *len){
 }
 
 int sort_lut(const void * a, const void * b) {
-    return( ((struct wav_lu_t*)a)->start_block - ((struct wav_lu_t*)b)->start_block );
+    uint16_t index_a = *(uint16_t *)a;
+    uint16_t index_b = *(uint16_t *)b;
+    struct wav_lu_t *wav_a = &wav_lut[index_a];
+    struct wav_lu_t *wav_b = &wav_lut[index_b];
+    return(wav_a->start_block - wav_b->start_block);
 }
 
-size_t search_directory(struct wav_lu_t *data,  size_t num_used_entries, size_t start, size_t end, size_t file_size){
+size_t search_directory(uint16_t*data,  size_t num_used_entries, size_t start, size_t end, size_t file_size){
     size_t i;
     if(num_used_entries == 0){
         // log_i("file system is empty");
@@ -548,7 +563,7 @@ size_t search_directory(struct wav_lu_t *data,  size_t num_used_entries, size_t 
     }
 
     // sort the files by position
-    qsort(data, num_used_entries, sizeof(struct wav_lu_t), sort_lut);
+    qsort(data, num_used_entries, sizeof(uint16_t), sort_lut);
 
     // make an array to hold the gaps (there is always one more gap then wav) and an index to keep track
     size_t num_gap_entries = num_used_entries +1;
@@ -561,11 +576,11 @@ size_t search_directory(struct wav_lu_t *data,  size_t num_used_entries, size_t 
     }
 
     //maybe add first gap
-    if(data[0].start_block > start){
+    if(wav_lut[data[0]].start_block > start){
         // log_i("there is a gap at the start");
         struct wav_lu_t gap;
         gap.start_block = start;
-        size_t gap_num_blocks = data[0].start_block - start;
+        size_t gap_num_blocks = wav_lut[data[0]].start_block - start;
         gap.length = gap_num_blocks * SECTOR_SIZE;
         gap.empty = 0;
         gaps[0] = gap;
@@ -574,12 +589,12 @@ size_t search_directory(struct wav_lu_t *data,  size_t num_used_entries, size_t 
 
     // find all the gaps and place them into the gap array
     for(i=0; i<num_used_entries-1; i++){
-        struct wav_lu_t file_a = data[i];
-        struct wav_lu_t file_b = data[i+1];
+        struct wav_lu_t *file_a = &wav_lut[data[i]];
+        struct wav_lu_t *file_b = &wav_lut[data[i+1]];
         struct wav_lu_t gap;
-        size_t a_num_blocks = file_a.length / SECTOR_SIZE + (file_a.length % SECTOR_SIZE != 0);
-        gap.start_block = file_a.start_block + a_num_blocks;
-        size_t gap_num_blocks = file_b.start_block - gap.start_block;
+        size_t a_num_blocks = file_a->length / SECTOR_SIZE + (file_a->length % SECTOR_SIZE != 0);
+        gap.start_block = file_a->start_block + a_num_blocks;
+        size_t gap_num_blocks = file_b->start_block - gap.start_block;
         gap.length = gap_num_blocks * SECTOR_SIZE;
         gap.empty = 0;
         gaps[num_gaps] = gap;
@@ -588,9 +603,9 @@ size_t search_directory(struct wav_lu_t *data,  size_t num_used_entries, size_t 
     }
 
     // maybe add last gap
-    struct wav_lu_t last_entry = data[num_used_entries-1];
-    size_t last_entry_num_blocks = last_entry.length / SECTOR_SIZE + (last_entry.length % SECTOR_SIZE != 0);
-    size_t end_of_entries = last_entry.start_block + last_entry_num_blocks;
+    struct wav_lu_t *last_entry = &wav_lut[data[num_used_entries-1]];
+    size_t last_entry_num_blocks = last_entry->length / SECTOR_SIZE + (last_entry->length % SECTOR_SIZE != 0);
+    size_t end_of_entries = last_entry->start_block + last_entry_num_blocks;
     if(end_of_entries < end){
         // log_i("there is a gap at the end");
         struct wav_lu_t gap;
@@ -605,11 +620,12 @@ size_t search_directory(struct wav_lu_t *data,  size_t num_used_entries, size_t 
     free(data);
 
     // find the smallest gap that is big enough for the wav
-    size_t smallest_fitting_gap=0;
+    size_t smallest_fitting_gap = 0;
     struct wav_lu_t best_slot;
+    struct wav_lu_t entry;
     // log_i("looking for smallest gap");
     for(i=0;i<num_gaps;i++){
-        struct wav_lu_t entry = gaps[i];
+        entry = gaps[i];
         // check that it isnt a void entry
         if(entry.empty == 1){
             // log_i("empty gap entry");
@@ -643,7 +659,6 @@ void update_voice_data(uint8_t voice_num, uint64_t index, uint64_t len, uint8_t 
     // figure out where we are
     size_t robin_index = index / (sizeof(struct wav_file_t));
     size_t robin_offset = index % (sizeof(struct wav_file_t));
-
     size_t robin_len = sizeof(struct wav_file_t) - robin_offset;
     if(len < robin_len)
         robin_len = len;
@@ -658,15 +673,15 @@ void update_voice_data(uint8_t voice_num, uint64_t index, uint64_t len, uint8_t 
         size_t remaining = len - bytes_written;
         if(remaining < robin_len)
             robin_len = remaining;
-        update_robin(voice_num, robin_index, 0, robin_len, data[bytes_written]);
+        update_robin(voice_num, robin_index, 0, robin_len, &data[bytes_written]);
         bytes_written += robin_len;
         robin_index++;
     }
 }
 
 void update_robin(uint8_t voice, size_t index, size_t offset, size_t len, uint8_t *data){
-    uint8_t note = index / ( NUM_LAYERS * NUM_ROBINS );
-    size_t left = index % ( NUM_LAYERS * NUM_ROBINS );
+    uint8_t note = index / WAV_PER_NOTE;
+    size_t left = index % WAV_PER_NOTE;
     uint8_t layer = left / NUM_ROBINS;
     uint8_t robin = left % NUM_ROBINS;
 
@@ -675,11 +690,11 @@ void update_robin(uint8_t voice, size_t index, size_t offset, size_t len, uint8_
         return;
 
     // fetch the existing data from disk
-    size_t sector_offset = wav_index / NUM_WAV_FILE_T_PER_SECTOR;
-    size_t sector_index = wav_index % NUM_WAV_FILE_T_PER_SECTOR;
+    size_t sector_index = wav_index / NUM_WAV_FILE_T_PER_SECTOR;
+    size_t sector_offset = wav_index % NUM_WAV_FILE_T_PER_SECTOR;
     struct wav_file_t *buf = ps_malloc(SECTOR_SIZE);
-    ESP_ERROR_CHECK(emmc_read(buf, WAV_LUT_START_BLOCK + sector_offset, 1));
-    struct wav_file_t *wav = &buf[sector_index];
+    ESP_ERROR_CHECK(emmc_read(buf, WAV_LUT_START_BLOCK + sector_index, 1));
+    struct wav_file_t *wav = &buf[sector_offset];
 
     // write on it
     uint8_t *wav_data = (uint8_t*)wav; // cast it as a uint8_t
@@ -688,7 +703,7 @@ void update_robin(uint8_t voice, size_t index, size_t offset, size_t len, uint8_
     }
 
     // save it to disk
-    ESP_ERROR_CHECK(emmc_write(buf, WAV_LUT_START_BLOCK + sector_offset, 1));
+    ESP_ERROR_CHECK(emmc_write(buf, WAV_LUT_START_BLOCK + sector_index, 1));
 
     // put it in ram
     struct wav_lu_t *lut = &wav_lut[wav_index];
@@ -728,7 +743,6 @@ char *print_config_json()
 }
 
 void add_metadata_json(cJSON * RESPONSE_ROOT){
-    cJSON_AddNumberToObject(RESPONSE_ROOT,"numFirmwares",metadata.num_firmwares);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"currentFirmwareIndex",metadata.current_firmware_index);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"shouldCheckStrappingPin",metadata.should_check_strapping_pin);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"recoveryModeStrappingPin",metadata.recovery_mode_straping_pin);
@@ -865,38 +879,21 @@ size_t getNumSectorsInEmmc(void)
 {
     size_t last_block_start = 0;
     size_t last_file_size = 0;
-    // TODO add rack LUT
-    for(int i=0;i<NUM_VOICES;i++)
-    {
-        for(int j=0;j<NUM_NOTES;j++)
-        {
-            struct wav_lu_t file = wav_lut[i][j];
-            size_t start = file.start_block;
-            if(start > last_block_start)
-            {
-                last_block_start = start;
-                last_file_size = file.length;
-                // log_i("start: %d, length: %d", last_block_start, last_file_size);
+    for(int i=0;i<NUM_VOICES;i++){
+        for(int j=0;j<NUM_NOTES;j++){
+            for(int k=0;k<NUM_LAYERS;k++){
+                for(int l=0; l<NUM_ROBINS; l++){
+                    if(wav_mtx[i][j][k][l] == 0)
+                        continue;
+                    struct wav_lu_t *wav = &wav_lut[wav_mtx[i][j][k][l]];
+                    if(wav->start_block > last_block_start){
+                        last_block_start = wav->start_block;
+                        last_file_size = wav->length;
+                    }
+                }
             }
         }
-    }
-    for(int i=0;i<NUM_RACK_DIRECTORY_ENTRIES;i++)
-    {
-        struct rack_lu_t rack = rack_lut[i];
-        if(rack.free == 1)
-        {
-            continue;
-        }
-        for(int j=0;j<rack.num_layers;j++)
-        {
-            struct wav_lu_t layer = rack.layers[j];
-            size_t start = layer.start_block;
-            if(start > last_block_start)
-            {
-                last_block_start = start;
-                last_file_size = layer.length;
-            }
-        }
+
     }
     size_t last_file_num_blocks = ( last_file_size / SECTOR_SIZE ) + 1;
     size_t total = last_block_start + last_file_num_blocks;
@@ -912,10 +909,9 @@ void getSector(size_t i, uint8_t *buf)
 void reset_emmc(void)
 {
     init_metadata();
+    init_wav_matrix();
     init_wav_lut();
     init_firmware_lut();
-    init_website_lut();
-    init_rack_lut();
     init_pin_config_lut();
 }
 

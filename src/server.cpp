@@ -64,6 +64,10 @@ extern "C" void sendWSMsg(char* msg){
   ws.textAll(msg);
 }
 
+extern "C" void sendBinary(uint8_t *data, size_t len){
+  ws.binaryAll(data, lan)
+}
+
 cJSON *ws_root;
 
 QueueHandle_t web_midi_queue;
@@ -342,7 +346,7 @@ void handleGetVoiceData(AsyncWebServerRequest *request){
   // int numVoice;
   // AsyncWebHeader* voice_string = request->getHeader("voice");
   // sscanf(voice_string->value().c_str(), "%d", &numVoice);
-  get_wav_data();
+  write_wav_data(ws);
   request->send(204);
 }
 

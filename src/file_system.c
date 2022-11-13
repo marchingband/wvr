@@ -383,8 +383,8 @@ uint8_t wav_data_msg[sizeof(struct wav_file_t) + 2]; // buffer for the index and
 
 void write_wav(uint16_t index){
     struct wav_file_t *buf = ps_malloc(SECTOR_SIZE);
-    size_t sector_index = index / NUM_WAV_FILE_T_PER_EMMC_BUF;
-    size_t sector_offset = index % NUM_WAV_FILE_T_PER_EMMC_BUF;
+    size_t sector_index = index / NUM_WAV_FILE_T_PER_SECTOR;
+    size_t sector_offset = index % NUM_WAV_FILE_T_PER_SECTOR;
     ESP_ERROR_CHECK(emmc_read(buf, WAV_LUT_START_BLOCK + sector_index, 1));
     struct wav_file_t wav = buf[sector_offset];
     uint8_t *wav_array = (uint8_t *)&wav;
@@ -400,13 +400,13 @@ void log_bank(int bank)
 {
     for(size_t j=0; j < NUM_NOTES; j++)
     {
-        log_i("v%d n%d = {rack:%d,empty:%d,startblk:%d,lnth:%d",
-                bank,j,
-                wav_lut[bank][j].isRack,
-                wav_lut[bank][j].empty,
-                wav_lut[bank][j].start_block,
-                wav_lut[bank][j].length
-            );
+        // log_i("v%d n%d = {rack:%d,empty:%d,startblk:%d,lnth:%d",
+                // bank,j,
+                // wav_lut[bank][j].isRack,
+                // wav_lut[bank][j].empty,
+                // wav_lut[bank][j].start_block,
+                // wav_lut[bank][j].length
+            // );
     }
 }
 
@@ -417,24 +417,25 @@ struct wav_lu_t null_wav_file = {
 
 struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_t velocity)
 {
-    uint16_t **note = wav_mtx[voice][note];
     for(int i=0; i<NUM_LAYERS; i++){
-        if(note[i][0].breakpoint < velocity)
+        uint16_t index = wav_mtx[voice][note][i][0];
+        struct wav_lu_t *wav = &wav_lut[index];
+        if(wav->breakpoint < velocity)
             continue;
-        uint16_t *layer = note[i];
         uint8_t luck = next_rand();
         for(int j=0; j<NUM_ROBINS; j++){
-            if(luck <= wav_mtx[voice][note][i][j])
+            index = wav_mtx[voice][note][i][j];
+            wav = &wav_lut[index];
+            if(luck <= wav->chance)
                 return wav_lut[wav_mtx[voice][note][i][j]];
         }
         return null_wav_file;
     }
 }
 
-void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,size_t size)
+void add_wav_to_file_system(char *name, int voice, int note, int layer, int robin, size_t start_block, size_t size)
 {
-    log_i("adding wav name:%s voice:%d, note:%d, start_block:%d, size:%d",
-        name,voice,note,start_block,size);
+    log_i("adding wav name:%s voice:%d, note:%d, start_block:%d, size:%d",name,voice,note,start_block,size);
     // get the existing mtx entry
     uint16_t index = wav_mtx[voice][note][layer][robin];
     // if it's empty, fill it
@@ -442,14 +443,14 @@ void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,siz
         index = next_wav_index();
         if(index == 0){
             log_e("no more filehandles available!");
-            return
+            return;
         }
         // write index to mtx in ram
         wav_mtx[voice][note][layer][robin] = index;
     }
     // write data to lut in ram
     wav_lut[index].start_block = start_block;
-    wav_lut[index].size = size;
+    wav_lut[index].length = size;
     wav_lut[index].empty = 0;
 
     // write lut data to disk
@@ -461,7 +462,7 @@ void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,siz
     struct wav_file_t *lut_sector_data = (struct wav_file_t*)ps_malloc(SECTOR_SIZE);
     ESP_ERROR_CHECK(emmc_read(lut_sector_data, lut_sector_start_block, 1));
     lut_sector_data[lut_sector_index].start_block = start_block;
-    lut_sector_data[lut_sector_index].size = size;
+    lut_sector_data[lut_sector_index].length = size;
     lut_sector_data[lut_sector_index].empty = 0;
     bzero(lut_sector_data[lut_sector_index].name, 24);
     strncpy(lut_sector_data[lut_sector_index].name, name, 23);
@@ -517,10 +518,11 @@ struct wav_lu_t *get_all_wav_files(size_t *len){
     size_t index = 0;
     for(int i=0;i<NUM_VOICES;i++){
         for(int j=0;j<NUM_NOTES;j++){
-            for(int k=0; k<NUM_LAYER; k++){
+            for(int k=0; k<NUM_LAYERS; k++){
                 for(int l=0; l<NUM_ROBINS; l++){
-                    if(wav_mtx[i][j][k][l].empty == 0){
-                        data[index++] = wav_mtx[i][j][k][l];
+                    if(wav_mtx[i][j][k][l] != 0){ // there is data
+                        uint16_t wav_index = wav_mtx[i][j][k][l];
+                        data[index++] = wav_lut[wav_index];
                         if(index >= num_wavs){
                             log_e("error, index %d is out of range %d", index, num_wavs);
                             return NULL;
@@ -644,9 +646,9 @@ void update_voice_data(uint8_t voice_num, uint64_t index, uint64_t len, uint8_t 
 
     size_t robin_len = sizeof(struct wav_file_t) - robin_offset;
     if(len < robin_len)
-        robin_len = len
+        robin_len = len;
     size_t bytes_written = 0;
-    update_robin(robin_index, robin_offset, robin_len, data);
+    update_robin(voice_num, robin_index, robin_offset, robin_len, data);
     bytes_written += robin_len;
     robin_index++;
 
@@ -664,7 +666,7 @@ void update_voice_data(uint8_t voice_num, uint64_t index, uint64_t len, uint8_t 
 
 void update_robin(uint8_t voice, size_t index, size_t offset, size_t len, uint8_t *data){
     uint8_t note = index / ( NUM_LAYERS * NUM_ROBINS );
-    left = left % ( NUM_LAYERS * NUM_ROBINS );
+    size_t left = index % ( NUM_LAYERS * NUM_ROBINS );
     uint8_t layer = left / NUM_ROBINS;
     uint8_t robin = left % NUM_ROBINS;
 
@@ -677,7 +679,7 @@ void update_robin(uint8_t voice, size_t index, size_t offset, size_t len, uint8_
     size_t sector_index = wav_index % NUM_WAV_FILE_T_PER_SECTOR;
     struct wav_file_t *buf = ps_malloc(SECTOR_SIZE);
     ESP_ERROR_CHECK(emmc_read(buf, WAV_LUT_START_BLOCK + sector_offset, 1));
-    struct wave_file_t *wav = buf[sector_index];
+    struct wav_file_t *wav = &buf[sector_index];
 
     // write on it
     uint8_t *wav_data = (uint8_t*)wav; // cast it as a uint8_t
@@ -689,7 +691,7 @@ void update_robin(uint8_t voice, size_t index, size_t offset, size_t len, uint8_
     ESP_ERROR_CHECK(emmc_write(buf, WAV_LUT_START_BLOCK + sector_offset, 1));
 
     // put it in ram
-    struct wav_lut_t *lut = &wav_lut[wav_index];
+    struct wav_lu_t *lut = &wav_lut[wav_index];
     lut->length = wav->length;
     lut->start_block = wav->start_block;
     lut->loop_start = wav->loop_start;
@@ -727,7 +729,6 @@ char *print_config_json()
 
 void add_metadata_json(cJSON * RESPONSE_ROOT){
     cJSON_AddNumberToObject(RESPONSE_ROOT,"numFirmwares",metadata.num_firmwares);
-    cJSON_AddNumberToObject(RESPONSE_ROOT,"numWebsites",metadata.num_websites);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"currentFirmwareIndex",metadata.current_firmware_index);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"shouldCheckStrappingPin",metadata.should_check_strapping_pin);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"recoveryModeStrappingPin",metadata.recovery_mode_straping_pin);

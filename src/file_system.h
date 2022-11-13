@@ -94,10 +94,7 @@ struct pin_config_t {
 
 struct metadata_t {
     char tag[METADATA_TAG_LENGTH];      
-    size_t num_voices;                  
-    size_t num_firmwares;    
     int current_firmware_index;
-    size_t recovery_firmware_size;
     int recovery_mode_straping_pin;
     uint8_t global_volume;
     uint8_t wlog_verbosity;

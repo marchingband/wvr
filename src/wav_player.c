@@ -484,7 +484,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             {
               bufs[i].asr = make_asr_data(new_wav);
             }
-            if(new_wav.isRack == -2 || new_wav.response_curve == RESPONSE_FIXED)
+            if(new_wav.breakpoint >= 127 || new_wav.response_curve == RESPONSE_FIXED)
             {
               // it's a rack member or a fixed volume file
               bufs[i].volume = 127;

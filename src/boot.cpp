@@ -69,7 +69,6 @@ void bootFromEmmc(int index)
             free(buf);
             metadata_t *new_metadata = get_metadata();
             new_metadata->current_firmware_index = index;
-            new_metadata->current_website_index = index;
             write_metadata(*new_metadata);
             sdmmc_host_deinit();
             feedLoopWDT();

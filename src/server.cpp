@@ -27,7 +27,6 @@ extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t siz
 extern "C" esp_err_t close_wav_to_emmc(void);
 extern "C" void add_wav_to_file_system(char *name,int voice,int note,size_t start_block,size_t size);
 extern "C" size_t place_wav(struct lut_t *_data,  size_t num_data_entries, size_t start, size_t end, size_t file_size);
-// extern "C" void updateVoiceConfig(char* json);
 extern "C" void updatePinConfig(char* json);
 extern "C" void updateMetadata(char* json);
 extern "C" void reset_emmc(void);
@@ -65,7 +64,7 @@ extern "C" void sendWSMsg(char* msg){
 }
 
 extern "C" void sendBinary(uint8_t *data, size_t len){
-  ws.binaryAll(data, lan)
+  ws.binaryAll(data, len);
 }
 
 cJSON *ws_root;
@@ -105,8 +104,8 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
           voice_num, 
           info->index - 1, // remove the voice num byte 
           info->len,
-          data[index == 0 ? 1 : 0] // remove the voice num byte
-        )
+          data[info->index == 0 ? 1 : 0] // remove the voice num byte
+        );
     }
   }
 }
@@ -160,38 +159,6 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
       Serial.println("failed");
     }
     request->send(204);
-    //wav_player_resume();
-  }
-}
-
-uint8_t *voice_config_json = NULL;
-
-void handleUpdateSingleVoiceConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
-  static int num_voice = 0;
-  if(index==0){
-    //start
-    // log_i("start free ram : %d",ESP.getFreeHeap());
-    AsyncWebHeader* num_voice_string = request->getHeader("numVoice");
-    sscanf(num_voice_string->value().c_str(), "%d", &num_voice);
-    voice_config_json = (uint8_t*)ps_malloc(total + 1);
-    if(!voice_config_json){
-      log_i("failed to malloc for json");
-    }
-  }
-  //always
-  for(int i=0;i<len;i++){
-    voice_config_json[i + index] = data[i];
-  }
-  feedLoopWDT();
-  if(index + len == total){
-    //done
-    feedLoopWDT();
-    // esp_task_wdt_feed();
-    // request->send(200, "text/plain", "all done voice config update");
-    updateSingleVoiceConfig((char *)voice_config_json, num_voice);
-    free(voice_config_json);
-    // feedLoopWDT();
-    // log_i("end free ram : %d",ESP.getFreeHeap());
     //wav_player_resume();
   }
 }
@@ -322,7 +289,7 @@ void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len
     strcpy(f->name, firmware_name_string->value().c_str());
   }
   //always
-  if((f_firmware_size > MAX_FIRMWARE_SIZE) || (f_gui_size > MAX_WEBSITE_SIZE)){
+  if(f_firmware_size > MAX_FIRMWARE_SIZE){
     request->send(400, "text/plain", "FILES TOO LARGE");
     return;
   }
@@ -346,7 +313,7 @@ void handleGetVoiceData(AsyncWebServerRequest *request){
   // int numVoice;
   // AsyncWebHeader* voice_string = request->getHeader("voice");
   // sscanf(voice_string->value().c_str(), "%d", &numVoice);
-  write_wav_data(ws);
+  write_wav_data();
   request->send(204);
 }
 
@@ -356,26 +323,6 @@ void handleRecoveryGetVoiceData(AsyncWebServerRequest *request){
   // sscanf(voice_string->value().c_str(), "%d", &numVoice);
   // get_wav_data();
   request->send(204);
-}
-
-void handleRecoveryVoiceJSON(AsyncWebServerRequest *request){
-  char *json = "[]";
-  feedLoopWDT();
-  size_t size = strlen(json);
-  AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-    feedLoopWDT();
-    size_t toWrite = min(size - index, maxLen);
-    memcpy(buffer, json + index, toWrite);
-    // if(index + toWrite == size){
-    // }
-    return toWrite;
-  });
-  response->addHeader("size",String(size));
-  feedLoopWDT();
-  request->send(response);
-  // free(json);
-  feedLoopWDT();
-  // log_i("end : %d", ESP.getFreeHeap());
 }
 
 void handleConfigJSON(AsyncWebServerRequest *request){

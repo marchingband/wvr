@@ -330,6 +330,7 @@ void init_wav_matrix(void);
 void read_pin_config_lut_from_disk(void);
 uint16_t next_wav_index(void);
 void add_pin_config_json(cJSON *RESPONSE_ROOT);
+void clean_up_file_system(void);
 
 #ifdef __cplusplus
 }

@@ -114,7 +114,9 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
     }
   }
 
-  clean_up_rack_directory();
+  log_i("start cleaning up filesystem");
+  clean_up_file_system();
+  log_i("done cleaning up filesystem");
 
   dac_init();
   logSize("dac");

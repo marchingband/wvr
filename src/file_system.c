@@ -436,13 +436,38 @@ struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_
         if(wav->breakpoint < velocity)
             continue;
         uint8_t luck = next_rand();
+        uint8_t chance = 0;
         for(int j=0; j<NUM_ROBINS; j++){
             index = wav_mtx[voice][note][i][j];
             wav = &wav_lut[index];
-            if(luck <= wav->chance)
+            chance += wav->chance;
+            if(luck <= chance)
                 return wav_lut[wav_mtx[voice][note][i][j]];
         }
         return null_wav_file;
+    }
+}
+
+bool is_empty(uint16_t address){
+    for(int i=0; i<NUM_VOICES; i++){
+        for(int j=0; j<NUM_NOTES; j++){
+            for(int k=0; k<NUM_LAYERS;k++){
+                for(int l=0; l<NUM_ROBINS; l++){
+                    if(wav_mtx[i][j][k][l] == address)
+                        return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+void clean_up_file_system(void){
+    for(int i=0; i<NUM_WAV_LUT_ENTRIES; i++){
+        if(wav_lut[i].empty == 1)
+            continue;
+        if(is_empty(i)) // its empty but is marked full in the lut
+            wav_lut[i].empty = 1;
     }
 }
 

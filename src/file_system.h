@@ -37,6 +37,39 @@ extern "C"
 
 #define METADATA_TAG_LENGTH 12
 
+// #define METADATA_START_BLOCK 2
+#define METADATA_START_BLOCK 1
+#define METADATA_SIZE_IN_BLOCKS 1
+
+// #define FIRMWARE_LUT_START_BLOCK 3
+#define FIRMWARE_LUT_START_BLOCK 2
+#define MAX_FIRMWARES 10
+#define FIRMWARE_LUT_SIZE (sizeof(struct firmware_t) * MAX_FIRMWARES)
+#define FIRMWARE_LUT_BLOCKS (FIRMWARE_LUT_SIZE / SECTOR_SIZE + (FIRMWARE_LUT_SIZE % SECTOR_SIZE !=0))
+
+#define FIRMWARE_DIRECTORY_START_BLOCK (FIRMWARE_LUT_START_BLOCK + FIRMWARE_LUT_BLOCKS)
+#define FIRMWARE_DIRECTORY_SIZE (MAX_FIRMWARES * MAX_FIRMWARE_SIZE)
+#define FIRMWARE_DIRECTORY_BLOCKS (FIRMWARE_DIRECTORY_SIZE / SECTOR_SIZE + (FIRMWARE_DIRECTORY_SIZE % SECTOR_SIZE !=0))
+
+#define PIN_CONFIG_START_BLOCK (FIRMWARE_DIRECTORY_START_BLOCK + FIRMWARE_DIRECTORY_BLOCKS)
+#define PIN_CONFIG_SIZE (NUM_PIN_CONFIGS * sizeof(struct pin_config_t))
+#define PIN_CONFIG_BLOCKS (PIN_CONFIG_SIZE / SECTOR_SIZE + (PIN_CONFIG_SIZE % SECTOR_SIZE !=0))
+
+#define WAV_LUT_ENTRIES 65536 // uint16_t max
+#define WAV_LUT_START_BLOCK (PIN_CONFIG_START_BLOCK + PIN_CONFIG_BLOCKS)
+#define WAV_LUT_BYTES (WAV_LUT_ENTRIES * sizeof(struct wav_file_t)) // 4,194,304
+#define WAV_LUT_BLOCKS (WAV_LUT_BYTES / SECTOR_SIZE) // 8,192
+
+#define WAV_MATRIX_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_BLOCKS)
+#define WAV_MATRIX_ENTRIES ( NUM_VOICES * NUM_NOTES * NUM_LAYERS * NUM_ROBINS ) // 262,144
+#define BYTES_PER_MATRIX_VOICE ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS * sizeof(uint16_t) ) // 32,768
+#define BLOCKS_PER_MATRIX_VOICE ( BYTES_PER_MATRIX_VOICE / SECTOR_SIZE ) // 64
+#define WAV_MATRIX_BYTES ( WAV_MATRIX_ENTRIES * sizeof(uint16_t) ) // 524,288
+#define WAV_MATRIX_BLOCKS ( WAV_MATRIX_BYTES / SECTOR_SIZE + (WAV_MATRIX_BYTES % SECTOR_SIZE != 0) ) // 1,024
+
+
+#define WAV_LUT_MSG_LEN (sizeof(struct wav_file_t) + 2)
+
 enum play_back_mode {
     ONE_SHOT,
     LOOP,
@@ -127,7 +160,6 @@ struct wav_lu_t {
     uint8_t empty;
     uint8_t breakpoint;
     uint8_t chance;
-    uint16_t RFU;
 };
 
 struct wav_file_t {
@@ -145,7 +177,6 @@ struct wav_file_t {
     uint8_t empty;
     uint8_t breakpoint;
     uint8_t chance;
-    int RFU;
 };
 
 struct firmware_t {
@@ -332,6 +363,9 @@ uint16_t next_wav_index(void);
 void add_pin_config_json(cJSON *RESPONSE_ROOT);
 void clean_up_file_system(void);
 void add_wav_to_file_system(char *name, int voice, int note, int layer, int robin, size_t start_block, size_t size);
+void read_wav_lut_sector(struct wav_file_t *dest, size_t index);
+size_t read_wav_lut(uint8_t *dest, size_t last, size_t *bytes_read);
+void read_wav(uint16_t index, uint8_t* dest);
 
 #ifdef __cplusplus
 }

@@ -277,7 +277,7 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     //done
     // log_i("close %d");
     close_wav_to_emmc();
-    add_wav_to_file_system(&w_name[0], w_voice, w_note, w_layer, w_robin, w_start_block,total);
+    add_wav_to_file_system(&w_name[0], w_voice, w_note, w_layer, w_robin, w_start_block, total);
     request->send(200);
     // log_i("done");
     //wav_player_resume();
@@ -326,12 +326,19 @@ void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len
   }
 }
 
+size_t last = 0;
+
 void handleGetVoiceData(AsyncWebServerRequest *request){
-  // int numVoice;
-  // AsyncWebHeader* voice_string = request->getHeader("voice");
-  // sscanf(voice_string->value().c_str(), "%d", &numVoice);
-  write_wav_data();
-  request->send(204);
+  AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [last](uint8_t *buffer, size_t maxLen, size_t index) mutable -> size_t {
+    size_t bytes_read = 0;
+    last = read_wav_lut(buffer, last, &bytes_read);
+    log_i("bytes_read was %d", bytes_read);
+    if(bytes_read == 0){
+      last = 0;
+    }
+    return bytes_read;
+  });
+  request->send(response);
 }
 
 void handleRecoveryGetVoiceData(AsyncWebServerRequest *request){

@@ -14,35 +14,35 @@
 #include "esp_heap_caps.h"
 #include "emmc.h"
 
-// #define METADATA_START_BLOCK 2
-#define METADATA_START_BLOCK 1
-#define METADATA_SIZE_IN_BLOCKS 1
+// // #define METADATA_START_BLOCK 2
+// #define METADATA_START_BLOCK 1
+// #define METADATA_SIZE_IN_BLOCKS 1
 
-// #define FIRMWARE_LUT_START_BLOCK 3
-#define FIRMWARE_LUT_START_BLOCK 2
-#define MAX_FIRMWARES 10
-#define FIRMWARE_LUT_SIZE (sizeof(struct firmware_t) * MAX_FIRMWARES)
-#define FIRMWARE_LUT_BLOCKS (FIRMWARE_LUT_SIZE / SECTOR_SIZE + (FIRMWARE_LUT_SIZE % SECTOR_SIZE !=0))
+// // #define FIRMWARE_LUT_START_BLOCK 3
+// #define FIRMWARE_LUT_START_BLOCK 2
+// #define MAX_FIRMWARES 10
+// #define FIRMWARE_LUT_SIZE (sizeof(struct firmware_t) * MAX_FIRMWARES)
+// #define FIRMWARE_LUT_BLOCKS (FIRMWARE_LUT_SIZE / SECTOR_SIZE + (FIRMWARE_LUT_SIZE % SECTOR_SIZE !=0))
 
-#define FIRMWARE_DIRECTORY_START_BLOCK (FIRMWARE_LUT_START_BLOCK + FIRMWARE_LUT_BLOCKS)
-#define FIRMWARE_DIRECTORY_SIZE (MAX_FIRMWARES * MAX_FIRMWARE_SIZE)
-#define FIRMWARE_DIRECTORY_BLOCKS (FIRMWARE_DIRECTORY_SIZE / SECTOR_SIZE + (FIRMWARE_DIRECTORY_SIZE % SECTOR_SIZE !=0))
+// #define FIRMWARE_DIRECTORY_START_BLOCK (FIRMWARE_LUT_START_BLOCK + FIRMWARE_LUT_BLOCKS)
+// #define FIRMWARE_DIRECTORY_SIZE (MAX_FIRMWARES * MAX_FIRMWARE_SIZE)
+// #define FIRMWARE_DIRECTORY_BLOCKS (FIRMWARE_DIRECTORY_SIZE / SECTOR_SIZE + (FIRMWARE_DIRECTORY_SIZE % SECTOR_SIZE !=0))
 
-#define PIN_CONFIG_START_BLOCK (FIRMWARE_DIRECTORY_START_BLOCK + FIRMWARE_DIRECTORY_BLOCKS)
-#define PIN_CONFIG_SIZE (NUM_PIN_CONFIGS * sizeof(struct pin_config_t))
-#define PIN_CONFIG_BLOCKS (PIN_CONFIG_SIZE / SECTOR_SIZE + (PIN_CONFIG_SIZE % SECTOR_SIZE !=0))
+// #define PIN_CONFIG_START_BLOCK (FIRMWARE_DIRECTORY_START_BLOCK + FIRMWARE_DIRECTORY_BLOCKS)
+// #define PIN_CONFIG_SIZE (NUM_PIN_CONFIGS * sizeof(struct pin_config_t))
+// #define PIN_CONFIG_BLOCKS (PIN_CONFIG_SIZE / SECTOR_SIZE + (PIN_CONFIG_SIZE % SECTOR_SIZE !=0))
 
-#define WAV_LUT_ENTRIES 65536 // uint16_t max
-#define WAV_LUT_START_BLOCK (PIN_CONFIG_START_BLOCK + PIN_CONFIG_BLOCKS)
-#define WAV_LUT_BYTES (WAV_LUT_ENTRIES * sizeof(wav_file_t)) // 4,194,304
-#define WAV_LUT_BLOCKS (WAV_LUT_ENTRIES / SECTOR_SIZE) // 8,192
+// #define WAV_LUT_ENTRIES 65536 // uint16_t max
+// #define WAV_LUT_START_BLOCK (PIN_CONFIG_START_BLOCK + PIN_CONFIG_BLOCKS)
+// #define WAV_LUT_BYTES (WAV_LUT_ENTRIES * sizeof(wav_file_t)) // 4,194,304
+// #define WAV_LUT_BLOCKS (WAV_LUT_ENTRIES / SECTOR_SIZE) // 8,192
 
-#define WAV_MATRIX_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_BLOCKS)
-#define WAV_MATRIX_ENTRIES ( NUM_VOICES * NUM_NOTES * NUM_LAYERS * NUM_ROBINS ) // 262,144
-#define BYTES_PER_MATRIX_VOICE ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS * sizeof(uint16_t) ) // 32,768
-#define BLOCKS_PER_MATRIX_VOICE ( BYTES_PER_MATRIX_VOICE / SECTOR_SIZE ) // 64
-#define WAV_MATRIX_BYTES ( WAV_MATRIX_ENTRIES * sizeof(uint16_t) ) // 524,288
-#define WAV_MATRIX_BLOCKS ( WAV_MATRIX_BYTES / SECTOR_SIZE + (WAV_MATRIX_BYTES % SECTOR_SIZE != 0) ) // 1,024
+// #define WAV_MATRIX_START_BLOCK (WAV_LUT_START_BLOCK + WAV_LUT_BLOCKS)
+// #define WAV_MATRIX_ENTRIES ( NUM_VOICES * NUM_NOTES * NUM_LAYERS * NUM_ROBINS ) // 262,144
+// #define BYTES_PER_MATRIX_VOICE ( NUM_NOTES * NUM_LAYERS * NUM_ROBINS * sizeof(uint16_t) ) // 32,768
+// #define BLOCKS_PER_MATRIX_VOICE ( BYTES_PER_MATRIX_VOICE / SECTOR_SIZE ) // 64
+// #define WAV_MATRIX_BYTES ( WAV_MATRIX_ENTRIES * sizeof(uint16_t) ) // 524,288
+// #define WAV_MATRIX_BLOCKS ( WAV_MATRIX_BYTES / SECTOR_SIZE + (WAV_MATRIX_BYTES % SECTOR_SIZE != 0) ) // 1,024
 
 // #define LAST_BLOCK 16773216 // 16777216 is 8GB / 512, I saved 2MB (4000 blocks) at the end for corruption?
 #define EMMC_CAPACITY_BYTES 7818182656
@@ -59,7 +59,7 @@
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_16"; // v4.x.x
-char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_18"; // DEV
+char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_27"; // DEV
 static const char* TAG = "file_system";
 
 // declare handle to WS
@@ -76,6 +76,7 @@ uint32_t random_numbers[NUM_RANDOM_NUMBERS];
 void file_system_init(void)
 {
     // wav_lookup = (uint16_t *)ps_malloc(2621440);
+    log_i("wav_file_t %d, wav_lu_t %d", sizeof(struct wav_file_t), sizeof(struct wav_lu_t));
     if(wav_mtx == NULL){
         wav_mtx = (uint16_t*)ps_malloc(WAV_MATRIX_ENTRIES * sizeof(uint16_t));
         if(wav_mtx == NULL) log_e("failed to alloc wav_mtx");
@@ -215,7 +216,6 @@ void init_wav_lut(void){
         buf[i].loop_end = 0;
         buf[i].breakpoint = 0;
         buf[i].chance = 0;
-        buf[i].RFU = 0;
         memcpy(buf[i].name, blank, 1);
     }
     // write to disk
@@ -343,9 +343,45 @@ void read_pin_config_lut_from_disk(void){
     free(buf);
 }
 
+size_t read_wav_lut(uint8_t *dest, size_t last, size_t *bytes_read){
+    size_t mtx_index;
+    log_i("last is %d", last);
+    for(mtx_index = last; mtx_index<WAV_MATRIX_ENTRIES; mtx_index++){
+        if(wav_mtx[mtx_index] == 0){
+            continue;
+        }
+        log_i("non zero %d", wav_mtx[mtx_index]);
+        read_wav(mtx_index, dest);
+        (*bytes_read) += WAV_LUT_MSG_LEN;
+        break;
+    }
+    log_i("exited at %d", mtx_index);
+    return mtx_index + 1;
+}
+
+uint8_t wav_data[WAV_LUT_MSG_LEN]; // buffer for the index and the wav data
+
+void read_wav(uint16_t mtx_index, uint8_t* dest){
+    size_t lut_index = wav_mtx[mtx_index];
+    struct wav_file_t *buf = ps_malloc(SECTOR_SIZE);
+    size_t sector_index = lut_index / NUM_WAV_FILE_T_PER_SECTOR;
+    size_t sector_offset = lut_index % NUM_WAV_FILE_T_PER_SECTOR;
+    ESP_ERROR_CHECK(emmc_read(buf, WAV_LUT_START_BLOCK + sector_index, 1));
+    struct wav_file_t wav = buf[sector_offset];
+    uint8_t *wav_array = (uint8_t *)&wav;
+    wav_data[0] = mtx_index >> 8;
+    wav_data[1] = mtx_index & 0b0000000011111111;
+    for(int i=0; i<sizeof(struct wav_file_t); i++){
+        wav_data[i + 2] = wav_array[i];
+    }
+    memcpy(dest, wav_data, WAV_LUT_MSG_LEN);
+    free(buf);
+}
+
 uint16_t next_wav_index(void){
     for(int i=1; i<WAV_LUT_ENTRIES; i++){ // skip the first handle, 0 means error
         if(wav_lut[i].empty == 1){
+            log_i("next wav index is %d", i);
             return i;
         }
     }
@@ -382,7 +418,6 @@ void write_wav_data(void){
         write_wav(wav_mtx[i]);
     }
 }
-
 
 uint8_t wav_data_msg[WAV_DATA_MSG_LEN]; // buffer for the index and the wav data
 
@@ -466,6 +501,9 @@ void add_wav_to_file_system(char *name, int voice, int note, int layer, int robi
     wav_lut[index].length = size;
     wav_lut[index].empty = 0;
 
+    // wrtie data to mtx in ram
+    wav_mtx[mtx_index] = index;
+
     // write lut data to disk
     // calculate its sector and offset
     size_t lut_sector_index = index / NUM_WAV_FILE_T_PER_SECTOR;
@@ -514,10 +552,12 @@ uint16_t *get_all_wav_files(size_t *len){
     // count the total wavs on file
     size_t num_wavs = 0;
     for(int i=0;i<WAV_LUT_ENTRIES;i++){
-        num_wavs += ( wav_lut[i].empty == 0 );
+        if(wav_lut[i].empty == 0){
+            num_wavs ++;
+        }
     }
-    *len = num_wavs; // send that data back
-    log_i("found %u wavs on disk", num_wavs);
+    (*len) = num_wavs; // send that data back
+    log_i("found %d wavs on disk", num_wavs);
 
     // make a buffer for them all
     if(num_wavs == 0)
@@ -531,13 +571,12 @@ uint16_t *get_all_wav_files(size_t *len){
     for(int i=0; i<WAV_MATRIX_ENTRIES; i++){
         if(wav_mtx[i] != 0){ // there is data
             data[index++] = wav_mtx[i];
-            if(index >= num_wavs){
+            if(index > num_wavs){
                 log_e("error, index %d is out of range %d", index, num_wavs);
                 return NULL;
             }
         }
     }
-
     return(data);
 }
 
@@ -549,7 +588,7 @@ int sort_lut(const void * a, const void * b) {
     return(wav_a->start_block - wav_b->start_block);
 }
 
-size_t search_directory(uint16_t*data,  size_t num_used_entries, size_t start, size_t end, size_t file_size){
+size_t search_directory(uint16_t*data, size_t num_used_entries, size_t start, size_t end, size_t file_size){
     size_t i;
     if(num_used_entries == 0){
         // log_i("file system is empty");

@@ -4,7 +4,7 @@
 
 Purchase a WVR : https://www.tindie.com/products/ultrapalace/wvr  
 Join us on the WVR Forum : https://groups.google.com/g/wvr-audio  
-Find the Pinouts and download the schematics for WVR :  https://github.com/marchingband/wvr_hardware  
+Find the Pinouts and Wiring Diagram, and download the schematics for WVR :  https://github.com/marchingband/wvr_hardware  
 Binaries for all the WVR boards are here : https://github.com/marchingband/wvr_binaries  
 Code for the Web UI is here : https://github.com/marchingband/wvr_ui  
 Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_backpack  

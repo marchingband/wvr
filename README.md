@@ -35,6 +35,7 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * [firmware manager](#firmware-manager)
 * [setting up for Arduino IDE programming](#setting-up-for-arduino-ide-programming)
 * [using Arduino CLI](#using-arduino-cli)
+* [using PlatformIO](#using-platformio)
 * [using FTDI](#using-ftdi)
 * [hardware considerations](#hardware-considerations)
 
@@ -224,6 +225,26 @@ Congratulations! You have flashed a custom firmware to your WVR!
 * to flash, you can use curl, the command ```curl --data-binary "@/Users/Username/Documents/Arduino/wvr_basic/build/esp32.esp32.esp32wrover/wvr_basic.ino.bin" http://192.168.5.18/update --header "content-type:text/plain"``` will work, if you change the paths to point at your binary in the build folder within your sketch folder
 * in the WVR Arduino library, look at the file ```wvr.sh``` to find some other ideas for things you can do with the arduino-cli, you can modify this bash script to work for you if you like!
 
+# using platformIO
+
+setup your platformio.ini file like this:
+```
+[env:esp-wrover-kit]
+platform = espressif32@6.2.0
+framework = arduino
+board = esp-wrover-kit
+lib_deps =
+    https://github.com/marchingband/wvr.git
+    https://github.com/me-no-dev/ESPAsyncWebServer.git
+    https://github.com/me-no-dev/AsyncTCP.git
+    adafruit/Adafruit NeoPixel@^1.11.0
+build_flags = -DBOARD_HAS_PSRAM -mfix-esp32-psram-cache-issue
+monitor_speed = 115200
+# upload_port = /dev/cu.usbserial-A50285BI
+```  
+  
+Create a main.cpp and copy one of the example files into it. Remember to add `#include <Arduin.h>` at the top.  
+  
 # using FTDI  
 You will need something like this: https://www.adafruit.com/product/3309  
 To connect a usb->fdti module to your WVR, connect **D0** to **RX**, **D1** to **TX**, and **GND** to **GND**. Open the sketch examples/wvr_ftdi, where you will see ```wvr->useFTDI = true```. The ESP32 on the WVR needs to be booted into a special FTDI boot mode, to do this, ground **D6** and ground the small copper pad on the top of the WVR labeled "boot" (it's right next to the eMMC), and hit reset. You can release D6 and the boot pad now. The ESP32 is now in FTDI boot mode, and if you have a serial monitor attached the WVR, it should print ```waiting for download```. Now you can use the **UPLOAD** button in the Arduin IDE, at the end of flashing it will print "hard resetting", now restart the WVR. If you open the Arduino Serial Console, you will see some logs form the WVR boot process. With FTDI, you can also use ```./wvr.sh ftdi``` to flash, and Arduino Serial Monitor (or any Serial monitor app you like) to get logs from WVR

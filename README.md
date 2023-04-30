@@ -243,7 +243,7 @@ monitor_speed = 115200
 # upload_port = /dev/cu.usbserial-A50285BI
 ```  
   
-Create a main.cpp and copy one of the example files into it. Remember to add `#include <Arduin.h>` at the top.  
+Create a `main.cpp` and copy one of the example files into it. Remember to add `#include <Arduino.h>` at the top of `main.cpp`.  
   
 # using FTDI  
 You will need something like this: https://www.adafruit.com/product/3309  

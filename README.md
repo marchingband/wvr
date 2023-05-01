@@ -201,7 +201,7 @@ Do not upload your own custom code to WVR without a working USB-FTDI module setu
   Once you have your FTDI working, here are the steps to setup Arduino for WVR programming!  
 * install the latest Arduino IDE
 * follow instructions online to install the ESP32 stuff : https://github.com/espressif/arduino-esp32
-* In the Arduino Boards manager, when you install the ESP32 board, please select version 2.1, which is **not** the default version.
+* In the Arduino Boards manager, when you install the ESP32 board, please select version 2.0.8.
 * donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.9
 * create a folder called **libries** in your Arduino sketch folder and unzip the **WVR Arduino library** into that folder, so it should be Arduino/libraries/WVR/...
 * using the Arduino library manager, install **ADAFRUIT NEOPIXEL**

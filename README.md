@@ -202,7 +202,7 @@ Do not upload your own custom code to WVR without a working USB-FTDI module setu
 * install the latest Arduino IDE
 * follow instructions online to install the ESP32 stuff : https://github.com/espressif/arduino-esp32
 * In the Arduino Boards manager, when you install the ESP32 board, please select version 2.0.8.
-* donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v1.0.9
+* donwload the WVR Arduino library here https://github.com/marchingband/wvr/releases/tag/v3.8.3
 * create a folder called **libries** in your Arduino sketch folder and unzip the **WVR Arduino library** into that folder, so it should be Arduino/libraries/WVR/...
 * using the Arduino library manager, install **ADAFRUIT NEOPIXEL**
 * download https://github.com/me-no-dev/ESPAsyncWebServer and https://github.com/me-no-dev/AsyncTCP (click **CODE** -> **download zip**) and then unzip them into the **libraries** folder as well.

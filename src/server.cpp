@@ -171,7 +171,7 @@ void handleUpdateSingleVoiceConfig(AsyncWebServerRequest *request, uint8_t *data
   if(index + len == total){
     //done
     feedLoopWDT();
-    // esp_task_wdt_feed();
+    // // esp_task_wdt_feed();
     // request->send(200, "text/plain", "all done voice config update");
     updateSingleVoiceConfig((char *)voice_config_json, num_voice);
     free(voice_config_json);
@@ -456,10 +456,12 @@ void handleConfigJSON(AsyncWebServerRequest *request){
   char *json = print_config_json();
   log_i("done print_config_json");
   feedLoopWDT();
+  // esp_task_wdt_feed();
   size_t size = strlen(json);
   log_i("config JSON size is %d",size);
   AsyncWebServerResponse *response = request->beginResponse("text/html", size, [size,json](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
     feedLoopWDT();
+    // esp_task_wdt_feed();
     size_t toWrite = min(size - index, maxLen);
     memcpy(buffer, json + index, toWrite);
     if(index + toWrite == size){
@@ -469,6 +471,51 @@ void handleConfigJSON(AsyncWebServerRequest *request){
   });
   response->addHeader("size",String(size));
   request->send(response);
+}
+
+void handleFetchLocalIP(AsyncWebServerRequest *request){
+  log_i("handleFetchLocalIP");
+  if(WiFi.status() == WL_CONNECTED)
+  {
+    request->send(200, "text/plain", WiFi.localIP().toString().c_str());
+  }
+  else if(WiFi.status() == WL_DISCONNECTED)
+  {
+    request->send(200, "text/plain", "trying to connect");
+  }
+  else if(WiFi.status() == WL_CONNECTION_LOST)
+  {
+    request->send(200, "text/plain", "connection lost");
+  }
+  else if(WiFi.status() == WL_CONNECT_FAILED)
+  {
+    request->send(200, "text/plain", "wrong password");
+  }
+  else if(WiFi.status() == WL_NO_SSID_AVAIL)
+  {
+    request->send(200, "text/plain", "wrong network name");
+  }
+  else
+  {
+    request->send(200, "text/plain", "unkown error");
+  }
+}
+
+void handleTryLogonLocalNetwork(AsyncWebServerRequest *request){
+  log_e("handleTryLogonLocalNetwork");
+  const char* ssid = request->getHeader("ssid")->value().c_str();
+  const char* password = request->getHeader("password")->value().c_str();
+  memcpy(&metadata->station_ssid, ssid, 20);
+  memcpy(&metadata->station_passphrase, password, 20);
+  metadata->do_station_mode = 1;
+  log_e("headers: %s %s meta: %s %s",
+    ssid, password,
+    metadata->station_ssid,
+    metadata->station_passphrase
+  );
+  write_metadata(*metadata);
+  request->send(200, "text/plain", "saved, please reset");
+  // try_log_on_network();
 }
 
 void handleBackupEMMC(AsyncWebServerRequest *request){
@@ -638,10 +685,26 @@ void _server_pause(){
   WiFi.mode(WIFI_OFF);
 }
 
+void try_log_on_network()
+{
+  log_e("begin try_log_on_network");
+  WiFi.begin(metadata->station_ssid, metadata->station_passphrase);
+  log_e("done begin try_log_on_network");
+  // WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
+  //       log_e("WiFi lost connection. Reason: %s", info.wifi_sta_disconnected.reason);
+  //   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  // log_e("done disconnect listener");
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
+        log_e("WiFi connected. IP: %s", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
+    }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  log_e("done connect listener");
+}
+
 void server_begin() {
   Serial.println("Configuring access point...");
 
-  WiFi.mode(WIFI_AP);
+  // WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_MODE_APSTA);
 
   IPAddress IP = IPAddress (192, 168, 5, 18);
   IPAddress gateway = IPAddress (192, 168, 5, 17);
@@ -666,6 +729,22 @@ void server_begin() {
   esp_wifi_get_max_tx_power(&power);
   log_i("wifi power is %d", power);
 
+  if(metadata->do_station_mode == 1){
+    log_e("starting station");
+    WiFi.begin(metadata->station_ssid, metadata->station_passphrase);
+    int retries = 0;
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      log_e("Connecting to WiFi..");
+      if(retries++ > 10){
+        log_e("Failed to connect to WiFi..");
+        break;
+      }
+    }
+    if(WiFi.status() == WL_CONNECTED){
+      log_e("connect on IP: %s", WiFi.localIP().toString().c_str());
+    }
+  }
 
   server.on(
     "/",
@@ -707,6 +786,18 @@ void server_begin() {
     "/voicejson",
     HTTP_GET,
     handleVoiceJSON
+  );
+
+  server.on(
+    "/fetchLocalIP",
+    HTTP_GET,
+    handleFetchLocalIP
+  );
+
+  server.on(
+    "/tryLogonLocalNetwork",
+    HTTP_GET,
+    handleTryLogonLocalNetwork
   );
 
   server.on(
@@ -961,6 +1052,18 @@ void recovery_server_begin() {
     "/deleteFirmware",
     HTTP_GET,
     handleDeleteFirmware
+  );
+
+  server.on(
+    "/fetchLocalIP",
+    HTTP_GET,
+    handleFetchLocalIP
+  );
+
+  server.on(
+    "/tryLogonLocalNetwork",
+    HTTP_GET,
+    handleTryLogonLocalNetwork
   );
 
   server.on(

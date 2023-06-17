@@ -18,6 +18,7 @@
 #include "file_system.h"
 #include "WVR.h"
 #include "gpio.h"
+#include "server.h"
 
 struct wav_lu_t **wav_lut;
 
@@ -126,6 +127,13 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
 
   server_begin();
   logSize("server");
+
+  log_i("do:%d network:%s pass:%s",get_metadata()->do_station_mode,get_metadata()->station_ssid,get_metadata()->station_passphrase);
+
+  if(get_metadata()->do_station_mode == 1)
+  {
+    try_log_on_network();
+  }
 
   button_init();
   logSize("button");

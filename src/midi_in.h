@@ -14,6 +14,7 @@
 #define MIDI_CC_EXP 11
 #define MIDI_CC_SUSTAIN 64
 #define MIDI_CC_RELEASE 72
+#define MIDI_CC_ATTACK 73
 #define MIDI_CC_MUTE 120
 #define MIDI_CC_RESET 121
 

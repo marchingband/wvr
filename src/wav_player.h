@@ -13,6 +13,11 @@ struct pan_t {
     uint8_t right_vol;
 };
 
+#define FADE_NORMAL -2
+#define FADE_OUT -1
+#define FADE_IN_INIT 0
+#define FADE_FACTOR_MULTIPLIER 90 // number of 256 sample loops to wait before inc/dec volume by 1 :: 256/44100 * FADE_FACTOR_MULTIPLIER ~= 0.05
+
 #define FX_NONE ((struct pan_t) {.left_vol = 127, .right_vol = 127})
 
 struct wav_player_event_t {

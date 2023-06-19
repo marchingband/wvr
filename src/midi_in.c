@@ -115,6 +115,9 @@ bool channel_sustain[16];
 const uint8_t channel_release_default[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 uint8_t channel_release[16];
 
+const uint8_t channel_attack_default[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t channel_attack[16];
+
 uint8_t *get_channel_lut(void)
 {
     return &channel_lut[0];
@@ -415,6 +418,9 @@ static void handle_midi(uint8_t *msg)
                     break;
                 case MIDI_CC_RELEASE:
                     channel_release[channel] = val;
+                    break;
+                case MIDI_CC_ATTACK:
+                    channel_attack[channel] = val;
                     break;
                 default:
                     break;

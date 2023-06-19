@@ -628,11 +628,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
               output_buf[i] += (sample >> DAMPEN_BITS);
 
-              if(bufs[buf].fade != FADE_NORMAL)
+              if((bufs[buf].fade != FADE_NORMAL) && ((bufs[buf].fade_counter % fade_factor == 0)))
               {
 
                 // check if its time to decriment
-                if( (bufs[buf].fade == -1) && (bufs[buf].fade_counter % fade_factor == 0) )
+                if( (bufs[buf].fade == -1))
                 {
                   // just fade to 0 on both channels
                   bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
@@ -645,7 +645,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 }
 
                 // check if its time to increment
-                if( (bufs[buf].fade > -1) && (bufs[buf].fade_counter % fade_factor == 0) )
+                else
+                // if( (bufs[buf].fade > -1) && (bufs[buf].fade_counter % fade_factor == 0) )
                 {
                   // fade in up to the target
                   bufs[buf].fade += (bufs[buf].fade < 127);
@@ -655,13 +656,13 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     (bufs[buf].stereo_volume.right == bufs[buf].target_stereo_volume.right) && 
                     (bufs[buf].stereo_volume.left == bufs[buf].target_stereo_volume.left)) // attack done
                   {
-                    bufs[buf].fade = -2;
+                    bufs[buf].fade = FADE_NORMAL;
                     bufs[buf].fade_counter = 0;
                   }
                 }
 
-                bufs[buf].fade_counter++;
               }
+              bufs[buf].fade_counter++;
             }
             bufs[buf].wav_position += to_write;
             if(to_write == remaining)
@@ -704,7 +705,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               {
                 fade_factor = 4;
               }
-              else if(bufs[i].fade == -1)
+              else if(bufs[buf].fade == -1)
               {
                 fade_factor = 4 + (channel_release[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER);
               }
@@ -729,7 +730,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 if(bufs[buf].fade != FADE_NORMAL){
 
                   // check if its time to decriment
-                  if( (bufs[buf].fade == -1) && (bufs[buf].fade_counter % fade_factor == 0) )
+                  if( (bufs[buf].fade == FADE_OUT) && (bufs[buf].fade_counter % fade_factor == 0) )
                   {
                     // just fade to 0 on both channels
                     // log_e("%d %d", fade_factor, bufs[buf].fade_counter);
@@ -752,7 +753,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                       (bufs[buf].stereo_volume.right == bufs[buf].target_stereo_volume.right) && 
                       (bufs[buf].stereo_volume.left == bufs[buf].target_stereo_volume.left)) // attack done
                     {
-                      bufs[buf].fade = -2;
+                      bufs[buf].fade = FADE_NORMAL;
                       bufs[buf].fade_counter = 0;
                       // break;
                     }
@@ -993,6 +994,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
         bufs[i].current_buf = 0;
         bufs[i].wav_position = 0;
         bufs[i].sample_pointer = 0;
+        bufs[i].fade_counter = 0;
+        bufs[i].fade = FADE_NORMAL;
         if(bufs[i].pruned == 1)
         {
           bufs[i].pruned = 0;

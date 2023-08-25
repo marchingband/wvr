@@ -67,6 +67,7 @@ void logRam(){
   Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
   Serial.printf("Total PSRAM: %d\n", ESP.getPsramSize());
   Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
+  Serial.printf("CPU freq: %d\n", getCpuFrequencyMhz());
 }
 
 // void forceARP(){

@@ -443,6 +443,7 @@ void reset_midi_controllers(void)
         channel_exp[i] = channel_exp_default[i];
         channel_release[i] = channel_release_default[i];
         channel_sustain[i] = channel_sustain_default[i];
+        channel_attack[i] = channel_attack_default[i];
     }
     for(int i=0; i<128; i++)
     {

@@ -164,8 +164,8 @@ void init_buffs(void)
     bufs[i].pruned = 0;
     bufs[i].current_buf = 0;
     // uint8_t's
-    bufs[i].volume=127;
-    bufs[i].fade=0;
+    bufs[i].volume = 127;
+    bufs[i].fade = 0;
     // size_t's
     bufs[i].read_block = 0;
     bufs[i].wav_position = 0;
@@ -520,7 +520,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
         }
       }
       else if (wav_player_event.code == MIDI_NOTE_OFF){
-        for(int b=0;b<NUM_BUFFERS;b++)
+        for(int b=0; b<NUM_BUFFERS; b++)
         {
           if(
               bufs[b].wav_player_event.voice == wav_player_event.voice &&
@@ -615,7 +615,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
 
             // fade factor is the number of samples between inc/dec of the volume
             int fade_factor = bufs[buf].pruned ? 4 // fast fadeout
-              : bufs[buf].fade == -1 ? 4 + (channel_release[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER)  // release
+              : bufs[buf].fade == FADE_OUT ? 4 + (channel_release[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER)  // release
               : 4 + (channel_attack[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER); // attack
             for(int i=0; i<to_write; i++)
             {
@@ -632,7 +632,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               {
 
                 // check if its time to decriment
-                if( (bufs[buf].fade == -1))
+                if( (bufs[buf].fade == FADE_OUT))
                 {
                   // just fade to 0 on both channels
                   bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
@@ -705,7 +705,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               {
                 fade_factor = 4;
               }
-              else if(bufs[buf].fade == -1)
+              else if(bufs[buf].fade == FADE_OUT)
               {
                 fade_factor = 4 + (channel_release[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER);
               }
@@ -900,7 +900,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
                   output_buf[i] += (sample >> DAMPEN_BITS);
                   if( 
-                    (bufs[buf].fade == -1) &&
+                    (bufs[buf].fade == FADE_OUT) &&
                     (bufs[buf].wav_data.note_off_meaning == HALT) &&
                     (i % fade_factor == 0) // were fading and its time to decrement volumes
                   )
@@ -917,7 +917,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               }
               bufs[buf].wav_position += this_write;
               to_write -= this_write;
-              if((this_write == remaining_in_sustain) && (!bufs[buf].fade)) // we need to loop
+              if((this_write == remaining_in_sustain) && (bufs[buf].fade != FADE_OUT)) // we need to loop
+              // if((this_write == remaining_in_sustain) && (!bufs[buf].fade)) // we need to loop
               {
                 buf_pointer = bufs[buf].buffer_head;
                 bufs[buf].current_buf = 2;

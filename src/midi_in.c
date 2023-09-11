@@ -115,6 +115,9 @@ bool channel_sustain[16];
 const uint8_t channel_release_default[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 uint8_t channel_release[16];
 
+const uint16_t channel_pitch_bend_default[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint16_t channel_pitch_bend[16];
+
 uint8_t *get_channel_lut(void)
 {
     return &channel_lut[0];
@@ -342,6 +345,12 @@ static void handle_midi(uint8_t *msg)
                 channel_lut[channel] = voice;
                 break;
             }
+            case MIDI_PITCH_BEND:
+            {
+                uint8_t fine = msg[1];
+                uint8_t coarse = msg[2];
+                channel_pitch_bend[channel] = (coarse << 7) | fine;
+            }
             case MIDI_CC:
             {
                 uint8_t CC = msg[1] & 0b01111111;
@@ -437,6 +446,7 @@ void reset_midi_controllers(void)
         channel_exp[i] = channel_exp_default[i];
         channel_release[i] = channel_release_default[i];
         channel_sustain[i] = channel_sustain_default[i];
+        channel_pitch_bend[i] = channel_pitch_bend_default[i];
     }
     for(int i=0; i<128; i++)
     {

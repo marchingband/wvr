@@ -8,6 +8,7 @@
 #define MIDI_NOTE_OFF 8
 #define MIDI_NOTE_ON 9
 #define MIDI_PROGRAM_CHANGE 12
+#define MIDI_PITCH_BEND 14
 #define MIDI_CC 11
 #define MIDI_CC_VOLUME 7
 #define MIDI_CC_PAN 10

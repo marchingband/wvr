@@ -47,12 +47,18 @@ static const char* TAG = "wav_player";
 #define MAX_READS_PER_LOOP 4 // default
 // #define MAX_READS_PER_LOOP 3
 
+#define s15p16 int32_t
+#define u16p16 uint32_t
+
 // from midi.c
 uint8_t channel_lut[16];
 struct pan_t channel_pan[16];
 uint8_t channel_vol[16];
 uint8_t channel_exp[16];
 uint8_t channel_release[16];
+uint16_t channel_pitch_bend[16];
+
+uint32_t channel_pitch_bend_factor[16];
 
 extern struct metadata_t metadata;
 bool mute = false;
@@ -93,7 +99,7 @@ struct buf_t {
   size_t read_block;
   size_t wav_position;
   size_t size;
-  size_t sample_pointer;
+  u16p16 sample_pointer;
   uint8_t volume;
   uint8_t voice;
   uint8_t fade;
@@ -213,6 +219,19 @@ void init_response_lut_fade_pair(struct response_curve_t *dest, struct response_
         dest[i].fade_val = j;
       }
     }
+  }
+}
+
+void update_pitch_bends(void)
+{
+  for(int i=0; i<16; i++)
+  {
+    uint16_t pitch_bend = channel_pitch_bend[i];
+    float bend = pitch_bend / 8192.0 - 1.0;
+    float semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
+    float exponent = semitones / 12.0;
+    float pitch_factor = pow(2, exponent);
+    pitch_bend_factor[i] = pitch_factor * 0x10000;
   }
 }
 
@@ -361,6 +380,15 @@ void IRAM_ATTR update_stereo_volume(uint8_t buf)
   uint32_t right = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].right_vol * bufs[buf].volume;
   bufs[buf].stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127*127
   bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
+}
+
+int16_t IRAM_ATTR interpolate(int16_t *in, u16p16 acc)
+{
+  uint32_t  idx = acc >> 16; // just the real part
+  s15p16      x = acc & 0x0000FFFF; // just the fractional part
+  int32_t     y = in[idx + 2] - in[idx]; // delta y, +2 because it's stereo
+  int32_t delta = (x * y) >> 16; // execute fixed point multiply to do the linear interpolation
+  return(in[idx] + delta); // add the base                
 }
 
 void IRAM_ATTR wav_player_task(void* pvParameters)
@@ -573,8 +601,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
 
     new_midi_buf=-1;
 
+    // update all the pitch bend states only once per render cycle, it is expensive!
+    update_pitch_bends();
+
     // sum the next section of each buffer and send to DAC buffer
-    for(int buf=0; buf<NUM_BUFFERS; buf++)
+    for(int buf = 0; buf < NUM_BUFFERS; buf++)
     {
       if(bufs[buf].free == 0)
       {
@@ -583,8 +614,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
           case ONE_SHOT:
           {
             size_t remaining = bufs[buf].size - bufs[buf].wav_position;
-            size_t remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
-            size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES < remaining ? DAC_BUFFER_SIZE_IN_SAMPLES : remaining;
+            u16p16 step = pitch_factor[buf];
+
             if(bufs[buf].fade == 0) // dont update stereo volume while fading
             {
               update_stereo_volume(buf);
@@ -593,21 +624,55 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             {
               convert_buf_linear(buf);
             }
+
             int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
-            for(int i=0; i<to_write; i++)
+
+            for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i += 2)
             {
-              uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
-              sample = 
+
+              int16_t sample_left = interpolate(buf_pointer, bufs[buf].sample_pointer);
+              bufs[buf].sample_pointer += 0x10000;
+              int16_t sample_right = interpolate(buf_pointer, bufs[buf].sample_pointer);
+
+              sample_left = 
                 bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
-                scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
+                  scale_sample(sample_left, bufs[buf].stereo_volume.left) :
                 bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
-                scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
-                scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
-              output_buf[i] += (sample >> DAMPEN_BITS);
-              if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
+                  scale_sample_sqrt(sample_left, bufs[buf].stereo_volume.left) :
+                  scale_sample_inv_sqrt(sample_left, bufs[buf].stereo_volume.left);
+
+              sample_right = 
+                bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+                  scale_sample(sample_right, bufs[buf].stereo_volume.right) :
+                bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+                  scale_sample_sqrt(sample_right, bufs[buf].stereo_volume.right) :
+                  scale_sample_inv_sqrt(sample_right, bufs[buf].stereo_volume.right);
+
+              output_buf[i]     += (sample_left  >> DAMPEN_BITS);
+              output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
+
+              bufs[buf].sample_pointer += step;
+              size_t written = bufs[buf].sample_pointer >> 16;
+
+              if(written >= remaining)
+              {
+                bufs[buf].done = true;
+                break;
+              }
+
+              if(written >= SAMPLES_PER_READ)
+              {
+                buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+                bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+                bufs[buf].sample_pointer -= ( SAMPLES_PER_READ * 0x10000);
+                bufs[buf].full = 0;
+                bufs[buf].wav_position += SAMPLES_PER_READ;
+              }
+
+              if( (bufs[buf].fade > 0) && (i % fade_factor < 2) ) // < 2 because the loop is i += 2
               {
                 bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
-                bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+                bufs[buf].stereo_volume.left  -= (bufs[buf].stereo_volume.left > 0);
                 if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
                 {
                   bufs[buf].done = true;
@@ -615,20 +680,56 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 }
               }
             }
-            bufs[buf].wav_position += to_write;
-            if(to_write == remaining)
-            {
-              bufs[buf].done=true;
-            }
-            if(to_write == remaining_in_buffer)
-            {
-              buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
-              bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
-              bufs[buf].sample_pointer = 0;
-              bufs[buf].full = 0;
-            }
             break;
           }
+          // {
+          //   size_t remaining = bufs[buf].size - bufs[buf].wav_position;
+          //   size_t remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+          //   size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES < remaining ? DAC_BUFFER_SIZE_IN_SAMPLES : remaining;
+          //   if(bufs[buf].fade == 0) // dont update stereo volume while fading
+          //   {
+          //     update_stereo_volume(buf);
+          //   }
+          //   else if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // starting a fade but the buf is not a linear response
+          //   {
+          //     convert_buf_linear(buf);
+          //   }
+          //   int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
+          //   for(int i=0; i<to_write; i++)
+          //   {
+          //     uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
+          //     sample = 
+          //       bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+          //       scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //       bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+          //       scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //       scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
+          //     output_buf[i] += (sample >> DAMPEN_BITS);
+          //     if( (bufs[buf].fade > 0) && (i % fade_factor == 0) )
+          //     {
+          //       bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+          //       bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+          //       if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+          //       {
+          //         bufs[buf].done = true;
+          //         break;
+          //       }
+          //     }
+          //   }
+          //   bufs[buf].wav_position += to_write;
+          //   if(to_write == remaining)
+          //   {
+          //     bufs[buf].done=true;
+          //   }
+          //   if(to_write == remaining_in_buffer)
+          //   {
+          //     buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+          //     bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+          //     bufs[buf].sample_pointer = 0;
+          //     bufs[buf].full = 0;
+          //   }
+          //   break;
+          // }
           case LOOP :
           {
             size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES;

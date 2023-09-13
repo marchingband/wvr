@@ -59,7 +59,7 @@ uint8_t channel_exp[16];
 uint8_t channel_release[16];
 uint16_t channel_pitch_bend[16];
 
-uint32_t channel_pitch_bend_factor[16];
+s15p16 channel_pitch_bend_factor[16];
 
 extern struct metadata_t metadata;
 bool mute = false;
@@ -140,10 +140,9 @@ struct response_curve_t {
   uint8_t fade_val;
 };
 
-struct response_curve_t lin_float_lut[128];
-struct response_curve_t exp_float_lut[128];
-struct response_curve_t sqrt_float_lut[128];
-struct response_curve_t inv_sqrt_float_lut[128];
+struct response_curve_t lin_response_lut[128];
+struct response_curve_t sqrt_response_lut[128];
+struct response_curve_t inv_sqrt_response_lut[128];
 
 int16_t sample;
 
@@ -235,10 +234,10 @@ void update_pitch_bends(void)
     // pitch_bend_factor[i] = pitch_factor * 0x10000;
 
     uint16_t pitch_bend = channel_pitch_bend[i];
-    int32_t bend = (pitch_bend << 16) / 8192.0 - ( 1 << 16);
-    int32_t semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
-    int32_t exponent = semitones / 12;
-    int32_t pitch_factor = fxexp2_s15p16(exponent);
+    s15p16 bend = (pitch_bend << 16) / 8192.0 - ( 1 << 16);
+    s15p16 semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
+    s15p16 exponent = semitones / 12;
+    s15p16 pitch_factor = fxexp2_s15p16(exponent);
     pitch_bend_factor[i] = pitch_factor;
   }
 }
@@ -247,12 +246,12 @@ void convert_buf_linear(int buf)
 {
   switch(bufs[buf].wav_data.response_curve){
     case RESPONSE_SQUARE_ROOT:
-      bufs[buf].stereo_volume.left = sqrt_float_lut[bufs[buf].stereo_volume.left].fade_val;
-      bufs[buf].stereo_volume.right = sqrt_float_lut[bufs[buf].stereo_volume.right].fade_val;
+      bufs[buf].stereo_volume.left = sqrt_response_lut[bufs[buf].stereo_volume.left].fade_val;
+      bufs[buf].stereo_volume.right = sqrt_response_lut[bufs[buf].stereo_volume.right].fade_val;
       break;
     case RESPONSE_INV_SQUARE_ROOT:
-      bufs[buf].stereo_volume.left = inv_sqrt_float_lut[bufs[buf].stereo_volume.left].fade_val;
-      bufs[buf].stereo_volume.right = inv_sqrt_float_lut[bufs[buf].stereo_volume.right].fade_val;
+      bufs[buf].stereo_volume.left = inv_sqrt_response_lut[bufs[buf].stereo_volume.left].fade_val;
+      bufs[buf].stereo_volume.right = inv_sqrt_response_lut[bufs[buf].stereo_volume.right].fade_val;
       break;
     default:
       break;
@@ -264,38 +263,38 @@ void init_response_luts(void)
 {
   for(int i=0;i<128;i++)
   {
-    lin_float_lut[i].val      = (i / 127.0)             * 0x10000;
-    sqrt_float_lut[i].val     = (sqrt(i * 127.0) / 127) * 0x10000;
-    inv_sqrt_float_lut[i].val = (pow(i / 127.0, 2))     * 0x10000;
+    lin_response_lut[i].val      = (i / 127.0)             * 0x10000;
+    sqrt_response_lut[i].val     = (sqrt(i * 127.0) / 127) * 0x10000;
+    inv_sqrt_response_lut[i].val = (pow(i / 127.0, 2))     * 0x10000;
   }
-  init_response_lut_fade_pair(sqrt_float_lut, lin_float_lut);
-  init_response_lut_fade_pair(inv_sqrt_float_lut, lin_float_lut);
-  init_response_lut_fade_pair(lin_float_lut, lin_float_lut);
+  init_response_lut_fade_pair(sqrt_response_lut, lin_response_lut);
+  init_response_lut_fade_pair(inv_sqrt_response_lut, lin_response_lut);
+  init_response_lut_fade_pair(lin_response_lut, lin_response_lut);
 }
 
 int16_t IRAM_ATTR scale_sample (int16_t in, uint8_t vol)
 {
-  // return (int16_t)(in * lin_float_lut[vol].val);
-  return (int16_t)((in * lin_float_lut[vol].val) >> 16);
+  // return (int16_t)(in * lin_response_lut[vol].val);
+  return (int16_t)((in * lin_response_lut[vol].val) >> 16);
 }
 
 int16_t IRAM_ATTR scale_sample_sqrt (int16_t in, uint8_t vol)
 {
-  // return (int16_t)(in * sqrt_float_lut[vol].val);
-  return (int16_t)((in * sqrt_float_lut[vol].val) >> 16);
+  // return (int16_t)(in * sqrt_response_lut[vol].val);
+  return (int16_t)((in * sqrt_response_lut[vol].val) >> 16);
 }
 
 int16_t IRAM_ATTR scale_sample_inv_sqrt (int16_t in, uint8_t vol)
 {
-  // return (int16_t)(in * inv_sqrt_float_lut[vol].val);
-  return (int16_t)((in * inv_sqrt_float_lut[vol].val) >> 16);
+  // return (int16_t)(in * inv_sqrt_response_lut[vol].val);
+  return (int16_t)((in * inv_sqrt_response_lut[vol].val) >> 16);
 }
 
 int16_t IRAM_ATTR scale_sample_clamped_16(int in, uint8_t volume)
 {
   int16_t out = (in > MAX_INT_16) ? MAX_INT_16 : (in < MIN_INT_16) ? MIN_INT_16 : in;
-  // return (int16_t)(out * lin_float_lut[volume].val);
-  return (int16_t)((out * lin_float_lut[vol].val) >> 16);
+  // return (int16_t)(out * lin_response_lut[volume].val);
+  return (int16_t)((out * lin_response_lut[vol].val) >> 16);
 }
 
 bool is_playing(uint8_t voice, uint8_t note)

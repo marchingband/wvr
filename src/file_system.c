@@ -215,7 +215,9 @@ void init_metadata(void){
         .ssid = "WVR",
         .passphrase = "12345678",
         .wifi_power = 8,
-        .midi_channel = 0
+        .midi_channel = 0,
+        .pitch_bend_semitones_up = 2,
+        .pitch_bend_semitones_down = 2
     };
     memcpy(new_metadata.tag, waver_tag, METADATA_TAG_LENGTH);
     write_metadata(new_metadata);
@@ -925,6 +927,8 @@ void add_metadata_json(cJSON * RESPONSE_ROOT){
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiPower",metadata.wifi_power);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiStartsOn",metadata.wifi_starts_on);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"midiChannel",metadata.midi_channel);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"pitchBendSemitonesUp",metadata.pitch_bend_semitones_up);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"pitchBendSemitonesDown",metadata.pitch_bend_semitones_down);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkName",metadata.ssid);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkPassword",metadata.passphrase);
 }
@@ -1321,6 +1325,8 @@ void updateMetadata(cJSON *config){
     metadata.wlog_verbosity = cJSON_GetObjectItemCaseSensitive(json, "wLogVerbosity")->valueint;
     metadata.wifi_power = cJSON_GetObjectItemCaseSensitive(json, "wifiPower")->valueint;
     metadata.midi_channel = cJSON_GetObjectItemCaseSensitive(json, "midiChannel")->valueint;
+    metadata.pitch_bend_semitones_up = cJSON_GetObjectItemCaseSensitive(json, "pitchBendSemitonesUp")->valueint;
+    metadata.pitch_bend_semitones_down = cJSON_GetObjectItemCaseSensitive(json, "pitchBendSemitonesDown")->valueint;
     memcpy(&metadata.ssid,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring,20);
     memcpy(&metadata.passphrase,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring,20);
     write_metadata(metadata);

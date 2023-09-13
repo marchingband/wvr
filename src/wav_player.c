@@ -17,6 +17,7 @@
 #include "ws_log.h"
 #include "rpc.h"
 #include "wav_player.h"
+#include "fp.h"
 
 static const char* TAG = "wav_player";
 
@@ -226,12 +227,19 @@ void update_pitch_bends(void)
 {
   for(int i=0; i<16; i++)
   {
+    // uint16_t pitch_bend = channel_pitch_bend[i];
+    // float bend = pitch_bend / 8192.0 - 1.0;
+    // float semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
+    // float exponent = semitones / 12.0;
+    // float pitch_factor = pow(2, exponent);
+    // pitch_bend_factor[i] = pitch_factor * 0x10000;
+
     uint16_t pitch_bend = channel_pitch_bend[i];
-    float bend = pitch_bend / 8192.0 - 1.0;
-    float semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
-    float exponent = semitones / 12.0;
-    float pitch_factor = pow(2, exponent);
-    pitch_bend_factor[i] = pitch_factor * 0x10000;
+    int32_t bend = (pitch_bend << 16) / 8192.0 - ( 1 << 16);
+    int32_t semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
+    int32_t exponent = semitones / 12;
+    int32_t pitch_factor = fxexp2_s15p16(exponent);
+    pitch_bend_factor[i] = pitch_factor;
   }
 }
 

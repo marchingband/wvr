@@ -115,7 +115,7 @@ bool channel_sustain[16];
 const uint8_t channel_release_default[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 uint8_t channel_release[16];
 
-const uint16_t channel_pitch_bend_default[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+const uint16_t channel_pitch_bend_default[16] = {8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192}; // 1/2 of uint14_t_max
 uint16_t channel_pitch_bend[16];
 
 uint8_t *get_channel_lut(void)

@@ -31,6 +31,9 @@ static const char* TAG = "wav_player";
 #define BYTES_PER_READ (BLOCKS_PER_READ * BLOCK_SIZE)
 #define SAMPLES_PER_READ (BYTES_PER_READ / sizeof(int16_t))
 
+#define BLOCKS_PER_READ_PLUS 7
+#define BYTES_PER_READ_PLUS (BLOCKS_PER_READ_PLUS * BLOCK_SIZE)
+
 #define DAC_BUFFER_SIZE_IN_SAMPLES 256
 #define DAC_BUFFER_SIZE_IN_BYTES ( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t) ) 
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
@@ -175,9 +178,9 @@ void init_buffs(void)
     bufs[i].size = 0;
     bufs[i].sample_pointer = 0;
     // buffers
-    bufs[i].buffer_a    = (int16_t *)malloc(BYTES_PER_READ);
-    bufs[i].buffer_b    = (int16_t *)malloc(BYTES_PER_READ);
-    bufs[i].buffer_head = (int16_t *)ps_malloc(BYTES_PER_READ);
+    bufs[i].buffer_a    = (int16_t *)malloc(BYTES_PER_READ_PLUS);
+    bufs[i].buffer_b    = (int16_t *)malloc(BYTES_PER_READ_PLUS);
+    bufs[i].buffer_head = (int16_t *)ps_malloc(BYTES_PER_READ_PLUS);
     if(bufs[i].buffer_a==NULL || bufs[i].buffer_b == NULL || bufs[i].buffer_head == NULL)
     {
       log_e("failed to alloc buffers at %d",i);
@@ -226,22 +229,20 @@ void update_pitch_bends(void)
 {
   for(int i=0; i<16; i++)
   {
-    // uint16_t pitch_bend = channel_pitch_bend[i];
-    // float bend = pitch_bend / 8192.0 - 1.0;
-    // float semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
+    // float pitch_bend = (float)channel_pitch_bend[i];
+    // float bend = (pitch_bend / 8192.0) - 1.0;
+    // float semitones = bend >= 0.0 ? 2.0 * bend : 2.0 * bend;
     // float exponent = semitones / 12.0;
     // float pitch_factor = pow(2, exponent);
-    // pitch_bend_factor[i] = pitch_factor * 0x10000;
+    // s15p16 pitch_factor_fp = pitch_factor * 0x10000;
+    // channel_pitch_bend_factor[i] = pitch_factor_fp;
 
-    uint16_t pitch_bend = channel_pitch_bend[i];
+    uint16_t pitch_bend = channel_pitch_bend[i]; // 14 bit
     s15p16 bend = (pitch_bend << 16) / 8192.0 - ( 1 << 16);
     s15p16 semitones = bend >= 0 ? 2 * bend : 2 * bend;
     // s15p16 semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
     s15p16 pitch_factor = fxexp2_s15p16(semitones / 12);
     channel_pitch_bend_factor[i] = pitch_factor;
-    // if(i==0){
-    //   log_e("set %d", pitch_factor); // 58387 (/ 65536)
-    // }
   }
 }
 
@@ -390,10 +391,14 @@ void IRAM_ATTR update_stereo_volume(uint8_t buf)
   bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
 }
 
-int16_t IRAM_ATTR interpolate(int16_t *in, u16p16 acc)
+int16_t IRAM_ATTR interpolate(int16_t *in, u16p16 acc, int right)
 {
   uint32_t  idx = acc >> 16; // just the real part
   s15p16      x = acc & 0x0000FFFF; // just the fractional part
+
+  idx *= 2; // the buffer position of the left sample
+  idx += right;
+
   int32_t     y = in[idx + 2] - in[idx]; // delta y, +2 because it's stereo
   int32_t delta = (x * y) >> 16; // execute fixed point multiply to do the linear interpolation
   return(in[idx] + delta); // add the base                
@@ -577,12 +582,12 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
       // if its a looped sample, read into the buffer_head
       if(bufs[new_midi_buf].wav_data.play_back_mode == LOOP)
       {
-        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_head, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
+        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_head, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ_PLUS ));
         bufs[new_midi_buf].current_buf = 2;
       }
       else
       {
-        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
+        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ_PLUS ));
       }
       num_reads++;
       bufs[new_midi_buf].read_block += BLOCKS_PER_READ;
@@ -600,7 +605,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
         )
       {
         buf_pointer = bufs[i].current_buf == 0 ? bufs[i].buffer_b : bufs[i].buffer_a;
-        ESP_ERROR_CHECK(emmc_read(buf_pointer, bufs[i].read_block , BLOCKS_PER_READ ));
+        ESP_ERROR_CHECK(emmc_read(buf_pointer, bufs[i].read_block , BLOCKS_PER_READ_PLUS ));
         num_reads++;
         bufs[i].read_block += BLOCKS_PER_READ;
         bufs[i].full = 1; // now the buffer is full
@@ -638,9 +643,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i += 2)
             {
 
-              int16_t sample_left = interpolate(buf_pointer, bufs[buf].sample_pointer);
-              bufs[buf].sample_pointer += 0x10000;
-              int16_t sample_right = interpolate(buf_pointer, bufs[buf].sample_pointer);
+              int16_t sample_left = interpolate(buf_pointer, bufs[buf].sample_pointer, false);
+              int16_t sample_right = interpolate(buf_pointer, bufs[buf].sample_pointer, true);
 
               sample_left = 
                 bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
@@ -660,7 +664,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
 
               bufs[buf].sample_pointer += step;
-              size_t written = bufs[buf].sample_pointer >> 16;
+              size_t written = (bufs[buf].sample_pointer >> 16) * 2;
 
               if(written >= remaining)
               {
@@ -672,7 +676,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               {
                 buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
                 bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
-                bufs[buf].sample_pointer -= ( SAMPLES_PER_READ * 0x10000);
+                bufs[buf].sample_pointer -= ( SAMPLES_PER_READ * 0x8000);
                 bufs[buf].full = 0;
                 bufs[buf].wav_position += SAMPLES_PER_READ;
               }

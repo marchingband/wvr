@@ -235,10 +235,13 @@ void update_pitch_bends(void)
 
     uint16_t pitch_bend = channel_pitch_bend[i];
     s15p16 bend = (pitch_bend << 16) / 8192.0 - ( 1 << 16);
-    s15p16 semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
-    s15p16 exponent = semitones / 12;
-    s15p16 pitch_factor = fxexp2_s15p16(exponent);
-    pitch_bend_factor[i] = pitch_factor;
+    s15p16 semitones = bend >= 0 ? 2 * bend : 2 * bend;
+    // s15p16 semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
+    s15p16 pitch_factor = fxexp2_s15p16(semitones / 12);
+    channel_pitch_bend_factor[i] = pitch_factor;
+    // if(i==0){
+    //   log_e("set %d", pitch_factor); // 58387 (/ 65536)
+    // }
   }
 }
 
@@ -294,7 +297,7 @@ int16_t IRAM_ATTR scale_sample_clamped_16(int in, uint8_t volume)
 {
   int16_t out = (in > MAX_INT_16) ? MAX_INT_16 : (in < MIN_INT_16) ? MIN_INT_16 : in;
   // return (int16_t)(out * lin_response_lut[volume].val);
-  return (int16_t)((out * lin_response_lut[vol].val) >> 16);
+  return (int16_t)((out * lin_response_lut[volume].val) >> 16);
 }
 
 bool is_playing(uint8_t voice, uint8_t note)
@@ -383,7 +386,7 @@ void IRAM_ATTR update_stereo_volume(uint8_t buf)
   uint8_t chan = bufs[buf].wav_player_event.channel;
   uint32_t left = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].left_vol * bufs[buf].volume;
   uint32_t right = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].right_vol * bufs[buf].volume;
-  bufs[buf].stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127*127
+  bufs[buf].stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127
   bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
 }
 
@@ -619,7 +622,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
           case ONE_SHOT:
           {
             size_t remaining = bufs[buf].size - bufs[buf].wav_position;
-            u16p16 step = pitch_factor[buf];
+            u16p16 step = channel_pitch_bend_factor[bufs[buf].wav_player_event.channel];
 
             if(bufs[buf].fade == 0) // dont update stereo volume while fading
             {

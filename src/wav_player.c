@@ -664,10 +664,6 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               int16_t sample_left = interpolate(sample_left_a, sample_left_b, frac);
               int16_t sample_right = interpolate(sample_right_a, sample_right_b, frac);
 
-
-              // int16_t sample_left = interpolate(buf_pointer[idx], buf_pointer[idx+2], frac);
-              // int16_t sample_right = interpolate(buf_pointer[idx+1], buf_pointer[idx+3], frac);
-
               sample_left = 
                 bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
                   scale_sample(sample_left, bufs[buf].stereo_volume.left) :
@@ -741,8 +737,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               uint32_t idx = (bufs[buf].sample_pointer >> 16) * 2; // just the whole part, *2 because stereo
               s15p16  frac = bufs[buf].sample_pointer & 0x0000FFFF; // just the fractional part
 
-              bool will_ovrflw_loop = ( idx ) > ( remaining - 4 );
-              bool will_ovrflw_buf = ( idx ) > ( SAMPLES_PER_READ - 4 );
+              bool will_ovrflw_loop = idx > ( remaining - 4 );
+              bool will_ovrflw_buf = idx > ( SAMPLES_PER_READ - 4 );
               int16_t *ovflw_buf_pointer = will_ovrflw_loop ? bufs[buf].buffer_head : bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
 
               int16_t sample_left_a = buf_pointer[idx];
@@ -776,9 +772,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 buf_pointer = bufs[buf].buffer_head;
                 bufs[buf].current_buf = 2;
                 bufs[buf].wav_position = 0;
-                bufs[buf].sample_pointer &= 0x0000FFFF; // keep the fractional part
+                // bufs[buf].sample_pointer &= 0x0000FFFF; // keep the fractional part
+                bufs[buf].sample_pointer -= (remaining * 0x8000); // keep the fractional part
                 bufs[buf].read_block = bufs[buf].wav_data.start_block + BLOCKS_PER_READ; // next read can skip buffer_head
                 bufs[buf].full = 0;
+                remaining = bufs[buf].size;
               } 
               else if(written >= SAMPLES_PER_READ) // out of buffer but more to the wav
               {
@@ -822,156 +820,463 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
 */
           case ASR_LOOP :
           {
-            size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES;
-            size_t i = 0;
-            while(to_write)
+            u16p16 step = channel_pitch_bend_factor[bufs[buf].wav_player_event.channel];            
+
+            if(bufs[buf].fade == 0) // dont update stereo volume while fading
             {
-              size_t this_write;
-              size_t remaining_in_attack = 0;
-              size_t remaining_in_buffer_head = 0;
-              size_t remaining_in_sustain = 0;
-              size_t remaining_in_release = 0;
-              size_t remaining_in_buffer = 0;
-              bool should_copy;
-              if(bufs[buf].wav_position < bufs[buf].asr.loop_start) // were in the attack
+              update_stereo_volume(buf);
+            }
+            else if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // starting a fade but the buf is not a linear response
+            {
+              convert_buf_linear(buf);
+            }
+            int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
+
+            for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i += 2)
+            {
+              size_t idx = (bufs[buf].sample_pointer >> 16) * 2;
+              s15p16 frac = bufs[buf].sample_pointer & 0x0000FFFF;
+              size_t position = bufs[buf].wav_position + idx;
+              size_t remaining_in_buffer = SAMPLES_PER_READ - position;
+
+              int section;
+              size_t remaining;
+              bool should_copy = false;
+
+              if( position < bufs[buf].asr.loop_start )
               {
-                remaining_in_attack = bufs[buf].asr.loop_start - bufs[buf].wav_position;
-                remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
-                size_t temp = remaining_in_buffer < remaining_in_attack ? remaining_in_buffer : remaining_in_attack;
-                this_write = to_write < temp ? to_write : temp;
-                should_copy = false;
+                section = ASR_ATTACK;
+                remaining = bufs[buf].asr.loop_start - bufs[buf].wav_position;
               }
-              else if( bufs[buf].wav_position < (bufs[buf].asr.loop_start + SAMPLES_PER_READ)) // were in the loop section and need to copy
+              else if(position < (bufs[buf].asr.loop_start + SAMPLES_PER_READ))
               {
-                remaining_in_buffer_head = (bufs[buf].asr.loop_start + SAMPLES_PER_READ) - bufs[buf].wav_position;
-                remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
-                size_t temp = remaining_in_buffer_head < remaining_in_buffer ? remaining_in_buffer_head : remaining_in_buffer;
-                this_write = to_write < temp ? to_write : temp;
+                section = ASR_HEAD;
+                remaining = (bufs[buf].asr.loop_start + SAMPLES_PER_READ) - bufs[buf].wav_position;
                 should_copy = bufs[buf].asr.full == false;
               }
-              else if(bufs[buf].wav_position < bufs[buf].asr.loop_end) // were in the sustain
+              else if(position < bufs[buf].asr.loop_end)
               {
-                remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
-                remaining_in_sustain = bufs[buf].asr.loop_end - bufs[buf].wav_position;
-                size_t temp = remaining_in_sustain < remaining_in_buffer ? remaining_in_sustain : remaining_in_buffer;
-                this_write = to_write < temp ? to_write : temp;
-                should_copy = false;
-              }
-              else // were in the release
-              {
-                remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
-                remaining_in_release = bufs[buf].size - bufs[buf].wav_position;
-                size_t temp = remaining_in_release < remaining_in_buffer ? remaining_in_release : remaining_in_buffer;
-                this_write = to_write < temp ? to_write : temp;
-                should_copy = false;
-              }
-              size_t this_write_end = this_write + i;
-              // update_stereo_volume(buf);
-              if(bufs[buf].fade == 0) // dont update stereo volume while fading
-              {
-                update_stereo_volume(buf);
-              }
-              else if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // starting a fade but the buf is not a linear response
-              {
-                convert_buf_linear(buf);
-              }
-              int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
-              if(should_copy)
-              {
-                for(; i<this_write_end; i++) // mix into output and copy to buffer_head
-                {
-                  uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
-                  sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
-                    scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
-                    bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
-                    scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
-                    scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
-                  output_buf[i] += (sample >> DAMPEN_BITS);
-                  bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
-                  // do fadeout but only if HALT
-                  if( 
-                    (bufs[buf].fade > 0) &&
-                    (bufs[buf].wav_data.note_off_meaning == HALT) &&
-                    (i % fade_factor == 0) // were fading and its time to decrement volumes
-                  )
-                  {
-                    bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
-                    bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
-                    if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
-                    {
-                      bufs[buf].done = true;
-                      break;
-                    }
-                  }
-                }
+                section = ASR_SUSTAIN;
+                remaining = bufs[buf].asr.loop_end - bufs[buf].wav_position;
               }
               else
               {
-                for(; i<this_write_end; i++) // just mix into output
+                section = ASR_RELEASE;
+                remaining = bufs[buf].size - bufs[buf].wav_position;
+              }
+
+              if(should_copy)
+              {
+                size_t write_index = position - bufs[buf].asr.loop_start;
+                bufs[buf].buffer_head[write_index] = buf_pointer[idx];
+                bufs[buf].buffer_head[write_index + 1] = buf_pointer[idx + 1];
+              }
+
+              bool will_ovrflw_loop = (section == ASR_SUSTAIN) && (idx > (remaining - 4));
+              bool will_ovrflw_head = (section == ASR_HEAD) && (idx > (remaining - 4));
+              bool will_ovrflw_buf = idx > (SAMPLES_PER_READ - 4);
+              int16_t *ovflw_buf_pointer = 
+                will_ovrflw_loop ? bufs[buf].buffer_head : 
+                will_ovrflw_head ? bufs[buf].buffer_a + bufs[buf].asr.offset : 
+                bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : 
+                bufs[buf].buffer_a;
+
+              int16_t sample_left_a = buf_pointer[idx];
+              int16_t sample_right_a = buf_pointer[idx+1];
+              int16_t sample_left_b =  (will_ovrflw_loop || will_ovrflw_buf) ? ovflw_buf_pointer[0] : buf_pointer[idx+2];
+              int16_t sample_right_b = (will_ovrflw_loop || will_ovrflw_buf) ? ovflw_buf_pointer[1] : buf_pointer[idx+3];
+
+              int16_t sample_left = interpolate(sample_left_a, sample_left_b, frac);
+              int16_t sample_right = interpolate(sample_right_a, sample_right_b, frac);
+
+              sample_left = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+                scale_sample(sample_left, bufs[buf].stereo_volume.left) :
+                bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+                scale_sample_sqrt(sample_left, bufs[buf].stereo_volume.left) :
+                scale_sample_inv_sqrt(sample_left, bufs[buf].stereo_volume.left);
+
+              sample_right = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+                scale_sample(sample_right, bufs[buf].stereo_volume.right) :
+                bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+                scale_sample_sqrt(sample_right, bufs[buf].stereo_volume.right) :
+                scale_sample_inv_sqrt(sample_right, bufs[buf].stereo_volume.right);
+
+              output_buf[i]     += (sample_left  >> DAMPEN_BITS);
+              output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
+
+              bufs[buf].sample_pointer += step;
+              size_t written = (bufs[buf].sample_pointer >> 16) * 2;
+
+              if(written >= remaining) // finished the section
+              {
+                if(section == ASR_HEAD)
                 {
-                  uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
-                  sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
-                    scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
-                    bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
-                    scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
-                    scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
-                  output_buf[i] += (sample >> DAMPEN_BITS);
-                  if( 
-                    (bufs[buf].fade > 0) &&
-                    (bufs[buf].wav_data.note_off_meaning == HALT) &&
-                    (i % fade_factor == 0) // were fading and its time to decrement volumes
-                  )
+                  // log_e("head done");
+                  if(bufs[buf].asr.full) // we need to jump to the right spot in the next buffer
                   {
-                    bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
-                    bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
-                    if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
-                    {
-                      bufs[buf].done = true;
-                      break;
-                    }
+                    buf_pointer = bufs[buf].buffer_a;
+                    bufs[buf].current_buf = 0;
+                    // bufs[buf].sample_pointer = (bufs[buf].asr.offset * 0x8000) | (bufs[buf].sample_pointer & 0x0000FFFF);
+                    bufs[buf].sample_pointer -= ( SAMPLES_PER_READ * 0x8000); // rewind one buffer
+                    bufs[buf].sample_pointer += ( bufs[buf].asr.offset * 0x8000); // ffwd the offset
+                    bufs[buf].full = 0;
+                    bufs[buf].wav_position =  bufs[buf].asr.read_block * (SAMPLES_PER_READ / BLOCKS_PER_READ); // ? 
+                  }
+                  else // done copy, and just keep going
+                  {
+                    bufs[buf].asr.full = true;
                   }
                 }
-              }
-              bufs[buf].wav_position += this_write;
-              to_write -= this_write;
-              if((this_write == remaining_in_sustain) && (!bufs[buf].fade)) // we need to loop
-              {
-                buf_pointer = bufs[buf].buffer_head;
-                bufs[buf].current_buf = 2;
-                bufs[buf].wav_position = bufs[buf].asr.loop_start;
-                bufs[buf].sample_pointer = 0;
-                bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
-                bufs[buf].full = 0;
-              }
-              else if(this_write == remaining_in_buffer_head)
-              {
-                if(bufs[buf].asr.full) // we need to jump to the right spot in the next buffer
+                else if(section == ASR_SUSTAIN)
                 {
-                  buf_pointer = bufs[buf].buffer_a;
-                  bufs[buf].current_buf = 0;
-                  bufs[buf].sample_pointer = bufs[buf].asr.offset;
-                  bufs[buf].full = 0;
+                  // log_e("sustain done");
+                  if(!bufs[buf].fade)
+                  {
+                    // log_e("looping");
+                    size_t samples = bufs[buf].asr.loop_end - bufs[buf].wav_position; // how far to rewind the sample_pointer
+                    buf_pointer = bufs[buf].buffer_head;
+                    bufs[buf].current_buf = 2;
+                    bufs[buf].wav_position = bufs[buf].asr.loop_start;
+                    // bufs[buf].sample_pointer &= 0x0000FFFF;
+                    bufs[buf].sample_pointer -= (samples * 0x8000);
+                    bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
+                    bufs[buf].full = 0;
+                  }
                 }
-                else // done copy, and just keep going
+                else if(section == ASR_RELEASE)
                 {
-                  bufs[buf].asr.full = true;
+                  // log_e("release done");
+                  bufs[buf].done = true;
                 }
               }
-              else if(this_write == remaining_in_release) // wav is done
+              else if(written >= SAMPLES_PER_READ) // out of buffer
               {
-                bufs[buf].done = true;
-                break; // leave the while loop
-              }
-              else if(this_write == remaining_in_buffer) // ran out of buffer
-              {
+                // log_e("buffer done %s", section == ASR_ATTACK ? "attack" : section == ASR_HEAD ? "head" : section == ASR_SUSTAIN ? "sustain" : section == ASR_RELEASE ? "release" : "unknown");
                 buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
-                bufs[buf].sample_pointer = 0;
+                bufs[buf].sample_pointer -= ( SAMPLES_PER_READ * 0x8000);
                 bufs[buf].full = 0;
                 bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+                bufs[buf].wav_position += SAMPLES_PER_READ;
+              }
+
+              if( 
+                (bufs[buf].fade > 0) &&
+                (bufs[buf].wav_data.note_off_meaning == HALT) &&
+                (i % fade_factor == 0) // were fading and its time to decrement volumes
+              )
+              {
+                bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+                bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+                if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+                {
+                  bufs[buf].done = true;
+                  break;
+                }
               }
             }
-            break;
           }
+          //   size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES;
+          //   size_t i = 0;
+          //   while(to_write)
+          //   {
+          //     size_t this_write;
+          //     size_t remaining_in_attack = 0;
+          //     size_t remaining_in_buffer_head = 0;
+          //     size_t remaining_in_sustain = 0;
+          //     size_t remaining_in_release = 0;
+          //     size_t remaining_in_buffer = 0;
+          //     bool should_copy;
+          //     if(bufs[buf].wav_position < bufs[buf].asr.loop_start) // were in the attack
+          //     {
+          //       remaining_in_attack = bufs[buf].asr.loop_start - bufs[buf].wav_position;
+          //       remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+          //       size_t temp = remaining_in_buffer < remaining_in_attack ? remaining_in_buffer : remaining_in_attack;
+          //       this_write = to_write < temp ? to_write : temp;
+          //       should_copy = false;
+          //     }
+          //     else if( bufs[buf].wav_position < (bufs[buf].asr.loop_start + SAMPLES_PER_READ)) // were in the loop section and need to copy
+          //     {
+          //       remaining_in_buffer_head = (bufs[buf].asr.loop_start + SAMPLES_PER_READ) - bufs[buf].wav_position;
+          //       remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+          //       size_t temp = remaining_in_buffer_head < remaining_in_buffer ? remaining_in_buffer_head : remaining_in_buffer;
+          //       this_write = to_write < temp ? to_write : temp;
+          //       should_copy = bufs[buf].asr.full == false;
+          //     }
+          //     else if(bufs[buf].wav_position < bufs[buf].asr.loop_end) // were in the sustain
+          //     {
+          //       remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+          //       remaining_in_sustain = bufs[buf].asr.loop_end - bufs[buf].wav_position;
+          //       size_t temp = remaining_in_sustain < remaining_in_buffer ? remaining_in_sustain : remaining_in_buffer;
+          //       this_write = to_write < temp ? to_write : temp;
+          //       should_copy = false;
+          //     }
+          //     else // were in the release
+          //     {
+          //       remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+          //       remaining_in_release = bufs[buf].size - bufs[buf].wav_position;
+          //       size_t temp = remaining_in_release < remaining_in_buffer ? remaining_in_release : remaining_in_buffer;
+          //       this_write = to_write < temp ? to_write : temp;
+          //       should_copy = false;
+          //     }
+          //     size_t this_write_end = this_write + i;
+          //     // update_stereo_volume(buf);
+          //     if(bufs[buf].fade == 0) // dont update stereo volume while fading
+          //     {
+          //       update_stereo_volume(buf);
+          //     }
+          //     else if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // starting a fade but the buf is not a linear response
+          //     {
+          //       convert_buf_linear(buf);
+          //     }
+          //     int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
+          //     if(should_copy)
+          //     {
+          //       for(; i<this_write_end; i++) // mix into output and copy to buffer_head
+          //       {
+          //         uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
+          //         sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+          //           scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //           bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+          //           scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //           scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
+          //         output_buf[i] += (sample >> DAMPEN_BITS);
+          //         bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
+          //         // do fadeout but only if HALT
+          //         if( 
+          //           (bufs[buf].fade > 0) &&
+          //           (bufs[buf].wav_data.note_off_meaning == HALT) &&
+          //           (i % fade_factor == 0) // were fading and its time to decrement volumes
+          //         )
+          //         {
+          //           bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+          //           bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+          //           if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+          //           {
+          //             bufs[buf].done = true;
+          //             break;
+          //           }
+          //         }
+          //       }
+          //     }
+          //     else
+          //     {
+          //       for(; i<this_write_end; i++) // just mix into output
+          //       {
+          //         uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
+          //         sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+          //           scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //           bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+          //           scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //           scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
+          //         output_buf[i] += (sample >> DAMPEN_BITS);
+          //         if( 
+          //           (bufs[buf].fade > 0) &&
+          //           (bufs[buf].wav_data.note_off_meaning == HALT) &&
+          //           (i % fade_factor == 0) // were fading and its time to decrement volumes
+          //         )
+          //         {
+          //           bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+          //           bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+          //           if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+          //           {
+          //             bufs[buf].done = true;
+          //             break;
+          //           }
+          //         }
+          //       }
+          //     }
+          //     bufs[buf].wav_position += this_write;
+          //     to_write -= this_write;
+          //     if((this_write == remaining_in_sustain) && (!bufs[buf].fade)) // we need to loop
+          //     {
+          //       buf_pointer = bufs[buf].buffer_head;
+          //       bufs[buf].current_buf = 2;
+          //       bufs[buf].wav_position = bufs[buf].asr.loop_start;
+          //       bufs[buf].sample_pointer = 0;
+          //       bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
+          //       bufs[buf].full = 0;
+          //     }
+          //     else if(this_write == remaining_in_buffer_head)
+          //     {
+          //       if(bufs[buf].asr.full) // we need to jump to the right spot in the next buffer
+          //       {
+          //         buf_pointer = bufs[buf].buffer_a;
+          //         bufs[buf].current_buf = 0;
+          //         bufs[buf].sample_pointer = bufs[buf].asr.offset;
+          //         bufs[buf].full = 0;
+          //       }
+          //       else // done copy, and just keep going
+          //       {
+          //         bufs[buf].asr.full = true;
+          //       }
+          //     }
+          //     else if(this_write == remaining_in_release) // wav is done
+          //     {
+          //       bufs[buf].done = true;
+          //       break; // leave the while loop
+          //     }
+          //     else if(this_write == remaining_in_buffer) // ran out of buffer
+          //     {
+          //       buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+          //       bufs[buf].sample_pointer = 0;
+          //       bufs[buf].full = 0;
+          //       bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+          //     }
+          //   }
+          //   break;
+          // }
+          // case ASR_LOOP :
+          // {
+          //   size_t to_write = DAC_BUFFER_SIZE_IN_SAMPLES;
+          //   size_t i = 0;
+          //   while(to_write)
+          //   {
+          //     size_t this_write;
+          //     size_t remaining_in_attack = 0;
+          //     size_t remaining_in_buffer_head = 0;
+          //     size_t remaining_in_sustain = 0;
+          //     size_t remaining_in_release = 0;
+          //     size_t remaining_in_buffer = 0;
+          //     bool should_copy;
+          //     if(bufs[buf].wav_position < bufs[buf].asr.loop_start) // were in the attack
+          //     {
+          //       remaining_in_attack = bufs[buf].asr.loop_start - bufs[buf].wav_position;
+          //       remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+          //       size_t temp = remaining_in_buffer < remaining_in_attack ? remaining_in_buffer : remaining_in_attack;
+          //       this_write = to_write < temp ? to_write : temp;
+          //       should_copy = false;
+          //     }
+          //     else if( bufs[buf].wav_position < (bufs[buf].asr.loop_start + SAMPLES_PER_READ)) // were in the loop section and need to copy
+          //     {
+          //       remaining_in_buffer_head = (bufs[buf].asr.loop_start + SAMPLES_PER_READ) - bufs[buf].wav_position;
+          //       remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+          //       size_t temp = remaining_in_buffer_head < remaining_in_buffer ? remaining_in_buffer_head : remaining_in_buffer;
+          //       this_write = to_write < temp ? to_write : temp;
+          //       should_copy = bufs[buf].asr.full == false;
+          //     }
+          //     else if(bufs[buf].wav_position < bufs[buf].asr.loop_end) // were in the sustain
+          //     {
+          //       remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+          //       remaining_in_sustain = bufs[buf].asr.loop_end - bufs[buf].wav_position;
+          //       size_t temp = remaining_in_sustain < remaining_in_buffer ? remaining_in_sustain : remaining_in_buffer;
+          //       this_write = to_write < temp ? to_write : temp;
+          //       should_copy = false;
+          //     }
+          //     else // were in the release
+          //     {
+          //       remaining_in_buffer = SAMPLES_PER_READ - bufs[buf].sample_pointer;
+          //       remaining_in_release = bufs[buf].size - bufs[buf].wav_position;
+          //       size_t temp = remaining_in_release < remaining_in_buffer ? remaining_in_release : remaining_in_buffer;
+          //       this_write = to_write < temp ? to_write : temp;
+          //       should_copy = false;
+          //     }
+          //     size_t this_write_end = this_write + i;
+          //     // update_stereo_volume(buf);
+          //     if(bufs[buf].fade == 0) // dont update stereo volume while fading
+          //     {
+          //       update_stereo_volume(buf);
+          //     }
+          //     else if(bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // starting a fade but the buf is not a linear response
+          //     {
+          //       convert_buf_linear(buf);
+          //     }
+          //     int fade_factor = bufs[buf].pruned ? 4 : 4 + channel_release[bufs[buf].wav_player_event.channel];
+          //     if(should_copy)
+          //     {
+          //       for(; i<this_write_end; i++) // mix into output and copy to buffer_head
+          //       {
+          //         uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
+          //         sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+          //           scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //           bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+          //           scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //           scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
+          //         output_buf[i] += (sample >> DAMPEN_BITS);
+          //         bufs[buf].buffer_head[bufs[buf].asr.read_ptr++] = buf_pointer[bufs[buf].sample_pointer - 1]; // ptr has been incrimented so -1
+          //         // do fadeout but only if HALT
+          //         if( 
+          //           (bufs[buf].fade > 0) &&
+          //           (bufs[buf].wav_data.note_off_meaning == HALT) &&
+          //           (i % fade_factor == 0) // were fading and its time to decrement volumes
+          //         )
+          //         {
+          //           bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+          //           bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+          //           if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+          //           {
+          //             bufs[buf].done = true;
+          //             break;
+          //           }
+          //         }
+          //       }
+          //     }
+          //     else
+          //     {
+          //       for(; i<this_write_end; i++) // just mix into output
+          //       {
+          //         uint8_t vol = (i & 0x1) ? bufs[buf].stereo_volume.right : bufs[buf].stereo_volume.left; // i & 0x1 means odd sample, so right channel
+          //         sample = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
+          //           scale_sample(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //           bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
+          //           scale_sample_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol) :
+          //           scale_sample_inv_sqrt(buf_pointer[bufs[buf].sample_pointer++], vol);
+          //         output_buf[i] += (sample >> DAMPEN_BITS);
+          //         if( 
+          //           (bufs[buf].fade > 0) &&
+          //           (bufs[buf].wav_data.note_off_meaning == HALT) &&
+          //           (i % fade_factor == 0) // were fading and its time to decrement volumes
+          //         )
+          //         {
+          //           bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+          //           bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+          //           if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+          //           {
+          //             bufs[buf].done = true;
+          //             break;
+          //           }
+          //         }
+          //       }
+          //     }
+          //     bufs[buf].wav_position += this_write;
+          //     to_write -= this_write;
+          //     if((this_write == remaining_in_sustain) && (!bufs[buf].fade)) // we need to loop
+          //     {
+          //       buf_pointer = bufs[buf].buffer_head;
+          //       bufs[buf].current_buf = 2;
+          //       bufs[buf].wav_position = bufs[buf].asr.loop_start;
+          //       bufs[buf].sample_pointer = 0;
+          //       bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
+          //       bufs[buf].full = 0;
+          //     }
+          //     else if(this_write == remaining_in_buffer_head)
+          //     {
+          //       if(bufs[buf].asr.full) // we need to jump to the right spot in the next buffer
+          //       {
+          //         buf_pointer = bufs[buf].buffer_a;
+          //         bufs[buf].current_buf = 0;
+          //         bufs[buf].sample_pointer = bufs[buf].asr.offset;
+          //         bufs[buf].full = 0;
+          //       }
+          //       else // done copy, and just keep going
+          //       {
+          //         bufs[buf].asr.full = true;
+          //       }
+          //     }
+          //     else if(this_write == remaining_in_release) // wav is done
+          //     {
+          //       bufs[buf].done = true;
+          //       break; // leave the while loop
+          //     }
+          //     else if(this_write == remaining_in_buffer) // ran out of buffer
+          //     {
+          //       buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+          //       bufs[buf].sample_pointer = 0;
+          //       bufs[buf].full = 0;
+          //       bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
+          //     }
+          //   }
+          //   break;
+          // }
         }
       }
     }

@@ -8,6 +8,11 @@ extern "C"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
+#define ASR_ATTACK 0
+#define ASR_HEAD 1
+#define ASR_SUSTAIN 2
+#define ASR_RELEASE 3
+
 struct pan_t {
     uint8_t left_vol;
     uint8_t right_vol;

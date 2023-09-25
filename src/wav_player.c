@@ -589,12 +589,12 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
       // if its a looped sample, read into the buffer_head
       if(bufs[new_midi_buf].wav_data.play_back_mode == LOOP)
       {
-        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_head, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ_PLUS ));
+        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_head, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
         bufs[new_midi_buf].current_buf = 2;
       }
       else
       {
-        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ_PLUS ));
+        ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
       }
       num_reads++;
       bufs[new_midi_buf].read_block += BLOCKS_PER_READ;
@@ -612,7 +612,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
         )
       {
         buf_pointer = bufs[i].current_buf == 0 ? bufs[i].buffer_b : bufs[i].buffer_a;
-        ESP_ERROR_CHECK(emmc_read(buf_pointer, bufs[i].read_block , BLOCKS_PER_READ_PLUS ));
+        ESP_ERROR_CHECK(emmc_read(buf_pointer, bufs[i].read_block , BLOCKS_PER_READ ));
         num_reads++;
         bufs[i].read_block += BLOCKS_PER_READ;
         bufs[i].full = 1; // now the buffer is full
@@ -877,7 +877,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               bool will_ovrflw_buf = idx > (SAMPLES_PER_READ - 4);
               int16_t *ovflw_buf_pointer = 
                 will_ovrflw_loop ? bufs[buf].buffer_head : 
-                will_ovrflw_head ? bufs[buf].buffer_a + bufs[buf].asr.offset : 
+                will_ovrflw_head ? bufs[buf].buffer_a + bufs[buf].asr.offset : // ?
                 bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : 
                 bufs[buf].buffer_a;
 
@@ -933,12 +933,10 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   if(!bufs[buf].fade)
                   {
                     // log_e("looping");
-                    size_t samples = bufs[buf].asr.loop_end - bufs[buf].wav_position; // how far to rewind the sample_pointer
                     buf_pointer = bufs[buf].buffer_head;
                     bufs[buf].current_buf = 2;
                     bufs[buf].wav_position = bufs[buf].asr.loop_start;
-                    // bufs[buf].sample_pointer &= 0x0000FFFF;
-                    bufs[buf].sample_pointer -= (samples * 0x8000);
+                    bufs[buf].sample_pointer -= (remaining * 0x8000);
                     bufs[buf].read_block = bufs[buf].wav_data.start_block + bufs[buf].asr.read_block; // next read is at the asr.read_block
                     bufs[buf].full = 0;
                   }

@@ -836,7 +836,6 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             {
               uint32_t idx = (bufs[buf].sample_pointer >> 16) * 2;
               s15p16 frac = bufs[buf].sample_pointer & 0x0000FFFF;
-
               uint32_t position = bufs[buf].wav_position + idx;
 
               int section;
@@ -845,27 +844,22 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
 
               if( position < bufs[buf].asr.loop_start )
               {
-                // log_e("in attack");
                 section = ASR_ATTACK;
                 remaining = bufs[buf].asr.loop_start - bufs[buf].wav_position;
               }
-              // else if(bufs[buf].current_buf == 2)
               else if(position < (bufs[buf].asr.loop_start + SAMPLES_PER_READ))
               {
-                // log_e("in head");
                 section = ASR_HEAD;
                 remaining = (bufs[buf].asr.loop_start + SAMPLES_PER_READ) - bufs[buf].wav_position;
                 should_copy = bufs[buf].asr.full == false;
               }
               else if(position < bufs[buf].asr.loop_end)
               {
-                // log_e("in sustain");
                 section = ASR_SUSTAIN;
                 remaining = bufs[buf].asr.loop_end - bufs[buf].wav_position;
               }
               else
               {
-                // log_e("in release");
                 section = ASR_RELEASE;
                 remaining = bufs[buf].size - bufs[buf].wav_position;
               }
@@ -874,13 +868,18 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               {
                 if(idx >= SAMPLES_PER_READ) // out of buffer
                 {
-                  // log_e("buffer done %s", section == ASR_ATTACK ? "attack" : section == ASR_HEAD ? "head" : section == ASR_SUSTAIN ? "sustain" : section == ASR_RELEASE ? "release" : "unknown");
                   buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
                   bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
                   bufs[buf].sample_pointer -= ( SAMPLES_PER_READ * 0x8000);
                   bufs[buf].full = 0;
                   bufs[buf].wav_position += SAMPLES_PER_READ;
-                  break;
+
+                  remaining -= SAMPLES_PER_READ;
+                  idx = (bufs[buf].sample_pointer >> 16) * 2;
+                  frac = bufs[buf].sample_pointer & 0x0000FFFF;
+                  position = bufs[buf].wav_position + idx;
+
+                  // break;
                 }
 
                 if(should_copy)

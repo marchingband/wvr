@@ -562,7 +562,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               )
             )
           {
-            bufs[b].fade=1;
+            bufs[b].fade = 1;
             // bufs[b].done=1;
             // break; // comment out to stop them all, leave it uncommented to break just the first one that matches
           }
@@ -834,12 +834,13 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             int i = 0;
             while(i < DAC_BUFFER_SIZE_IN_SAMPLES)
             {
-              size_t idx = (bufs[buf].sample_pointer >> 16) * 2;
+              uint32_t idx = (bufs[buf].sample_pointer >> 16) * 2;
               s15p16 frac = bufs[buf].sample_pointer & 0x0000FFFF;
-              size_t position = bufs[buf].wav_position + idx;
+
+              uint32_t position = bufs[buf].wav_position + idx;
 
               int section;
-              size_t remaining;
+              uint32_t remaining;
               bool should_copy = false;
 
               if( position < bufs[buf].asr.loop_start )
@@ -848,6 +849,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 section = ASR_ATTACK;
                 remaining = bufs[buf].asr.loop_start - bufs[buf].wav_position;
               }
+              // else if(bufs[buf].current_buf == 2)
               else if(position < (bufs[buf].asr.loop_start + SAMPLES_PER_READ))
               {
                 // log_e("in head");
@@ -874,9 +876,9 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 {
                   // log_e("buffer done %s", section == ASR_ATTACK ? "attack" : section == ASR_HEAD ? "head" : section == ASR_SUSTAIN ? "sustain" : section == ASR_RELEASE ? "release" : "unknown");
                   buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
+                  bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
                   bufs[buf].sample_pointer -= ( SAMPLES_PER_READ * 0x8000);
                   bufs[buf].full = 0;
-                  bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
                   bufs[buf].wav_position += SAMPLES_PER_READ;
                   break;
                 }
@@ -891,6 +893,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 bool will_ovrflw_loop = (section == ASR_SUSTAIN) && (idx > (remaining - 4));
                 bool will_ovrflw_head = (section == ASR_HEAD) && (idx > (remaining - 4));
                 bool will_ovrflw_buf = idx > (SAMPLES_PER_READ - 4);
+
                 int16_t *ovflw_buf_pointer = 
                   will_ovrflw_loop ? bufs[buf].buffer_head : 
                   will_ovrflw_head ? bufs[buf].buffer_a + bufs[buf].asr.offset : // ?
@@ -917,18 +920,15 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   scale_sample_sqrt(sample_right, bufs[buf].stereo_volume.right) :
                   scale_sample_inv_sqrt(sample_right, bufs[buf].stereo_volume.right);
 
-                output_buf[i++] += (sample_left  >> DAMPEN_BITS);
-                output_buf[i++] += (sample_right >> DAMPEN_BITS);
-
-                if(i >= DAC_BUFFER_SIZE_IN_SAMPLES)
-                {
-                  break;
-                }
+                output_buf[i] += (sample_left  >> DAMPEN_BITS);
+                i++;
+                output_buf[i] += (sample_right >> DAMPEN_BITS);
+                i++;
 
                 if( 
                   (bufs[buf].fade > 0) &&
                   (bufs[buf].wav_data.note_off_meaning == HALT) &&
-                  (i % fade_factor == 0) // were fading and its time to decrement volumes
+                  (i % fade_factor < 2) // were fading and its time to decrement volumes
                 )
                 {
                   bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
@@ -944,51 +944,16 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 idx = (bufs[buf].sample_pointer >> 16) * 2;
                 frac = bufs[buf].sample_pointer & 0x0000FFFF;
                 position = bufs[buf].wav_position + idx;
+
+                if(i >= DAC_BUFFER_SIZE_IN_SAMPLES)
+                {
+                  // log_e("dac buffer done %d", i);
+                  break;
+                }
+
               }
 
-              // if(should_copy)
-              // {
-              //   size_t write_index = position - bufs[buf].asr.loop_start;
-              //   bufs[buf].buffer_head[write_index] = buf_pointer[idx];
-              //   bufs[buf].buffer_head[write_index + 1] = buf_pointer[idx + 1];
-              // }
-
-              // bool will_ovrflw_loop = (section == ASR_SUSTAIN) && (idx > (remaining - 4));
-              // bool will_ovrflw_head = (section == ASR_HEAD) && (idx > (remaining - 4));
-              // bool will_ovrflw_buf = idx > (SAMPLES_PER_READ - 4);
-              // int16_t *ovflw_buf_pointer = 
-              //   will_ovrflw_loop ? bufs[buf].buffer_head : 
-              //   will_ovrflw_head ? bufs[buf].buffer_a + bufs[buf].asr.offset : // ?
-              //   bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : 
-              //   bufs[buf].buffer_a;
-
-              // int16_t sample_left_a = buf_pointer[idx];
-              // int16_t sample_right_a = buf_pointer[idx+1];
-              // int16_t sample_left_b =  (will_ovrflw_loop || will_ovrflw_buf) ? ovflw_buf_pointer[0] : buf_pointer[idx+2];
-              // int16_t sample_right_b = (will_ovrflw_loop || will_ovrflw_buf) ? ovflw_buf_pointer[1] : buf_pointer[idx+3];
-
-              // int16_t sample_left = interpolate(sample_left_a, sample_left_b, frac);
-              // int16_t sample_right = interpolate(sample_right_a, sample_right_b, frac);
-
-              // sample_left = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
-              //   scale_sample(sample_left, bufs[buf].stereo_volume.left) :
-              //   bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
-              //   scale_sample_sqrt(sample_left, bufs[buf].stereo_volume.left) :
-              //   scale_sample_inv_sqrt(sample_left, bufs[buf].stereo_volume.left);
-
-              // sample_right = bufs[buf].wav_data.response_curve == RESPONSE_LINEAR ?
-              //   scale_sample(sample_right, bufs[buf].stereo_volume.right) :
-              //   bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
-              //   scale_sample_sqrt(sample_right, bufs[buf].stereo_volume.right) :
-              //   scale_sample_inv_sqrt(sample_right, bufs[buf].stereo_volume.right);
-
-              // output_buf[i]     += (sample_left  >> DAMPEN_BITS);
-              // output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
-
-              // bufs[buf].sample_pointer += step;
-              size_t written = (bufs[buf].sample_pointer >> 16) * 2;
-
-              if(written >= remaining) // finished the section
+              if(idx >= remaining) // finished the section
               {
                 if(section == ASR_HEAD)
                 {
@@ -998,7 +963,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     buf_pointer = bufs[buf].buffer_a;
                     bufs[buf].current_buf = 0;
                     // bufs[buf].sample_pointer = (bufs[buf].asr.offset * 0x8000) | (bufs[buf].sample_pointer & 0x0000FFFF);
-                    bufs[buf].sample_pointer -= ( SAMPLES_PER_READ * 0x8000); // rewind one buffer
+                    bufs[buf].sample_pointer -= ( remaining * 0x8000); // rewind one buffer
                     bufs[buf].sample_pointer += ( bufs[buf].asr.offset * 0x8000); // ffwd the offset
                     bufs[buf].full = 0;
                     bufs[buf].wav_position =  bufs[buf].asr.read_block * (SAMPLES_PER_READ / BLOCKS_PER_READ); // ? 
@@ -1028,31 +993,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   bufs[buf].done = true;
                   break;
                 }
+                else
+                {
+                  // log_e("attack done");
+                }
               }
-              // else if(written >= SAMPLES_PER_READ) // out of buffer
-              // {
-              //   // log_e("buffer done %s", section == ASR_ATTACK ? "attack" : section == ASR_HEAD ? "head" : section == ASR_SUSTAIN ? "sustain" : section == ASR_RELEASE ? "release" : "unknown");
-              //   buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_b : bufs[buf].buffer_a;
-              //   bufs[buf].sample_pointer -= ( SAMPLES_PER_READ * 0x8000);
-              //   bufs[buf].full = 0;
-              //   bufs[buf].current_buf = bufs[buf].current_buf == 0 ? 1 : 0;
-              //   bufs[buf].wav_position += SAMPLES_PER_READ;
-              // }
-
-              // if( 
-              //   (bufs[buf].fade > 0) &&
-              //   (bufs[buf].wav_data.note_off_meaning == HALT) &&
-              //   (i % fade_factor == 0) // were fading and its time to decrement volumes
-              // )
-              // {
-              //   bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
-              //   bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
-              //   if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
-              //   {
-              //     bufs[buf].done = true;
-              //     break;
-              //   }
-              // }
             }
             break;
           }

@@ -351,6 +351,7 @@ static void handle_midi(uint8_t *msg)
                 uint8_t coarse = msg[2];
                 channel_pitch_bend[channel] = (coarse << 7) | fine;
                 // log_e("pb:%d", channel_pitch_bend[channel]);
+                break;
             }
             case MIDI_CC:
             {

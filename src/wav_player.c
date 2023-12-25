@@ -38,9 +38,10 @@ static const char* TAG = "wav_player";
 #define DAC_BUFFER_SIZE_IN_BYTES ( DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t) ) 
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
 
+// #define NUM_BUFFERS 2    // debug
 // #define NUM_BUFFERS 16    // 1.1.x
-#define NUM_BUFFERS 18 // 1.0.x
 // #define NUM_BUFFERS 17 // 1.0.x
+#define NUM_BUFFERS 18 // 1.0.x
 // #define NUM_BUFFERS 19
 // #define NUM_BUFFERS 20
 // #define NUM_BUFFERS 30
@@ -110,7 +111,7 @@ struct buf_t {
   size_t fade_counter;
   uint8_t volume;
   uint8_t voice;
-  uint8_t fade;
+  int8_t fade;
   uint8_t current_buf;
   uint8_t free :1;
   uint8_t done :1;
@@ -447,7 +448,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               bufs[b].wav_player_event.voice == wav_player_event.voice &&
               bufs[b].wav_player_event.note == wav_player_event.note &&
               bufs[b].free == 0 &&
-              bufs[b].fade == FADE_OUT
+              bufs[b].fade != FADE_OUT
             )
           {
             // it is a retrigger, do the right thing
@@ -734,7 +735,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   }
                 }
               }
-              bufs[buf].fade_counter++;
+              bufs[buf].fade_counter += 2;
             }
             break;
           }
@@ -825,8 +826,9 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 bufs[buf].wav_position += SAMPLES_PER_READ;
               }
 
-              if(bufs[buf].fade != FADE_NORMAL){
-                if( (bufs[buf].fade == FADE_OUT) && (bufs[buf].fade_counter % fade_factor < 2) )
+              if((bufs[buf].fade != FADE_NORMAL) && (bufs[buf].fade_counter % fade_factor < 2))
+              {
+                if( bufs[buf].fade == FADE_OUT )
                 {
                   bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
                   bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
@@ -836,24 +838,21 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     break;
                   }
                 }
-              }
-              else if( (bufs[buf].fade > -1) && (bufs[buf].fade_counter % fade_factor == 0) ) // check if its time to increment
-              {
-                // fade in up to the target
-                // log_e("%d %d", fade_factor, bufs[buf].fade_counter);
-                bufs[buf].fade += (bufs[buf].fade < 127);
-                bufs[buf].stereo_volume.right = bufs[buf].fade < bufs[buf].target_stereo_volume.right ? bufs[buf].fade : bufs[buf].target_stereo_volume.right;
-                bufs[buf].stereo_volume.left = bufs[buf].fade < bufs[buf].target_stereo_volume.left ? bufs[buf].fade : bufs[buf].target_stereo_volume.left;
-                if(
-                  (bufs[buf].stereo_volume.right == bufs[buf].target_stereo_volume.right) && 
-                  (bufs[buf].stereo_volume.left == bufs[buf].target_stereo_volume.left)) // attack done
+                else
                 {
-                  bufs[buf].fade = FADE_NORMAL;
-                  bufs[buf].fade_counter = 0;
-                  // break;
+                  bufs[buf].fade += (bufs[buf].fade < 127);
+                  bufs[buf].stereo_volume.right = bufs[buf].fade < bufs[buf].target_stereo_volume.right ? bufs[buf].fade : bufs[buf].target_stereo_volume.right;
+                  bufs[buf].stereo_volume.left = bufs[buf].fade < bufs[buf].target_stereo_volume.left ? bufs[buf].fade : bufs[buf].target_stereo_volume.left;
+                  if(
+                    (bufs[buf].stereo_volume.right == bufs[buf].target_stereo_volume.right) && 
+                    (bufs[buf].stereo_volume.left == bufs[buf].target_stereo_volume.left)) // attack done
+                  {
+                    bufs[buf].fade = FADE_NORMAL;
+                    bufs[buf].fade_counter = 0;
+                  }
                 }
               }
-              bufs[buf].fade_counter++;
+              bufs[buf].fade_counter += 2;
             }
             break;
           }

@@ -40,6 +40,7 @@ static const char* TAG = "wav_player";
 
 // #define NUM_BUFFERS 16    // 1.1.x
 #define NUM_BUFFERS 18 // 1.0.x
+// #define NUM_BUFFERS 17 // 1.0.x
 // #define NUM_BUFFERS 19
 // #define NUM_BUFFERS 20
 // #define NUM_BUFFERS 30
@@ -182,9 +183,12 @@ void init_buffs(void)
     bufs[i].sample_pointer = 0;
     bufs[i].fade_counter = 0;
     // buffers
-    bufs[i].buffer_a    = (int16_t *)malloc(BYTES_PER_READ_PLUS);
-    bufs[i].buffer_b    = (int16_t *)malloc(BYTES_PER_READ_PLUS);
-    bufs[i].buffer_head = (int16_t *)ps_malloc(BYTES_PER_READ_PLUS);
+    bufs[i].buffer_a    = (int16_t *)malloc(BYTES_PER_READ);
+    bufs[i].buffer_b    = (int16_t *)malloc(BYTES_PER_READ);
+    bufs[i].buffer_head = (int16_t *)ps_malloc(BYTES_PER_READ);
+    // bufs[i].buffer_a    = (int16_t *)malloc(BYTES_PER_READ_PLUS);
+    // bufs[i].buffer_b    = (int16_t *)malloc(BYTES_PER_READ_PLUS);
+    // bufs[i].buffer_head = (int16_t *)ps_malloc(BYTES_PER_READ_PLUS);
     if(bufs[i].buffer_a==NULL || bufs[i].buffer_b == NULL || bufs[i].buffer_head == NULL)
     {
       log_e("failed to alloc buffers at %d",i);

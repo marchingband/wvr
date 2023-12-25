@@ -414,7 +414,7 @@ static void handle_midi(uint8_t *msg)
                     channel_exp[channel] = channel_exp_default[channel];
                     channel_sustain[channel] = channel_sustain_default[channel];
                     channel_attack[channel] = channel_attack_default[channel];
-                    channel_pitch_bend = channel_pan_default[channel];
+                    channel_pitch_bend[channel] = channel_pitch_bend_default[channel];
                     handle_channel_sustain_release(channel); // lift the sustain pedal
                     break;
                 case MIDI_CC_SUSTAIN:

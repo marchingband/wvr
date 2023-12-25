@@ -106,6 +106,9 @@ struct metadata_t {
     uint8_t midi_channel; // 0 is omni
     uint8_t pitch_bend_semitones_up;
     uint8_t pitch_bend_semitones_down;
+    uint8_t do_station_mode;
+    char station_ssid[20];
+    char station_passphrase[20];
 };
 
 struct vol_t {

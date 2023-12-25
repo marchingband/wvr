@@ -562,11 +562,12 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               bufs[b].wav_player_event.voice == wav_player_event.voice &&
               bufs[b].wav_player_event.note == wav_player_event.note &&
               bufs[b].free == 0 &&
-              (
-                bufs[b].wav_data.note_off_meaning == HALT   ||
-                bufs[b].wav_data.play_back_mode == ASR_LOOP || // ASR gets stopped either way
-                bufs[b].wav_data.play_back_mode == LOOP        // LOOP gets stopped either way
-              )
+              bufs[b].wav_data.note_off_meaning == HALT
+              // (
+                // bufs[b].wav_data.note_off_meaning == HALT   ||
+                // bufs[b].wav_data.play_back_mode == ASR_LOOP || // ASR gets stopped either way
+                // bufs[b].wav_data.play_back_mode == LOOP        // LOOP gets stopped either way
+              // )
             )
           {
             bufs[b].fade = FADE_OUT;

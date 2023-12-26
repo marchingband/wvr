@@ -13,6 +13,12 @@ extern "C"
 #define ASR_SUSTAIN 2
 #define ASR_RELEASE 3
 
+#define PAUSE_NONE 0
+#define PAUSE_START 1
+#define PAUSE_PAUSED 2
+#define PAUSE_RESUMING 3
+
+
 struct pan_t {
     uint8_t left_vol;
     uint8_t right_vol;

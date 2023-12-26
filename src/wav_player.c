@@ -113,6 +113,7 @@ struct buf_t {
   uint8_t voice;
   int8_t fade;
   uint8_t current_buf;
+  uint8_t pause_state :2;
   uint8_t free :1;
   uint8_t done :1;
   uint8_t full :1;
@@ -173,6 +174,7 @@ void init_buffs(void)
     bufs[i].done = 0;
     bufs[i].full = 0;
     bufs[i].pruned = 0;
+    bufs[i].pause_state = PAUSE_NONE;
     bufs[i].current_buf = 0;
     // uint8_t's
     bufs[i].volume=127;
@@ -434,7 +436,47 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
       // fetch the file
       struct wav_lu_t new_wav = get_file_t_from_lookup_table(wav_player_event.voice, wav_player_event.note, wav_player_event.velocity);
       // check that there is a wav file there
-      if(new_wav.empty == 1) abort_note = 1;
+      if(new_wav.empty == 1)
+      {
+        abort_note = 1;
+        // log_i("found empty");
+        // check for PAUSE RESETS
+        if(
+          (wav_player_event.code == MIDI_NOTE_ON) && 
+          (new_wav.mute_group > 0)
+        ){
+          for(int8_t i=0; i<NUM_BUFFERS; i++)
+          {
+            if(
+              (bufs[i].free == 0) &&
+              (bufs[i].wav_data.mute_group == new_wav.mute_group) &&
+              (bufs[i].wav_data.play_back_mode == PAUSE)
+            )
+            {
+              // log_i("pruned because new wav");
+              switch(bufs[i].pause_state){
+                case PAUSE_NONE:
+                case PAUSE_START:
+                case PAUSE_RESUMING:
+                  bufs[i].fade = FADE_OUT;
+                  bufs[i].pruned = 1;
+                  break;
+                case PAUSE_PAUSED:
+                  bufs[i].free = 1;
+                  bufs[i].done = 0;
+                  bufs[i].current_buf = 0;
+                  bufs[i].wav_position = 0;
+                  bufs[i].sample_pointer = 0;
+                  bufs[i].fade_counter = 0;
+                  bufs[i].fade = FADE_NORMAL;
+                  bufs[i].pause_state = PAUSE_NONE;
+                  break;
+                default:break;
+              }
+            }
+          }        
+        }
+      };
       // secret midi note to trigger pause
       if(wav_player_event.voice == 0xFF) wav_player_pause();
       // check if it is a disguised note-off
@@ -451,38 +493,61 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               bufs[b].fade != FADE_OUT
             )
           {
-            // it is a retrigger, do the right thing
-            
-            switch(bufs[b].wav_data.retrigger_mode){
-              case RESTART:
-                bufs[b].fade = FADE_OUT;
-                bufs[b].pruned = 1;
-                break;
-              case NOTE_OFF:
-                bufs[b].fade = FADE_OUT;
-                abort_note = 1;
-                break;
-              case NONE:
-                abort_note = 1;
-                break;
-              default:
-                break;
+            if(bufs[b].pause_state == PAUSE_PAUSED)
+            {
+              //resume
+              // log_i("resume");
+              bufs[b].pause_state = PAUSE_RESUMING;
+              bufs[b].fade = FADE_IN_INIT;
+              abort_note = 1;
+            }
+            else
+            {
+              // it is a retrigger, do the right thing
+              switch(bufs[b].wav_data.retrigger_mode){
+                case RESTART:
+                  bufs[b].fade = FADE_OUT;
+                  bufs[b].pruned = 1;
+                  // log_i("pruned because RESTART");
+                  break;
+                case NOTE_OFF:
+                  bufs[b].fade = FADE_OUT;
+                  abort_note = 1;
+                  if(bufs[b].wav_data.play_back_mode == PAUSE)
+                  {
+                    // log_i("pausing");
+                    bufs[b].pause_state = PAUSE_START;
+                  }
+                  break;
+                case NONE:
+                  abort_note = 1;
+                  break;
+                default:
+                  break;
+              }
             }
             break;
           }
         }
       }
+
+      // check mute groups
       if(wav_player_event.code == MIDI_NOTE_ON && !abort_note && new_wav.mute_group > 0)
       {
         for(int8_t i=0; i<NUM_BUFFERS; i++)
         {
-          if(bufs[i].wav_data.mute_group == new_wav.mute_group)
+          if(
+            (bufs[i].free == 0) &&
+            (bufs[i].wav_data.mute_group == new_wav.mute_group)
+          )
           {
             bufs[i].fade = FADE_OUT;
             bufs[i].pruned = 1;
+            // log_i("pruned because mute group");
           }
         }
       }
+
       // try to play the note
       if(wav_player_event.code == MIDI_NOTE_ON && !abort_note)
       {
@@ -503,6 +568,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               bufs[to_prune].next_wav_player_event = wav_player_event;
               bufs[to_prune].fade = FADE_OUT;
               bufs[to_prune].pruned = 1;
+              // log_i("pruned because out of buffers");
               break;
             }
           }
@@ -566,14 +632,14 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 bufs[b].wav_data.note_off_meaning == HALT ||
                 bufs[b].wav_data.note_off_meaning == RELEASE
               )
-              // (
-                // bufs[b].wav_data.note_off_meaning == HALT   ||
-                // bufs[b].wav_data.play_back_mode == ASR_LOOP || // ASR gets stopped either way
-                // bufs[b].wav_data.play_back_mode == LOOP        // LOOP gets stopped either way
-              // )
             )
           {
             bufs[b].fade = FADE_OUT;
+            if(bufs[b].wav_data.play_back_mode == PAUSE)
+            {
+              // log_i("pausing");
+              bufs[b].pause_state = PAUSE_START;
+            }
             // bufs[b].done=1;
             // break; // comment out to stop them all, leave it uncommented to break just the first one that matches
           }
@@ -638,11 +704,15 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
     // sum the next section of each buffer and send to DAC buffer
     for(int buf = 0; buf < NUM_BUFFERS; buf++)
     {
-      if(bufs[buf].free == 0)
+      if(
+        (bufs[buf].free == 0) &&
+        (bufs[buf].pause_state != PAUSE_PAUSED)
+      )
       {
         buf_pointer = bufs[buf].current_buf == 0 ? bufs[buf].buffer_a : bufs[buf].current_buf == 1 ? bufs[buf].buffer_b : bufs[buf].buffer_head;
         switch(bufs[buf].wav_data.play_back_mode){
           case ONE_SHOT:
+          case PAUSE:
           {
             size_t remaining = bufs[buf].size - bufs[buf].wav_position;
             u16p16 step = channel_pitch_bend_factor[bufs[buf].wav_player_event.channel];
@@ -656,7 +726,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               convert_buf_linear(buf);
             }
 
-            int fade_factor = bufs[buf].pruned ? 4 // fast fadeout
+            int fade_factor = (bufs[buf].pruned || bufs[buf].pause_state == PAUSE_RESUMING) ? 4 // fast fadeout/fadein
               : bufs[buf].fade == FADE_OUT ? 4 + (channel_release[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER)  // release
               : 4 + (channel_attack[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER); // attack
 
@@ -736,6 +806,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   {
                     bufs[buf].fade = FADE_NORMAL;
                     bufs[buf].fade_counter = 0;
+                    bufs[buf].pause_state = PAUSE_NONE;
+                    // log_i("pause none");
                   }
                 }
               }
@@ -938,7 +1010,6 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   idx = (bufs[buf].sample_pointer >> 16) * 2;
                   frac = bufs[buf].sample_pointer & 0x0000FFFF;
                   position = bufs[buf].wav_position + idx;
-
                   // break;
                 }
 
@@ -987,7 +1058,6 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 if( 
                   (bufs[buf].fade == FADE_OUT) &&
                   (bufs[buf].wav_data.note_off_meaning == HALT) &&
-                  // (bufs[buf].wav_data.note_off_meaning == RELEASE) &&
                   (i % fade_factor < 2) // were fading and its time to decrement volumes
                 )
                 {
@@ -1022,7 +1092,6 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   {
                     buf_pointer = bufs[buf].buffer_a;
                     bufs[buf].current_buf = 0;
-                    // bufs[buf].sample_pointer = (bufs[buf].asr.offset * 0x8000) | (bufs[buf].sample_pointer & 0x0000FFFF);
                     bufs[buf].sample_pointer -= ( remaining * 0x8000); // rewind one buffer
                     bufs[buf].sample_pointer += ( bufs[buf].asr.offset * 0x8000); // ffwd the offset
                     bufs[buf].full = 0;
@@ -1091,17 +1160,35 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
     {
       if(bufs[i].done == 1)
       {
-        bufs[i].free = 1;
-        bufs[i].done = 0;
-        bufs[i].current_buf = 0;
-        bufs[i].wav_position = 0;
-        bufs[i].sample_pointer = 0;
-        bufs[i].fade_counter = 0;
-        bufs[i].fade = FADE_NORMAL;
-        if(bufs[i].pruned == 1)
+        // log_i("done");
+        if(
+          // (bufs[i].wav_data.play_back_mode == PAUSE) &&
+          (bufs[i].pause_state == PAUSE_START) &&
+          (bufs[i].pruned != 1)
+        )
         {
-          bufs[i].pruned = 0;
-          xQueueSendToBack(wav_player_queue,(void *) &bufs[i].next_wav_player_event, portMAX_DELAY);
+          // log_i("set PAUSE_PAUSED");
+          bufs[i].pause_state = PAUSE_PAUSED;
+          bufs[i].done = 0;
+          bufs[i].fade_counter = 0;
+          bufs[i].fade = FADE_NORMAL;
+        }
+        else
+        {
+          bufs[i].free = 1;
+          bufs[i].done = 0;
+          bufs[i].current_buf = 0;
+          bufs[i].wav_position = 0;
+          bufs[i].sample_pointer = 0;
+          bufs[i].fade_counter = 0;
+          bufs[i].fade = FADE_NORMAL;
+          bufs[i].pause_state = PAUSE_NONE;
+          if(bufs[i].pruned == 1)
+          {
+            // log_i("pruned");
+            bufs[i].pruned = 0;
+            xQueueSendToBack(wav_player_queue,(void *) &bufs[i].next_wav_player_event, portMAX_DELAY);
+          }
         }
         // rpc_out(RPC_NOTE_OFF,bufs[i].voice,bufs[i].wav_player_event.note,NULL);
       }

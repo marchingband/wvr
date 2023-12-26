@@ -33,6 +33,7 @@ enum play_back_mode {
     PAUSE,
     ASR_LOOP,
     PAUSE_LOOP,
+    PAUSE_ASR
 };
 
 enum retrigger_mode {

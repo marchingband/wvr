@@ -452,7 +452,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               (bufs[i].wav_data.mute_group == new_wav.mute_group) &&
               (
                 (bufs[i].wav_data.play_back_mode == PAUSE) ||
-                (bufs[i].wav_data.play_back_mode == PAUSE_LOOP)
+                (bufs[i].wav_data.play_back_mode == PAUSE_LOOP) ||
+                (bufs[i].wav_data.play_back_mode == PAUSE_ASR)
 
               )
             )
@@ -519,7 +520,8 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   abort_note = 1;
                   if(
                     bufs[b].wav_data.play_back_mode == PAUSE ||
-                    bufs[b].wav_data.play_back_mode == PAUSE_LOOP
+                    bufs[b].wav_data.play_back_mode == PAUSE_LOOP ||
+                    bufs[b].wav_data.play_back_mode == PAUSE_ASR
                   )
                   {
                     // log_i("pausing");
@@ -612,7 +614,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               bufs[i].volume = wav_player_event.velocity;
             }
 
-            if(new_wav.play_back_mode == ASR_LOOP) // calculate the ASR data if needed
+            if(
+              new_wav.play_back_mode == ASR_LOOP ||
+              new_wav.play_back_mode == PAUSE_ASR
+              
+            ) // calculate the ASR data if needed
             {
               bufs[i].asr = make_asr_data(new_wav);
             }
@@ -632,19 +638,21 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
         for(int b=0;b<NUM_BUFFERS;b++)
         {
           if(
-              bufs[b].wav_player_event.voice == wav_player_event.voice &&
-              bufs[b].wav_player_event.note == wav_player_event.note &&
-              bufs[b].free == 0 &&
-              (
-                bufs[b].wav_data.note_off_meaning == HALT ||
-                bufs[b].wav_data.note_off_meaning == RELEASE
-              )
+            bufs[b].wav_player_event.voice == wav_player_event.voice &&
+            bufs[b].wav_player_event.note == wav_player_event.note &&
+            bufs[b].free == 0 &&
+            (
+              // bufs[b].wav_data.note_off_meaning == HALT
+              bufs[b].wav_data.note_off_meaning == HALT ||
+              bufs[b].wav_data.note_off_meaning == RELEASE
             )
+          )
           {
             bufs[b].fade = FADE_OUT;
             if(
               bufs[b].wav_data.play_back_mode == PAUSE ||
-              bufs[b].wav_data.play_back_mode == PAUSE_LOOP
+              bufs[b].wav_data.play_back_mode == PAUSE_LOOP ||
+              bufs[b].wav_data.play_back_mode == PAUSE_ASR
             )
             {
               // log_i("pausing");
@@ -952,6 +960,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                                      asr.offset
 */
           case ASR_LOOP :
+          case PAUSE_ASR :
           {
             u16p16 step = channel_pitch_bend_factor[bufs[buf].wav_player_event.channel];            
 
@@ -1056,18 +1065,40 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 output_buf[i] += (sample_right >> DAMPEN_BITS);
                 i++;
 
-                if( 
-                  (bufs[buf].fade == FADE_OUT) &&
-                  (bufs[buf].wav_data.note_off_meaning == HALT) &&
-                  (i % fade_factor < 2) // were fading and its time to decrement volumes
-                )
+                  // (bufs[buf].wav_data.note_off_meaning == HALT) &&
+                // if((bufs[buf].fade != FADE_NORMAL) && (i % fade_factor < 2) && bufs[buf].wav_data.note_off_meaning == HALT) // were fading and its time to decrement volumes
+                if(
+                  (bufs[buf].fade != FADE_NORMAL) && 
+                  (i % fade_factor < 2) &&
+                  (bufs[buf].wav_data.note_off_meaning != RELEASE) && 
+                  (
+                    (bufs[buf].wav_data.play_back_mode != ASR_LOOP) ||
+                    (bufs[buf].wav_data.note_off_meaning != IGNORE)
+                  )
+                )// were fading and its time to decrement volumes
                 {
-                  bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
-                  bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
-                  if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+                  if(bufs[buf].fade == FADE_OUT )
                   {
-                    bufs[buf].done = true;
-                    break;
+                    bufs[buf].stereo_volume.right -= (bufs[buf].stereo_volume.right > 0); // decriment unless 0
+                    bufs[buf].stereo_volume.left -= (bufs[buf].stereo_volume.left > 0);
+                    if((bufs[buf].stereo_volume.right == 0) && (bufs[buf].stereo_volume.left == 0)) // fade complete
+                    {
+                      bufs[buf].done = true;
+                      break;
+                    }
+                  }
+                  else
+                  {
+                    bufs[buf].fade += (bufs[buf].fade < 127);
+                    bufs[buf].stereo_volume.right = bufs[buf].fade < bufs[buf].target_stereo_volume.right ? bufs[buf].fade : bufs[buf].target_stereo_volume.right;
+                    bufs[buf].stereo_volume.left = bufs[buf].fade < bufs[buf].target_stereo_volume.left ? bufs[buf].fade : bufs[buf].target_stereo_volume.left;
+                    if(
+                      (bufs[buf].stereo_volume.right == bufs[buf].target_stereo_volume.right) && 
+                      (bufs[buf].stereo_volume.left == bufs[buf].target_stereo_volume.left)) // attack done
+                    {
+                      bufs[buf].fade = FADE_NORMAL;
+                      bufs[buf].fade_counter = 0;
+                    }
                   }
                 }
 
@@ -1081,6 +1112,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   // log_e("dac buffer done %d", i);
                   break;
                 }
+                // bufs[buf].fade_counter += 2;
 
               }
 

@@ -43,7 +43,8 @@ enum retrigger_mode {
 
 enum note_off_meaning {
     HALT,
-    IGNORE
+    IGNORE,
+    RELEASE
 };
 
 enum edge {

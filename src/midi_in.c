@@ -476,6 +476,7 @@ void midi_init(bool useUsbMidi)
     xTaskCreatePinnedToCore(web_midi_task, "web_midi_task", 4096, NULL, 3, NULL, 0);
     if(useUsbMidi)
     {
+        log_i("INITIALIZING USB MIDI");
         init_gpio_usb();
         init_uart_usb();
         xTaskCreatePinnedToCore(read_usb_uart_task, "read_usb_uart_task", 4096, NULL, 3, NULL, 0);

@@ -21,6 +21,8 @@
 #include "esp_wifi.h"
 #include "boot.h"
 #include "wav_player.h"
+#include "file_system.h"
+#include "gpio.h"
 
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
@@ -202,6 +204,7 @@ void handleUpdatePinConfig(AsyncWebServerRequest *request, uint8_t *data, size_t
     //done
     updatePinConfig((char *)pin_config_json);
     free(pin_config_json);
+    wvr_gpio_start();
     // request->send(200, "text/plain", "all done pin config update");
     //wav_player_resume();
   }
@@ -1081,11 +1084,18 @@ bool get_wifi_is_on()
 }
 
 void server_pause(void){
+  log_i("wifi off");
   WiFi.mode(WIFI_OFF);
   wifi_is_on = false;
 }
 
 void server_resume(void){
-  WiFi.mode(WIFI_AP);
+  log_i("wifi on");
+  // WiFi.mode(WIFI_AP);
+  if(get_metadata()->do_station_mode == 1)
+  {
+    try_log_on_network();
+  }
+  WiFi.mode(WIFI_MODE_APSTA);
   wifi_is_on = true;
 }

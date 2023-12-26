@@ -450,7 +450,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             if(
               (bufs[i].free == 0) &&
               (bufs[i].wav_data.mute_group == new_wav.mute_group) &&
-              (bufs[i].wav_data.play_back_mode == PAUSE)
+              (
+                (bufs[i].wav_data.play_back_mode == PAUSE) ||
+                (bufs[i].wav_data.play_back_mode == PAUSE_LOOP)
+
+              )
             )
             {
               // log_i("pruned because new wav");
@@ -513,7 +517,10 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 case NOTE_OFF:
                   bufs[b].fade = FADE_OUT;
                   abort_note = 1;
-                  if(bufs[b].wav_data.play_back_mode == PAUSE)
+                  if(
+                    bufs[b].wav_data.play_back_mode == PAUSE ||
+                    bufs[b].wav_data.play_back_mode == PAUSE_LOOP
+                  )
                   {
                     // log_i("pausing");
                     bufs[b].pause_state = PAUSE_START;
@@ -635,7 +642,10 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             )
           {
             bufs[b].fade = FADE_OUT;
-            if(bufs[b].wav_data.play_back_mode == PAUSE)
+            if(
+              bufs[b].wav_data.play_back_mode == PAUSE ||
+              bufs[b].wav_data.play_back_mode == PAUSE_LOOP
+            )
             {
               // log_i("pausing");
               bufs[b].pause_state = PAUSE_START;
@@ -717,7 +727,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             size_t remaining = bufs[buf].size - bufs[buf].wav_position;
             u16p16 step = channel_pitch_bend_factor[bufs[buf].wav_player_event.channel];
 
-            if((bufs[buf].fade == FADE_NORMAL) || (bufs[buf].fade == FADE_IN_INIT)) // dont update stereo volume while fading
+            if(bufs[buf].fade == FADE_NORMAL) // dont update stereo volume while fading
             {
               update_stereo_volume(buf);
             }
@@ -726,7 +736,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               convert_buf_linear(buf);
             }
 
-            int fade_factor = (bufs[buf].pruned || bufs[buf].pause_state == PAUSE_RESUMING) ? 4 // fast fadeout/fadein
+            int fade_factor = (bufs[buf].pruned || (bufs[buf].pause_state == PAUSE_RESUMING)) ? 4 // fast fadeout/fadein
               : bufs[buf].fade == FADE_OUT ? 4 + (channel_release[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER)  // release
               : 4 + (channel_attack[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER); // attack
 
@@ -816,6 +826,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             break;
           }
           case LOOP :
+          case PAUSE_LOOP :
           {
             size_t remaining = bufs[buf].size - bufs[buf].wav_position;
             u16p16 step = channel_pitch_bend_factor[bufs[buf].wav_player_event.channel];
@@ -823,7 +834,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             if(bufs[buf].done) // if it fades out, stop asap
               break;
 
-            if((bufs[buf].fade == FADE_NORMAL) || (bufs[buf].fade == FADE_IN_INIT)) // only update the volume when NOT fading-out or about to start fading-in
+            if(bufs[buf].fade == FADE_NORMAL) // only update the volume when NOT fading-out or about to start fading-in
             {
               update_stereo_volume(buf);
             }
@@ -832,19 +843,9 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
               convert_buf_linear(buf);
             }
 
-            size_t fade_factor = 0;
-            if(bufs[buf].pruned == 1)
-            {
-              fade_factor = 4;
-            }
-            else if(bufs[buf].fade == FADE_OUT)
-            {
-              fade_factor = 4 + (channel_release[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER);
-            }
-            else
-            {
-              fade_factor = 4 + (channel_attack[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER);
-            }
+            int fade_factor = (bufs[buf].pruned || (bufs[buf].pause_state == PAUSE_RESUMING)) ? 4 // fast fadeout/fadein
+              : bufs[buf].fade == FADE_OUT ? 4 + (channel_release[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER)  // release
+              : 4 + (channel_attack[bufs[buf].wav_player_event.channel] * FADE_FACTOR_MULTIPLIER); // attack
 
             for(int i=0; i<DAC_BUFFER_SIZE_IN_SAMPLES; i += 2)
             {
@@ -1162,7 +1163,6 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
       {
         // log_i("done");
         if(
-          // (bufs[i].wav_data.play_back_mode == PAUSE) &&
           (bufs[i].pause_state == PAUSE_START) &&
           (bufs[i].pruned != 1)
         )

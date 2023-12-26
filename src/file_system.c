@@ -1206,6 +1206,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
     }
     feedLoopWDT();
     read_wav_lut_from_disk();
+    read_rack_lut_from_disk();
     feedLoopWDT();
     //cleanup
     cJSON_Delete(vc_json);

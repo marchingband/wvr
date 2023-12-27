@@ -2,7 +2,6 @@
 #include <WVR.h>
 #include <button.h>
 #include <file_system.h>
-#include <rgb.h>
 #include <pot.h>
 
 WVR wvr;
@@ -69,10 +68,6 @@ void setup() {
   wvr.begin();
   
   log_i("dev board");
-
-  // connect D13 to RGBLED pin on dev board, make sure pin D13 is set to edge:none in WEB GUI 
-  // rgb_init(D13); 
-  // rgb_set_color(10,10,10); // very dim white
   
   wvr.resetPin(D9);
   wvr.resetPin(D10);

@@ -2,7 +2,6 @@
 #include <WVR.h>
 #include <button.h>
 #include <file_system.h>
-#include <rgb.h>
 #include <pot.h>
 
 WVR wvr;
@@ -47,14 +46,12 @@ void switchOneUp(void)
 {
   // log_i("switch one up");
   wvr.unmute();
-  // rgb_set_color(100 /* red */,100 /* green */,100 /* blue */); // makes white
 }
 
 void switchOneDown(void)
 {
   // log_i("switch one down");
   wvr.mute();
-  // rgb_set_color(0 ,0 ,0); // turn off RGB LED
 }
 
 void switchTwoUp(void)
@@ -76,9 +73,6 @@ void setup() {
 
   wvr.encoderInit(D9, D10);
   pot_init();
-  
-  // connect D13 to RGBLED pin on dev board, make sure pin D13 is set to edge:none in WEB GUI 
-  // rgb_init(D13); 
 
   gpio_reset_pin(gpioNumToGpioNum_T(D3));
   gpio_reset_pin(gpioNumToGpioNum_T(D4));

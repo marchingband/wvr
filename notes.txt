@@ -23,3 +23,7 @@ CPU freq: 240
 [    52][I][wvr_0.3.cpp:89] wvr_init(): wvr starting up 
 
 *** VERSION 3.8.4 ***
+
+3.9.0 1017344
+3.8.2 1009248
+3.7.2 1008880 bytes

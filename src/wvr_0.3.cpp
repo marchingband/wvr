@@ -36,7 +36,6 @@ void bootFromEmmc(int index);
 void boot_into_recovery_mode(void);
 int check_for_recovery_mode();
 void dev_board_init();
-void rgb_init(void);
 void neopixel_test(void);
 void mkr_init(void);
 void midi_parser_init(void);

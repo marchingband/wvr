@@ -24,10 +24,6 @@
     {
       "name": "ESPAsyncWebServer",
       "platforms": "espressif32"
-    },
-    {
-      "name": "Adafruit_NeoPixel",
-      "platforms": "espressif32"
     }
   ]
 }

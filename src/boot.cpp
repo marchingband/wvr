@@ -81,7 +81,7 @@ void bootFromEmmc(int index)
             log_e("Update.isFinished() : false");
         }
     } else {
-        log_e("Update.end() : false");
+        log_e("Update.end() failed : %s", String(Update.getError()));
     }
     free(buf);
 }

@@ -1,0 +1,25 @@
+rst:0xc (SW_CPU_RESET),boot:0x3f (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:1
+load:0x3fff0030,len:1420
+ho 0 tail 12 room 4
+load:0x40078000,len:13540
+load:0x40080400,len:3604
+entry 0x400805f0
+E (367) esp_core_dump_fla␞␆�: No core dump partition found!
+E (367) esp_core_dump_flash: No core dump partition found!
+[     4][D][esp32-hal-cpu.c:244] setCpuFrequencyMhz(): PLL: 480 / 2 = 240 Mhz, APB: 80000000 Hz
+E (257) psram: PSRAM ID read error: 0x7aa9ae06
+[    14][W][esp32-hal-psram.c:71] psramInit(): PSRAM init failed!
+Total heap: 312908
+Free heap: 285172
+Total PSRAM: 0
+Free PSRAM: 0
+CPU freq: 240
+[    39][I][wvr_0.3.cpp:86] wvr_init(): arduino setup running on core 1
+[    40][I][wvr_0.3.cpp:87] wvr_init(): cpu speed 240
+[    45][I][wvr_0.3.cpp:88] wvr_init(): Flash Speed = 80000000 Flash mode = 0
+[    52][I][wvr_0.3.cpp:89] wvr_init(): wvr starting up 
+
+*** VERSION 3.8.4 ***

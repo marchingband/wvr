@@ -98,7 +98,6 @@ struct buf_t {
   struct wav_player_event_t wav_player_event;
   struct wav_player_event_t next_wav_player_event;
   struct asr_t asr;
-  // enum response_curve response_curve;
   struct vol_t stereo_volume;
   struct vol_t target_stereo_volume;
   int16_t *buffer_a;
@@ -189,9 +188,6 @@ void init_buffs(void)
     bufs[i].buffer_a    = (int16_t *)malloc(BYTES_PER_READ);
     bufs[i].buffer_b    = (int16_t *)malloc(BYTES_PER_READ);
     bufs[i].buffer_head = (int16_t *)ps_malloc(BYTES_PER_READ);
-    // bufs[i].buffer_a    = (int16_t *)malloc(BYTES_PER_READ_PLUS);
-    // bufs[i].buffer_b    = (int16_t *)malloc(BYTES_PER_READ_PLUS);
-    // bufs[i].buffer_head = (int16_t *)ps_malloc(BYTES_PER_READ_PLUS);
     if(bufs[i].buffer_a==NULL || bufs[i].buffer_b == NULL || bufs[i].buffer_head == NULL)
     {
       log_e("failed to alloc buffers at %d",i);
@@ -240,14 +236,6 @@ void update_pitch_bends(void)
 {
   for(int i=0; i<16; i++)
   {
-    // float pitch_bend = (float)channel_pitch_bend[i];
-    // float bend = (pitch_bend / 8192.0) - 1.0;
-    // float semitones = bend >= 0.0 ? 2.0 * bend : 2.0 * bend;
-    // float exponent = semitones / 12.0;
-    // float pitch_factor = pow(2, exponent);
-    // s15p16 pitch_factor_fp = pitch_factor * 0x10000;
-    // channel_pitch_bend_factor[i] = pitch_factor_fp;
-
     uint16_t pitch_bend = channel_pitch_bend[i]; // 14 bit
     s15p16 bend = (pitch_bend << 16) / 8192.0 - ( 1 << 16);
     // s15p16 semitones = bend >= 0 ? 12 * bend : 12 * bend;
@@ -1065,8 +1053,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 output_buf[i] += (sample_right >> DAMPEN_BITS);
                 i++;
 
-                  // (bufs[buf].wav_data.note_off_meaning == HALT) &&
-                // if((bufs[buf].fade != FADE_NORMAL) && (i % fade_factor < 2) && bufs[buf].wav_data.note_off_meaning == HALT) // were fading and its time to decrement volumes
+                // fading in/out
                 if(
                   (bufs[buf].fade != FADE_NORMAL) && 
                   (i % fade_factor < 2) &&
@@ -1075,7 +1062,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                     (bufs[buf].wav_data.play_back_mode != ASR_LOOP) ||
                     (bufs[buf].wav_data.note_off_meaning != IGNORE)
                   )
-                )// were fading and its time to decrement volumes
+                )
                 {
                   if(bufs[buf].fade == FADE_OUT )
                   {
@@ -1113,7 +1100,6 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   break;
                 }
                 // bufs[buf].fade_counter += 2;
-
               }
 
               if(idx >= remaining) // finished the section

@@ -31,8 +31,8 @@ extern "C" {
     QueueHandle_t wav_player_queue;
 }
 
-bool cacheUseFTDI = 1;
-bool cacheUseUsbMidi = 1;
+static bool useFTDI = 1;
+static bool useUsbMidi = 1;
 
 void on_release_per_config(int pin_num)
 {
@@ -139,14 +139,14 @@ void wvr_gpio_clear(void){
 void wvr_gpio_start()
 {
     wvr_gpio_clear();
-    log_i("useFTDI is %d",cacheUseFTDI);
-    log_i("useUsbMidi is %d",cacheUseUsbMidi);
+    log_i("useFTDI is %d",useFTDI);
+    log_i("useUsbMidi is %d",useUsbMidi);
     for(int i=0;i<14;i++)
     {
         if(
-            ((i == 0) && cacheUseFTDI) ||
-            ((i == 1) && cacheUseFTDI) ||
-            ((i == 2) && cacheUseUsbMidi)
+            ((i == 0) && useFTDI) ||
+            ((i == 1) && useFTDI) ||
+            ((i == 2) && useUsbMidi)
         )
         {
             continue;
@@ -213,8 +213,8 @@ void wvr_gpio_start()
     if(buttons[13] != NULL) buttons[13]->onRelease([](){on_release_per_config(13);});
 }
 
-void wvr_gpio_init(bool useFTDI, bool useUsbMidi){
-    cacheUseFTDI = useFTDI;
-    cacheUseUsbMidi = useUsbMidi;
+void wvr_gpio_init(bool _useFTDI, bool _useUsbMidi){
+    useFTDI = _useFTDI;
+    useUsbMidi = _useUsbMidi;
     wvr_gpio_start();
 }

@@ -39,8 +39,8 @@ static const char* TAG = "wav_player";
 #define LOOPS_PER_BUFFER ( BYTES_PER_READ / DAC_BUFFER_SIZE_IN_BYTES )
 
 // #define NUM_BUFFERS 2    // debug
-// #define NUM_BUFFERS 16    // 1.1.x
-// #define NUM_BUFFERS 17 // 1.0.x
+// #define NUM_BUFFERS 16    //
+// #define NUM_BUFFERS 17 //
 #define NUM_BUFFERS 18 // 1.0.x
 // #define NUM_BUFFERS 19
 // #define NUM_BUFFERS 20

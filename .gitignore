@@ -2,3 +2,4 @@
 .DS_Store
 build
 compile_all_boards.sh
+debug-notes.txt

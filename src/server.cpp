@@ -680,19 +680,37 @@ void handlePlayWav(AsyncWebServerRequest *request){
   request->send(204);
 }
 
+int station_retries = 0;
+
 void try_log_on_network()
 {
   log_e("begin try_log_on_network");
-  WiFi.begin(metadata->station_ssid, metadata->station_passphrase);
-  log_e("done begin try_log_on_network");
-  // WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
-  //       log_e("WiFi lost connection. Reason: %s", info.wifi_sta_disconnected.reason);
-  //   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-  // log_e("done disconnect listener");
+  station_retries = 0;
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
+        log_e("ARDUINO_EVENT_WIFI_STA_DISCONNECTED. Reason: %u", info.wifi_sta_disconnected.reason);
+        switch(info.wifi_sta_disconnected.reason){
+          case 201:
+            log_e("Network \"%s\" not found", metadata->station_ssid);
+            WiFi.mode(WIFI_AP);
+            break;
+          case 15:
+            log_e("Password \"%s\" incorrect", metadata->station_passphrase);
+            WiFi.mode(WIFI_AP);
+            break;
+          default:
+            if(station_retries++ > 3){
+              log_e("Giving up connection to Station");
+              WiFi.mode(WIFI_AP);
+            }
+            break;
+        }
+    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
         log_e("WiFi connected. IP: %s", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
     }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  log_e("done connect listener");
+
+  WiFi.begin(metadata->station_ssid, metadata->station_passphrase);
 }
 
 void _server_pause(){
@@ -731,20 +749,22 @@ void server_begin() {
   log_i("wifi power is %d", power);
 
   if(metadata->do_station_mode == 1){
-    log_e("starting station");
-    WiFi.begin(metadata->station_ssid, metadata->station_passphrase);
-    int retries = 0;
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      log_e("Connecting to WiFi..");
-      if(retries++ > 10){
-        log_e("Failed to connect to WiFi..");
-        break;
-      }
-    }
-    if(WiFi.status() == WL_CONNECTED){
-      log_e("connect on IP: %s", WiFi.localIP().toString().c_str());
-    }
+    try_log_on_network();
+    // log_e("starting station");
+    // WiFi.begin(metadata->station_ssid, metadata->station_passphrase);
+    // int retries = 0;
+    // while (WiFi.status() != WL_CONNECTED) {
+    //   delay(500);
+    //   log_e("Connecting to WiFi..");
+    //   if(retries++ > 10){
+    //     log_e("Failed to connect to WiFi..");
+
+    //     break;
+    //   }
+    // }
+    // if(WiFi.status() == WL_CONNECTED){
+    //   log_e("connect on IP: %s", WiFi.localIP().toString().c_str());
+    // }
   }
 
   server.on(
@@ -1092,10 +1112,10 @@ void server_pause(void){
 void server_resume(void){
   log_i("wifi on");
   // WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_MODE_APSTA);
   if(get_metadata()->do_station_mode == 1)
   {
     try_log_on_network();
   }
-  WiFi.mode(WIFI_MODE_APSTA);
   wifi_is_on = true;
 }

@@ -12,11 +12,9 @@
 #include "cJSON.h"
 #include "esp_heap_caps.h"
 
-// #define METADATA_START_BLOCK 2
 #define METADATA_START_BLOCK 1
 #define METADATA_SIZE_IN_BLOCKS 1
 
-// #define FIRMWARE_LUT_START_BLOCK 3
 #define FIRMWARE_LUT_START_BLOCK 2
 #define MAX_FIRMWARES 10
 #define FIRMWARE_LUT_SIZE (sizeof(struct firmware_t) * MAX_FIRMWARES)

@@ -21,6 +21,8 @@
 #include "esp_wifi.h"
 #include "boot.h"
 #include "wav_player.h"
+#include "file_system.h"
+#include "gpio.h"
 
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
@@ -202,6 +204,7 @@ void handleUpdatePinConfig(AsyncWebServerRequest *request, uint8_t *data, size_t
     //done
     updatePinConfig((char *)pin_config_json);
     free(pin_config_json);
+    wvr_gpio_start();
     // request->send(200, "text/plain", "all done pin config update");
     //wav_player_resume();
   }
@@ -471,6 +474,51 @@ void handleConfigJSON(AsyncWebServerRequest *request){
   request->send(response);
 }
 
+void handleFetchLocalIP(AsyncWebServerRequest *request){
+  log_i("handleFetchLocalIP");
+  if(WiFi.status() == WL_CONNECTED)
+  {
+    request->send(200, "text/plain", WiFi.localIP().toString().c_str());
+  }
+  else if(WiFi.status() == WL_DISCONNECTED)
+  {
+    request->send(200, "text/plain", "trying to connect");
+  }
+  else if(WiFi.status() == WL_CONNECTION_LOST)
+  {
+    request->send(200, "text/plain", "connection lost");
+  }
+  else if(WiFi.status() == WL_CONNECT_FAILED)
+  {
+    request->send(200, "text/plain", "wrong password");
+  }
+  else if(WiFi.status() == WL_NO_SSID_AVAIL)
+  {
+    request->send(200, "text/plain", "wrong network name");
+  }
+  else
+  {
+    request->send(200, "text/plain", "unkown error");
+  }
+}
+
+void handleTryLogonLocalNetwork(AsyncWebServerRequest *request){
+  log_e("handleTryLogonLocalNetwork");
+  const char* ssid = request->getHeader("ssid")->value().c_str();
+  const char* password = request->getHeader("password")->value().c_str();
+  memcpy(&metadata->station_ssid, ssid, 20);
+  memcpy(&metadata->station_passphrase, password, 20);
+  metadata->do_station_mode = 1;
+  log_e("headers: %s %s meta: %s %s",
+    ssid, password,
+    metadata->station_ssid,
+    metadata->station_passphrase
+  );
+  write_metadata(*metadata);
+  request->send(200, "text/plain", "saved, please reset");
+  try_log_on_network();
+}
+
 void handleBackupEMMC(AsyncWebServerRequest *request){
   uint8_t *buf = (uint8_t*)ps_malloc(SECTOR_SIZE);
   size_t numSectors = getNumSectorsInEmmc();
@@ -632,6 +680,39 @@ void handlePlayWav(AsyncWebServerRequest *request){
   request->send(204);
 }
 
+int station_retries = 0;
+
+void try_log_on_network()
+{
+  log_e("begin try_log_on_network");
+  station_retries = 0;
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
+        log_e("ARDUINO_EVENT_WIFI_STA_DISCONNECTED. Reason: %u", info.wifi_sta_disconnected.reason);
+        switch(info.wifi_sta_disconnected.reason){
+          case 201:
+            log_e("Network \"%s\" not found", metadata->station_ssid);
+            WiFi.mode(WIFI_AP);
+            break;
+          case 15:
+            log_e("Password \"%s\" incorrect", metadata->station_passphrase);
+            WiFi.mode(WIFI_AP);
+            break;
+          default:
+            if(station_retries++ > 3){
+              log_e("Giving up connection to Station");
+              WiFi.mode(WIFI_AP);
+            }
+            break;
+        }
+    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
+        log_e("WiFi connected. IP: %s", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
+    }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+
+  WiFi.begin(metadata->station_ssid, metadata->station_passphrase);
+}
+
 void _server_pause(){
   ws.closeAll();
   server.end();
@@ -641,19 +722,20 @@ void _server_pause(){
 void server_begin() {
   Serial.println("Configuring access point...");
 
-  WiFi.mode(WIFI_AP);
+  // WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_MODE_APSTA);
 
-  IPAddress IP = IPAddress (192, 168, 5, 18);
-  IPAddress gateway = IPAddress (192, 168, 5, 17);
-  IPAddress NMask = IPAddress (255, 255, 255, 0);
+  // IPAddress IP = IPAddress (192, 168, 5, 18);
+  // IPAddress gateway = IPAddress (192, 168, 5, 17);
+  // IPAddress NMask = IPAddress (255, 255, 255, 0);
 
-  WiFi.softAPConfig(IP, gateway, NMask);
+  // WiFi.softAPConfig(IP, gateway, NMask);
 
   WiFi.softAP(metadata->ssid, metadata->passphrase);
   log_i("set ssid :%s, set passphrase: %s",metadata->ssid, metadata->passphrase);
  
   //  again??
-  WiFi.softAPConfig(IP, gateway, NMask);
+  // WiFi.softAPConfig(IP, gateway, NMask);
 
   IPAddress myIP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
@@ -666,6 +748,24 @@ void server_begin() {
   esp_wifi_get_max_tx_power(&power);
   log_i("wifi power is %d", power);
 
+  if(metadata->do_station_mode == 1){
+    try_log_on_network();
+    // log_e("starting station");
+    // WiFi.begin(metadata->station_ssid, metadata->station_passphrase);
+    // int retries = 0;
+    // while (WiFi.status() != WL_CONNECTED) {
+    //   delay(500);
+    //   log_e("Connecting to WiFi..");
+    //   if(retries++ > 10){
+    //     log_e("Failed to connect to WiFi..");
+
+    //     break;
+    //   }
+    // }
+    // if(WiFi.status() == WL_CONNECTED){
+    //   log_e("connect on IP: %s", WiFi.localIP().toString().c_str());
+    // }
+  }
 
   server.on(
     "/",
@@ -689,6 +789,18 @@ void server_begin() {
     "/main",
     HTTP_GET,
     handleMain
+  );
+
+  server.on(
+    "/fetchLocalIP",
+    HTTP_GET,
+    handleFetchLocalIP
+  );
+
+  server.on(
+    "/tryLogonLocalNetwork",
+    HTTP_GET,
+    handleTryLogonLocalNetwork
   );
 
   server.on(
@@ -831,7 +943,6 @@ void server_begin() {
     handleDeleteFirmware
   );
 
-
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
 
@@ -844,18 +955,18 @@ void recovery_server_begin() {
 
   WiFi.mode(WIFI_AP);
 
-  IPAddress IP = IPAddress (192, 168, 5, 18);
-  IPAddress gateway = IPAddress (192, 168, 5, 20);
-  IPAddress NMask = IPAddress (255, 255, 255, 0);
+  // IPAddress IP = IPAddress (192, 168, 5, 18);
+  // IPAddress gateway = IPAddress (192, 168, 5, 20);
+  // IPAddress NMask = IPAddress (255, 255, 255, 0);
 
-  WiFi.softAPConfig(IP, gateway, NMask);
+  // WiFi.softAPConfig(IP, gateway, NMask);
 
   WiFi.softAP("WVR", "12345678");
   log_i("recovery mode ssid :WVR, passphrase: 12345678");
   log_i("normal mode wifi ssid is :%s, passphrase is: %s",metadata->ssid, metadata->passphrase);
  
   //  again??
-  WiFi.softAPConfig(IP, gateway, NMask);
+  // WiFi.softAPConfig(IP, gateway, NMask);
 
   IPAddress myIP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
@@ -883,6 +994,18 @@ void recovery_server_begin() {
     "/favicon.ico",
     HTTP_GET,
     handleFavicon
+  );
+
+  server.on(
+    "/fetchLocalIP",
+    HTTP_GET,
+    handleFetchLocalIP
+  );
+
+  server.on(
+    "/tryLogonLocalNetwork",
+    HTTP_GET,
+    handleTryLogonLocalNetwork
   );
 
   server.on(
@@ -981,11 +1104,18 @@ bool get_wifi_is_on()
 }
 
 void server_pause(void){
+  log_i("wifi off");
   WiFi.mode(WIFI_OFF);
   wifi_is_on = false;
 }
 
 void server_resume(void){
-  WiFi.mode(WIFI_AP);
+  log_i("wifi on");
+  // WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_MODE_APSTA);
+  if(get_metadata()->do_station_mode == 1)
+  {
+    try_log_on_network();
+  }
   wifi_is_on = true;
 }

@@ -112,8 +112,14 @@ int16_t note_sustain[128];
 const bool channel_sustain_default[16] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
 bool channel_sustain[16];
 
+const uint8_t channel_attack_default[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t channel_attack[16];
+
 const uint8_t channel_release_default[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 uint8_t channel_release[16];
+
+const uint16_t channel_pitch_bend_default[16] = {8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192,8192}; // 1/2 of uint14_t_max
+uint16_t channel_pitch_bend[16];
 
 uint8_t *get_channel_lut(void)
 {
@@ -342,6 +348,14 @@ static void handle_midi(uint8_t *msg)
                 channel_lut[channel] = voice;
                 break;
             }
+            case MIDI_PITCH_BEND:
+            {
+                uint8_t fine = msg[1];
+                uint8_t coarse = msg[2];
+                channel_pitch_bend[channel] = (coarse << 7) | fine;
+                // log_e("pb:%d", channel_pitch_bend[channel]);
+                break;
+            }
             case MIDI_CC:
             {
                 uint8_t CC = msg[1] & 0b01111111;
@@ -399,6 +413,8 @@ static void handle_midi(uint8_t *msg)
                     channel_vol[channel] = channel_vol_default[channel];
                     channel_exp[channel] = channel_exp_default[channel];
                     channel_sustain[channel] = channel_sustain_default[channel];
+                    channel_attack[channel] = channel_attack_default[channel];
+                    channel_pitch_bend[channel] = channel_pitch_bend_default[channel];
                     handle_channel_sustain_release(channel); // lift the sustain pedal
                     break;
                 case MIDI_CC_SUSTAIN:
@@ -415,6 +431,9 @@ static void handle_midi(uint8_t *msg)
                     break;
                 case MIDI_CC_RELEASE:
                     channel_release[channel] = val;
+                    break;
+                case MIDI_CC_ATTACK:
+                    channel_attack[channel] = val;
                     break;
                 default:
                     break;
@@ -436,7 +455,9 @@ void reset_midi_controllers(void)
         channel_vol[i] = channel_vol_default[i];
         channel_exp[i] = channel_exp_default[i];
         channel_release[i] = channel_release_default[i];
+        channel_attack[i] = channel_attack_default[i];
         channel_sustain[i] = channel_sustain_default[i];
+        channel_pitch_bend[i] = channel_pitch_bend_default[i];
     }
     for(int i=0; i<128; i++)
     {
@@ -455,6 +476,7 @@ void midi_init(bool useUsbMidi)
     xTaskCreatePinnedToCore(web_midi_task, "web_midi_task", 4096, NULL, 3, NULL, 0);
     if(useUsbMidi)
     {
+        log_i("INITIALIZING USB MIDI");
         init_gpio_usb();
         init_uart_usb();
         xTaskCreatePinnedToCore(read_usb_uart_task, "read_usb_uart_task", 4096, NULL, 3, NULL, 0);

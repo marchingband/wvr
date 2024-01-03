@@ -30,8 +30,10 @@ extern "C"
 enum play_back_mode {
     ONE_SHOT,
     LOOP,
-    PING_PONG,
+    PAUSE,
     ASR_LOOP,
+    PAUSE_LOOP,
+    PAUSE_ASR
 };
 
 enum retrigger_mode {
@@ -43,7 +45,8 @@ enum retrigger_mode {
 
 enum note_off_meaning {
     HALT,
-    IGNORE
+    IGNORE,
+    RELEASE
 };
 
 enum edge {
@@ -104,6 +107,11 @@ struct metadata_t {
     char passphrase[20];
     uint8_t wifi_power;
     uint8_t midi_channel; // 0 is omni
+    uint8_t pitch_bend_semitones_up;
+    uint8_t pitch_bend_semitones_down;
+    uint8_t do_station_mode;
+    char station_ssid[30];
+    char station_passphrase[30];
 };
 
 struct vol_t {

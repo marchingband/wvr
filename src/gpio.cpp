@@ -31,6 +31,9 @@ extern "C" {
     QueueHandle_t wav_player_queue;
 }
 
+static bool useFTDI = 1;
+static bool useUsbMidi = 1;
+
 void on_release_per_config(int pin_num)
 {
     uint8_t *channel_lut = get_channel_lut();
@@ -102,8 +105,40 @@ void on_press_per_config(int pin_num)
     }
 }
 
-void wvr_gpio_init(bool useFTDI, bool useUsbMidi)
+void wvr_gpio_clear(void){
+    if(buttons[0] != NULL) buttons[0]->onPress(NULL);
+    if(buttons[0] != NULL) buttons[0]->onRelease(NULL);
+    if(buttons[1] != NULL) buttons[1]->onPress(NULL);
+    if(buttons[1] != NULL) buttons[1]->onRelease(NULL);
+    if(buttons[2] != NULL) buttons[2]->onPress(NULL);
+    if(buttons[2] != NULL) buttons[2]->onRelease(NULL);
+    if(buttons[3] != NULL) buttons[3]->onPress(NULL);
+    if(buttons[3] != NULL) buttons[3]->onRelease(NULL);
+    if(buttons[4] != NULL) buttons[4]->onPress(NULL);
+    if(buttons[4] != NULL) buttons[4]->onRelease(NULL);
+    if(buttons[5] != NULL) buttons[5]->onPress(NULL);
+    if(buttons[5] != NULL) buttons[5]->onRelease(NULL);
+    if(buttons[6] != NULL) buttons[6]->onPress(NULL);
+    if(buttons[6] != NULL) buttons[6]->onRelease(NULL);
+    if(buttons[7] != NULL) buttons[7]->onPress(NULL);
+    if(buttons[7] != NULL) buttons[7]->onRelease(NULL);
+    if(buttons[8] != NULL) buttons[8]->onPress(NULL);
+    if(buttons[8] != NULL) buttons[8]->onRelease(NULL);
+    if(buttons[9] != NULL) buttons[9]->onPress(NULL);
+    if(buttons[9] != NULL) buttons[9]->onRelease(NULL);
+    if(buttons[10] != NULL) buttons[10]->onPress(NULL);
+    if(buttons[10] != NULL) buttons[10]->onRelease(NULL);
+    if(buttons[11] != NULL) buttons[11]->onPress(NULL);
+    if(buttons[11] != NULL) buttons[11]->onRelease(NULL);
+    if(buttons[12] != NULL) buttons[12]->onPress(NULL);
+    if(buttons[12] != NULL) buttons[12]->onRelease(NULL);
+    if(buttons[13] != NULL) buttons[13]->onPress(NULL);
+    if(buttons[13] != NULL) buttons[13]->onRelease(NULL);
+}
+
+void wvr_gpio_start()
 {
+    wvr_gpio_clear();
     log_i("useFTDI is %d",useFTDI);
     log_i("useUsbMidi is %d",useUsbMidi);
     for(int i=0;i<14;i++)
@@ -116,6 +151,10 @@ void wvr_gpio_init(bool useFTDI, bool useUsbMidi)
         {
             continue;
         }
+
+        // clear listeners
+        buttons[i] = NULL;
+
         gpio_num_t gpio_num = gpio_pins[i];
         int pin_num = wvr_pins[i];
         pin_config_t pin = pin_config_lut[i];
@@ -172,4 +211,10 @@ void wvr_gpio_init(bool useFTDI, bool useUsbMidi)
     if(buttons[12] != NULL) buttons[12]->onRelease([](){on_release_per_config(12);});
     if(buttons[13] != NULL) buttons[13]->onPress([](){on_press_per_config(13);});
     if(buttons[13] != NULL) buttons[13]->onRelease([](){on_release_per_config(13);});
+}
+
+void wvr_gpio_init(bool _useFTDI, bool _useUsbMidi){
+    useFTDI = _useFTDI;
+    useUsbMidi = _useUsbMidi;
+    wvr_gpio_start();
 }

@@ -48,7 +48,8 @@ extern "C" uint8_t* midi_parse(uint8_t in)
                 midiParser.isMidiStatus(midiXparser::noteOnStatus) || 
                 midiParser.isMidiStatus(midiXparser::noteOffStatus) || 
                 midiParser.isMidiStatus(midiXparser::programChangeStatus) || 
-                midiParser.isMidiStatus(midiXparser::controlChangeStatus) 
+                midiParser.isMidiStatus(midiXparser::controlChangeStatus) ||
+                midiParser.isMidiStatus(midiXparser::pitchBendStatus) 
             ) 
         {
             msg = midiParser.getMidiMsg();
@@ -76,7 +77,8 @@ extern "C" uint8_t* usb_midi_parse(uint8_t in)
                 usbMidiParser.isMidiStatus(midiXparser::noteOnStatus) || 
                 usbMidiParser.isMidiStatus(midiXparser::noteOffStatus) || 
                 usbMidiParser.isMidiStatus(midiXparser::programChangeStatus) || 
-                usbMidiParser.isMidiStatus(midiXparser::controlChangeStatus) 
+                usbMidiParser.isMidiStatus(midiXparser::controlChangeStatus) ||
+                usbMidiParser.isMidiStatus(midiXparser::pitchBendStatus) 
             ) 
         {
             usb_msg = usbMidiParser.getMidiMsg();
@@ -104,7 +106,8 @@ extern "C" uint8_t* web_midi_parse(uint8_t in)
                 webMidiParser.isMidiStatus(midiXparser::noteOnStatus) || 
                 webMidiParser.isMidiStatus(midiXparser::noteOffStatus) || 
                 webMidiParser.isMidiStatus(midiXparser::programChangeStatus) || 
-                webMidiParser.isMidiStatus(midiXparser::controlChangeStatus) 
+                webMidiParser.isMidiStatus(midiXparser::controlChangeStatus) ||
+                webMidiParser.isMidiStatus(midiXparser::pitchBendStatus) 
             ) 
         {
             web_msg = webMidiParser.getMidiMsg();

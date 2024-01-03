@@ -12,11 +12,9 @@
 #include "cJSON.h"
 #include "esp_heap_caps.h"
 
-// #define METADATA_START_BLOCK 2
 #define METADATA_START_BLOCK 1
 #define METADATA_SIZE_IN_BLOCKS 1
 
-// #define FIRMWARE_LUT_START_BLOCK 3
 #define FIRMWARE_LUT_START_BLOCK 2
 #define MAX_FIRMWARES 10
 #define FIRMWARE_LUT_SIZE (sizeof(struct firmware_t) * MAX_FIRMWARES)
@@ -67,6 +65,8 @@
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_13"; // v1.x.x 
 // char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_14"; // v2.x.x
 char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_15"; // v3.x.x
+// char waver_tag[METADATA_TAG_LENGTH] = "wvr_magic_16"; // v4.x.x
+
 static const char* TAG = "file_system";
 
 // declare prototypes from emmc.c
@@ -215,7 +215,12 @@ void init_metadata(void){
         .ssid = "WVR",
         .passphrase = "12345678",
         .wifi_power = 8,
-        .midi_channel = 0
+        .midi_channel = 0,
+        .pitch_bend_semitones_up = 2,
+        .pitch_bend_semitones_down = 2,
+        .do_station_mode = 0,
+        .station_ssid = "",
+        .station_passphrase = ""
     };
     memcpy(new_metadata.tag, waver_tag, METADATA_TAG_LENGTH);
     write_metadata(new_metadata);
@@ -925,8 +930,13 @@ void add_metadata_json(cJSON * RESPONSE_ROOT){
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiPower",metadata.wifi_power);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"wifiStartsOn",metadata.wifi_starts_on);
     cJSON_AddNumberToObject(RESPONSE_ROOT,"midiChannel",metadata.midi_channel);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"pitchBendSemitonesUp",metadata.pitch_bend_semitones_up);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"pitchBendSemitonesDown",metadata.pitch_bend_semitones_down);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkName",metadata.ssid);
     cJSON_AddStringToObject(RESPONSE_ROOT,"wifiNetworkPassword",metadata.passphrase);
+    cJSON_AddNumberToObject(RESPONSE_ROOT,"doStationMode",metadata.do_station_mode);
+    cJSON_AddStringToObject(RESPONSE_ROOT,"stationWifiNetworkName",metadata.station_ssid);
+    cJSON_AddStringToObject(RESPONSE_ROOT,"stationWifiNetworkPassword",metadata.station_passphrase);
 }
 
 void add_pin_config_json(cJSON *RESPONSE_ROOT){
@@ -1195,6 +1205,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
     }
     feedLoopWDT();
     read_wav_lut_from_disk();
+    read_rack_lut_from_disk();
     feedLoopWDT();
     //cleanup
     cJSON_Delete(vc_json);
@@ -1321,6 +1332,11 @@ void updateMetadata(cJSON *config){
     metadata.wlog_verbosity = cJSON_GetObjectItemCaseSensitive(json, "wLogVerbosity")->valueint;
     metadata.wifi_power = cJSON_GetObjectItemCaseSensitive(json, "wifiPower")->valueint;
     metadata.midi_channel = cJSON_GetObjectItemCaseSensitive(json, "midiChannel")->valueint;
+    metadata.pitch_bend_semitones_up = cJSON_GetObjectItemCaseSensitive(json, "pitchBendSemitonesUp")->valueint;
+    metadata.pitch_bend_semitones_down = cJSON_GetObjectItemCaseSensitive(json, "pitchBendSemitonesDown")->valueint;
+    metadata.do_station_mode = cJSON_GetObjectItemCaseSensitive(json, "doStationMode")->valueint;
+    memcpy(&metadata.station_ssid,cJSON_GetObjectItemCaseSensitive(json, "stationWifiNetworkName")->valuestring,20);
+    memcpy(&metadata.station_passphrase,cJSON_GetObjectItemCaseSensitive(json, "stationWifiNetworkPassword")->valuestring,20);
     memcpy(&metadata.ssid,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkName")->valuestring,20);
     memcpy(&metadata.passphrase,cJSON_GetObjectItemCaseSensitive(json, "wifiNetworkPassword")->valuestring,20);
     write_metadata(metadata);

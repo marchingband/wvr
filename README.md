@@ -3,13 +3,21 @@
 
 ![wvr pinout diagram](https://github.com/marchingband/wvr_hardware/blob/main/images/wvr_pinout.png)
 
-Purchase a WVR : https://www.tindie.com/products/ultrapalace/wvr  
-Join us on the WVR Forum : https://groups.google.com/g/wvr-audio  
+Purchase a WVR:  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;https://www.sparkfun.com/products/21307  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;https://www.tindie.com/products/ultrapalace/wvr  
+
+Join us on the WVR Forum :  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;https://discord.gg/ZfXuBkzec8 (Discord)  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;https://groups.google.com/g/wvr-audio (Google Groups, now retired)
+
 Find the Pinouts and Wiring Diagram, and download the schematics for WVR :  https://github.com/marchingband/wvr_hardware  
 Binaries for all the WVR boards are here : https://github.com/marchingband/wvr_binaries  
 Code for the Web UI is here : https://github.com/marchingband/wvr_ui  
 Code for the WVR USB Backpack is here : https://github.com/marchingband/wvr_usb_backpack  
 If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/wvr_thames
+
+ >```note that starting with firmware version 3.9.0, the IP address of WVR has changed to 192.168.4.1```
 
 * [getting started](#getting-started)
 * [powering wvr](#powering-wvr)
@@ -46,6 +54,8 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * On a computer, join the wifi network **WVR**, using the password **12345678**
 * Open Google Chrome (or another browser which [implements the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open
 
+ >```note that starting with firmware version 3.9.0, the IP address of WVR has changed to 192.168.4.1```
+
 ![wvr gui](https://github.com/marchingband/wvr_hardware/blob/main/images/gui_sounds.png)
 
 # powering wvr
@@ -63,11 +73,12 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 * navigate to :
 https://github.com/marchingband/wvr_binaries
 and find the folder for your board, download the .ino.bin file, which will be a link like:
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/1.0.10/wvr_basic.ino.bin
-Choose the newest binary (currently v3.0.0)
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/3.0.9/wvr_basic.ino.bin
+Choose the newest binary (currently v3.9.0)
 * Apply power to your WVR.
 * On a computer, join the wifi network **WVR**, using the password **12345678**
 * Open Google Chrome (or another browser which [implements the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open
+ >```note that starting with firmware version 3.9.0, the IP address of WVR has changed to 192.168.4.1```
 * Click on **firmware** menu item at the top of the page
 * Click **select binary** for **slot 0**, and in the file upload dialog select the firmware that you downloaded earlier
 * To give the ninary a custom name, click the name of the binary at the left.
@@ -108,11 +119,13 @@ WVR will respond to the following midi events:
 Note on  
 Note off  
 Program Change  
+Pitch Bend
 CC 7 (volume)  
 CC 10 (panning)  
 CC 11 (expression)  
 CC 64 (sustain, like the pedal on a piano)  
 CC 72 (release time (up to ~30ms fade out))  
+CC 73 (attack time (up to ~30ms fade out))  
 CC 120 (all sound off)  
 CC 121 (reset all controllers)  
 Note that volume, panning and expression, like velocity, will respond acording to a particular sounds response curve. A sound with Inverse Square Root response curve selected will pan with that same algorythm applied.
@@ -128,7 +141,10 @@ The WVR Web UI can act as a MIDI destination for your DAW or other MIDI applicat
 On macos, open Audio MIDI Setup, open the MIDI Studio panel, double click the IAC Driver to open its preferences, and check the **Device is online** box.  
 In your DAW's preferences, make the IAC Driver a midi output. Select the IAC Driver as the MIDI destination for your midi track.  
 Google Chrome currently considers Web MIDI to be a "powerful feature" and so access is limited to HTTPS websites. Since ESP32 cannot serve over HTTPS, we need to ask Google Chrome to make an exception and trust the WVR.  
-In Google Chrome, enter **chrome://flags/#unsafely-treat-insecure-origin-as-secure** into the url bar, add **http://192.168.5.18** to the list, click **enable**, and then restart Google Chrome.  
+In Google Chrome, enter **chrome://flags/#unsafely-treat-insecure-origin-as-secure** into the url bar, add **http://192.168.5.18** to the list, click **enable**, and then restart Google Chrome.
+
+ >```note that starting with firmware version 3.9.0, the IP address of WVR has changed to 192.168.4.1```
+
 Now in the WVR Web UI, in the Global Screen (click the **WVR** button top and center), click the **Refresh** button at the bottom of the screen, under **Web MIDI**, and make sure the IAC Driver is listed to the right.  
 Your DAW should now stream MIDI data wirelessly to WVR.
 
@@ -141,7 +157,12 @@ WVR can playback up to 18 stereo sounds at once. It mixes all the sounds into a 
 **Exclusive Group** allows you to tell WVR that only one member out of a group of notes can be playing at one time. If you want your open hihat sample to stop when a closed hihat sample starts, or if you want one bass note to stop when another starts, you can achieve this by setting the **exclusive group** value of all the notes in that group to the same number ie. add them all to the same exclusive group. These groups work across voices and channels. When a note-on is received on a memeber of an exclusive group, any other note in that group that is playing will be immidiately stopped. As with all the note settings, you can select multiple notes using shift-click or command-click, and change the exclusive group for all selected notes.
 
 # understanding playback mode
-A *one-shot* sample will play once and stop. A *loop* sample will loop precisely, so trim the sample carefully to avoid pops. It will continue until it receives a note-off and then immidiately stop. An *ASR-loop* sample will start at the beginning of the sample, play until loop-end, then loop between loop-start and loop-end until it receives a note off, at which time it will play from its current position, past the loop-end, to the end of the sample. Choose the loop-start and loop-end carefully to avoid pops. The numbers you enter into loop-start and loop-end are expressed in *samples*. These are channel samples, and WVR converts all samples to stereo, so in your DAW, when measuring and calculating these points, you may need to half or double the number, depending on if your original sample is stereo or mono, and depending on how your DAW measures sample positions. The points are shown in the waveform view as golden vertical lines, but only the first time you load a sample. When you return to modify these points after a sync, the waveform is no longer loaded, so these points wont be displayed.
+* A *one-shot* sample will play once and stop.  
+* A *loop* sample will loop precisely, so trim the sample carefully to avoid pops. It will continue until it receives a note-off and then immidiately stop.  
+* An *ASR-loop* sample will start at the beginning of the sample, play until loop-end, then loop between loop-start and loop-end until it receives a note off, at which time it will play from its current position, past the loop-end, to the end of the sample (if the note-off meaning is set to **release**), or immidiately stop (if the note-off meaning is set to 
+**halt**). Choose the loop-start and loop-end carefully to avoid pops. The numbers you enter into loop-start and loop-end are expressed in *samples*. These are channel samples, and WVR converts all samples to stereo, so in your DAW, when measuring and calculating these points, you may need to half or double the number, depending on if your original sample is stereo or mono, and depending on how your DAW measures sample positions. The points are shown in the waveform view as golden vertical lines, but only the first time you load a sample. When you return to modify these points after a sync, the waveform is no longer loaded, so these points wont be displayed.  
+* A *pause/resume* sample will pause when it receives a note-off message, and resume from the same position when it receives the next note-on. You can reset the sample to the beginning by triggering a sample (or an empty note) with the same exclusive group.  
+* A *pause/loop* and a *pause/asr* sample behave exactly like *pause/resume* but with respect to loop and ASR-loop modes, respectively.
 
 # understanding response curve
 Every MIDI note has a velocity (or volume) attached to it. This is a value from 0 to 127. Imagine a graph with these 127 velocities on the y axis, and the playback volume that each actually triggers on the x axis. If this is a straight line, we have a **linear** response curve. Many people find other curves to be more human, or more musical. The default response curve for WVR is the **Square Root** algorithm, but you can also choose **linear** or **logarithmic**.
@@ -185,10 +206,13 @@ In the UI, click the blue **WVR** button top and center of the screen. This is t
 * **wifi on at boot** determines weather your WVR will turn on its wifi antenna at boot. Setting this to **false** is risky. Make sure that you have a pin action set to turn it on, and have tested that pin, because if you don't, its possible you will be unable to access the UI to change this setting back! The solution could be to boot into recovery mode, of course, should that occur.
 * you can also change the WIFI network name and password here.
 * **wifi power** allows you to change how strong the wifi signal is. Higher numbers mean more range, which also draws more power, creating more heat. At **8** the range should fill a room.
+* **midi channel** sets what MIDI channels WVR listens to, ***OMNI*** means it will listen on all 16 channels.
+* **pitch bend up** and **pitch bend down** allow you to set the range of your pitch bending, measured in semi-tones. Setting this to 2 means it will bend up/down one whole tone, while setting the ***down*** range to 12 will mean you can bend down one octave.
 * WVR has memory dedicated to store up to 128 racks. **rack slots remaining** lets you keep track of how many are free.
 * Backing up and restoring your eMMC (onboard memory on the WVR) is meant for cloning your WVR, in the case where you have a product that you want to quickly clone, and not have to set up all the configuration and sounds every time. **backup eMMC** will upload a binary file to your computer. On the receiving device, open this same menu and **select eMMC recovery file** then **restore eMMC**. This process may take a long time, depending on how many sounds you have in memory. Note this process will clone everything *except* the firmware running on your WVR, so make sure you have the same (or compatible) firmwares running on both devices. All the note configurations, all the sounds, the backup firmware, your stored firmwares, the global settings, and everything else will be cloned to the new WVR! After a successful restore process, always reset the WVR, and then refresh the borowser to see all the changes.
 * If you want to reset the memory on your WVR, you can click **reset eMMC**. All sounds, configuration, and firmwares will be deleted, but the firmware currently loaded will remain in flash, and will continue to run.
-* You can upload a firmware directly to the ESP32 flash, and boot it, without using the **firmware** menu, by clicking **select firmware**, choosing a binary, and then clicking **force uplad**. This binary will not be stored in eMMC memory, so it will not appear in the **firmware** menu. It will stay in flash, and continue to run until a new firmware is force-uploaded, or until another firmware is selected from the **firmware** tab.
+* You can upload a firmware directly to the ESP32 flash, and boot it, without using the **firmware** menu, by clicking **select firmware**, choosing a binary, and then clicking **force uplad**. This binary will not be stored in eMMC memory, so it will not appear in the **firmware** menu. It will stay in flash, and continue to run until a new firmware is force-uploaded, or until another firmware is selected from the **firmware** tab.  
+* **join external wifi network** will cause WVR to attempt to join a local WiFi nertwork. Set the drop-down to **yes** and fill out the network name and password, then click **try new network and password**. After a few seconds, click on **get IP Address**, and if the WVR was successfull in joining the network, an IP address will be displayed. Copy this address. You can now connect your computer to the local WiFi network, and access the WVR UI by pasting the IP address into your browser address bar. WVR will save the network and password, and automatically try to join it, at boot, as long as this setting is set to **yes**. Occasionally, your router may decide to assign a new IP address to the WVR, in which case you will have to repeat the process, to get the new IP.
 
 # firmware manager
 WVR can store up to 10 different firmwares, and the UI allows you to boot from any of them.
@@ -214,6 +238,9 @@ Do not upload your own custom code to WVR without a working USB-FTDI module setu
 * click file->save_as and save this as a new sketch (rename it if you like)
 * click **sketch->export compiled binary**, the file will be saved in your new sketch's folder in the newly created **build** folder
 * join the **WVR** wifi network, open the WVR UI at http://192.168.5.18/
+
+ >```note that starting with firmware version 3.9.0, the IP address of WVR has changed to 192.168.4.1```
+
 * click **firmware** and then choose a new slot, hit **select binary** for that slot, and choose your .bin file from the your_sketch/build folder, in the UI, click the file name and choose a new name for this firmware, so you can keep track of your custom binaries, silly Arduino will always default to the same binary name.
 * click **upload**, then click **boot** when upload is complete
 
@@ -224,6 +251,9 @@ Congratulations! You have flashed a custom firmware to your WVR!
 * in a fresh terminal use the command ```arduino-cli compile -e --build-property build.code_debug=2 --fqbn esp32:esp32:esp32wrover wvr_basic``` but use your sketch name in place of ```wvr_basic```
 * join the **WVR** wifi network
 * to flash, you can use curl, the command ```curl --data-binary "@/Users/Username/Documents/Arduino/wvr_basic/build/esp32.esp32.esp32wrover/wvr_basic.ino.bin" http://192.168.5.18/update --header "content-type:text/plain"``` will work, if you change the paths to point at your binary in the build folder within your sketch folder
+
+ >```note that starting with firmware version 3.9.0, the IP address of WVR has changed to 192.168.4.1```
+
 * in the WVR Arduino library, look at the file ```wvr.sh``` to find some other ideas for things you can do with the arduino-cli, you can modify this bash script to work for you if you like!
 
 # using platformIO

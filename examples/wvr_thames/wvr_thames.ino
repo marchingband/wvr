@@ -13,7 +13,6 @@
 #include <file_system.h>
 #include <wvr_0.3.h>
 #include <gpio.h>
-#include "rgb.h"
 
 #define KICK 40
 #define SNARE 41

@@ -110,8 +110,8 @@ struct metadata_t {
     uint8_t pitch_bend_semitones_up;
     uint8_t pitch_bend_semitones_down;
     uint8_t do_station_mode;
-    char station_ssid[20];
-    char station_passphrase[20];
+    char station_ssid[30];
+    char station_passphrase[30];
 };
 
 struct vol_t {

@@ -27,7 +27,7 @@ static const char* TAG = "wav_player";
 #define wav_player_queue_SIZE 80
 #define BLOCK_SIZE 512
 
-#define BLOCKS_PER_READ 7
+#define BLOCKS_PER_READ 6
 #define BYTES_PER_READ (BLOCKS_PER_READ * BLOCK_SIZE)
 #define SAMPLES_PER_READ (BYTES_PER_READ / sizeof(int16_t))
 
@@ -46,8 +46,8 @@ static const char* TAG = "wav_player";
 #define DAMPEN_BITS 1
 
 // #define MAX_READS_PER_LOOP 6
-// #define MAX_READS_PER_LOOP 5
-#define MAX_READS_PER_LOOP 4 // default
+#define MAX_READS_PER_LOOP 5
+// #define MAX_READS_PER_LOOP 4 // default
 // #define MAX_READS_PER_LOOP 3
 
 #define s15p16 int32_t

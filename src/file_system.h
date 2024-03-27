@@ -77,6 +77,14 @@ enum action {
     SOFT // reduce velocity
 };
 
+enum stereo_mode {
+    STEREO_MODE_STEREO,
+    STEREO_MODE_SUM_LEFT,
+    STEREO_MODE_SUM_RIGHT,
+    STEREO_MODE_MONO_LEFT,
+    STEREO_MODE_MONO_RIGHT,
+};
+
 struct pin_config_t {
     enum action action;
     enum edge edge;
@@ -127,6 +135,7 @@ struct wav_lu_t {
     enum retrigger_mode retrigger_mode;
     enum note_off_meaning note_off_meaning;
     enum response_curve response_curve;
+    enum stereo_mode stereo_mode;
     uint8_t priority; // 0 to 15
     uint8_t mute_group;
     uint8_t empty;
@@ -148,7 +157,7 @@ struct wav_file_t {
     uint8_t empty;
     size_t loop_start;
     size_t loop_end;
-    int RFU;
+    enum stereo_mode stereo_mode;
 };
 
 struct firmware_t {

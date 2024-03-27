@@ -766,9 +766,28 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 bufs[buf].wav_data.response_curve == RESPONSE_SQUARE_ROOT ?
                   scale_sample_sqrt(sample_right, bufs[buf].stereo_volume.right) :
                   scale_sample_inv_sqrt(sample_right, bufs[buf].stereo_volume.right);
+              
+              switch(bufs[buf].wav_data.stereo_mode){
+                case STEREO_MODE_STEREO:
+                  output_buf[i]     += (sample_left  >> DAMPEN_BITS);
+                  output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
+                  break;
+                case STEREO_MODE_SUM_LEFT:
+                  output_buf[i] += (sample_left  >> (DAMPEN_BITS + 1));
+                  output_buf[i] += (sample_right >> (DAMPEN_BITS + 1));
+                  break;
+                case STEREO_MODE_SUM_RIGHT:
+                  output_buf[i + 1] += (sample_left  >> (DAMPEN_BITS + 1));
+                  output_buf[i + 1] += (sample_right >> (DAMPEN_BITS + 1));
+                  break;
+                case STEREO_MODE_MONO_LEFT:
+                  output_buf[i]     += (sample_left  >> DAMPEN_BITS);
+                  break;
+                case STEREO_MODE_MONO_RIGHT:
+                  output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
+                  break;
+              }
 
-              output_buf[i]     += (sample_left  >> DAMPEN_BITS);
-              output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
 
               bufs[buf].sample_pointer += step;
               size_t written = (bufs[buf].sample_pointer >> 16) * 2;
@@ -873,8 +892,26 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                 scale_sample_sqrt(sample_right, bufs[buf].stereo_volume.right) :
                 scale_sample_inv_sqrt(sample_right, bufs[buf].stereo_volume.right);
 
-              output_buf[i]     += (sample_left  >> DAMPEN_BITS);
-              output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
+              switch(bufs[buf].wav_data.stereo_mode){
+                case STEREO_MODE_STEREO:
+                  output_buf[i]     += (sample_left  >> DAMPEN_BITS);
+                  output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
+                  break;
+                case STEREO_MODE_SUM_LEFT:
+                  output_buf[i] += (sample_left  >> (DAMPEN_BITS + 1));
+                  output_buf[i] += (sample_right >> (DAMPEN_BITS + 1));
+                  break;
+                case STEREO_MODE_SUM_RIGHT:
+                  output_buf[i + 1] += (sample_left  >> (DAMPEN_BITS + 1));
+                  output_buf[i + 1] += (sample_right >> (DAMPEN_BITS + 1));
+                  break;
+                case STEREO_MODE_MONO_LEFT:
+                  output_buf[i]     += (sample_left  >> DAMPEN_BITS);
+                  break;
+                case STEREO_MODE_MONO_RIGHT:
+                  output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
+                  break;
+              }
 
               bufs[buf].sample_pointer += step;
               size_t written = (bufs[buf].sample_pointer >> 16) * 2;
@@ -1048,10 +1085,31 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   scale_sample_sqrt(sample_right, bufs[buf].stereo_volume.right) :
                   scale_sample_inv_sqrt(sample_right, bufs[buf].stereo_volume.right);
 
-                output_buf[i] += (sample_left  >> DAMPEN_BITS);
-                i++;
-                output_buf[i] += (sample_right >> DAMPEN_BITS);
-                i++;
+                switch(bufs[buf].wav_data.stereo_mode){
+                  case STEREO_MODE_STEREO:
+                    output_buf[i] += (sample_left  >> DAMPEN_BITS);
+                    output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
+                    i+=2;
+                    break;
+                  case STEREO_MODE_SUM_LEFT:
+                    output_buf[i] += (sample_left  >> (DAMPEN_BITS + 1));
+                    output_buf[i] += (sample_right >> (DAMPEN_BITS + 1));
+                    i+=2;
+                    break;
+                  case STEREO_MODE_SUM_RIGHT:
+                    output_buf[i + 1] += (sample_left  >> (DAMPEN_BITS + 1));
+                    output_buf[i + 1] += (sample_right >> (DAMPEN_BITS + 1));
+                    i+=2;
+                    break;
+                  case STEREO_MODE_MONO_LEFT:
+                    output_buf[i]     += (sample_left  >> DAMPEN_BITS);
+                    i+=2;
+                    break;
+                  case STEREO_MODE_MONO_RIGHT:
+                    output_buf[i + 1] += (sample_right >> DAMPEN_BITS);
+                    i+=2;
+                    break;
+                }
 
                 // fading in/out
                 if(

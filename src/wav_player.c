@@ -378,16 +378,18 @@ int prune(uint8_t priority)
   return candidate;
 }
 
-void IRAM_ATTR update_stereo_volume(uint8_t buf)
+void IRAM_ATTR update_stereo_volume(uint8_t buf, enum stereo_mode stereo_mode)
 {
-  uint8_t chan = bufs[buf].wav_player_event.channel;
-  uint32_t left = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].left_vol * bufs[buf].volume;
-  uint32_t right = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].right_vol * bufs[buf].volume;
-  bufs[buf].stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127
-  bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
-    // copy to target
-  bufs[buf].target_stereo_volume.left = bufs[buf].stereo_volume.left;
-  bufs[buf].target_stereo_volume.right = bufs[buf].stereo_volume.right;
+    uint8_t chan = bufs[buf].wav_player_event.channel;
+    uint32_t left = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].left_vol * bufs[buf].volume;
+    uint32_t right = channel_vol[chan] * channel_exp[chan] * channel_pan[chan].right_vol * bufs[buf].volume;
+    // bufs[buf].stereo_volume.left = (uint8_t)(left / 2048383); // 127*127*127
+    // bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
+    bufs[buf].stereo_volume.left = stereo_mode == STEREO_MODE_STEREO ? ((uint8_t)(left / 2048383)) : stereo_mode == STEREO_MODE_MONO_LEFT ? 127 : 0; // 127*127*127
+    bufs[buf].stereo_volume.right = stereo_mode == STEREO_MODE_STEREO ? ((uint8_t)(right / 2048383)) : stereo_mode == STEREO_MODE_MONO_LEFT ? 0 : 127;
+      // copy to target
+    bufs[buf].target_stereo_volume.left = bufs[buf].stereo_volume.left;
+    bufs[buf].target_stereo_volume.right = bufs[buf].stereo_volume.right;
 }
 
 int16_t IRAM_ATTR interpolate(int16_t a, int16_t b, s15p16 frac)
@@ -395,43 +397,6 @@ int16_t IRAM_ATTR interpolate(int16_t a, int16_t b, s15p16 frac)
   int32_t     y = b - a; // delta y,
   int32_t delta = (frac * y) >> 16;  // execute fixed point multiply to do the linear interpolation
   return(a + delta);        // add the base                
-}
-
-void IRAM_ATTR apply_stereo_mode(int16_t *buf, enum stereo_mode stereo_mode){
-  switch(stereo_mode){
-    case STEREO_MODE_STEREO:
-      break;
-    case STEREO_MODE_SUM_LEFT:
-    {
-      for(int i=0; i<SAMPLES_PER_READ; i+=2)
-      {
-        buf[i] = (buf[i] >> 1) + (buf[i + 1] >> 1);
-        buf[i + 1] = 0;
-      }
-      break;
-    }
-    case STEREO_MODE_SUM_RIGHT:
-    {
-      for(int i=0; i<SAMPLES_PER_READ; i+=2)
-      {
-        buf[i + 1] = (buf[i] >> 1) + (buf[i + 1] >> 1);
-        buf[i] = 0;
-      }
-      break;
-    }
-    case STEREO_MODE_MONO_LEFT:
-      for(int i=0; i<SAMPLES_PER_READ; i+=2)
-      {
-        buf[i + 1] = 0;
-      }
-      break;
-    case STEREO_MODE_MONO_RIGHT:
-      for(int i=0; i<SAMPLES_PER_READ; i+=2)
-      {
-        buf[i] = 0;
-      }
-      break;
-  }
 }
 
 void IRAM_ATTR wav_player_task(void* pvParameters)
@@ -713,7 +678,6 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
       {
         ESP_ERROR_CHECK(emmc_read(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].read_block ,BLOCKS_PER_READ ));
       }
-      apply_stereo_mode(bufs[new_midi_buf].buffer_a, bufs[new_midi_buf].wav_data.stereo_mode);
       num_reads++;
       bufs[new_midi_buf].read_block += BLOCKS_PER_READ;
       new_midi = 0;
@@ -731,7 +695,6 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
       {
         buf_pointer = bufs[i].current_buf == 0 ? bufs[i].buffer_b : bufs[i].buffer_a;
         ESP_ERROR_CHECK(emmc_read(buf_pointer, bufs[i].read_block , BLOCKS_PER_READ ));
-        apply_stereo_mode(buf_pointer, bufs[i].wav_data.stereo_mode);
         num_reads++;
         bufs[i].read_block += BLOCKS_PER_READ;
         bufs[i].full = 1; // now the buffer is full
@@ -761,7 +724,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
 
             if(bufs[buf].fade == FADE_NORMAL) // dont update stereo volume while fading
             {
-              update_stereo_volume(buf);
+              update_stereo_volume(buf, bufs[buf].wav_data.stereo_mode);
             }
             else if(bufs[buf].pruned && bufs[buf].wav_data.response_curve != RESPONSE_LINEAR) // starting a fade but the buf is not a linear response
             {
@@ -868,7 +831,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
 
             if(bufs[buf].fade == FADE_NORMAL) // only update the volume when NOT fading-out or about to start fading-in
             {
-              update_stereo_volume(buf);
+              update_stereo_volume(buf, bufs[buf].wav_data.stereo_mode);
             }
             else if(bufs[buf].pruned && (bufs[buf].wav_data.response_curve != RESPONSE_LINEAR)) // starting a fade but the buf is not a linear response
             {
@@ -990,7 +953,7 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
 
             if(bufs[buf].fade == FADE_NORMAL) // only update the volume when NOT fading-out or about to start fading-in
             {
-              update_stereo_volume(buf);
+              update_stereo_volume(buf, bufs[buf].wav_data.stereo_mode);
             }
               else if(bufs[buf].pruned && (bufs[buf].wav_data.response_curve != RESPONSE_LINEAR)) // starting a fade but the buf is not a linear response
             {

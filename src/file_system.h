@@ -79,10 +79,8 @@ enum action {
 
 enum stereo_mode {
     STEREO_MODE_STEREO,
-    STEREO_MODE_SUM_LEFT,
-    STEREO_MODE_SUM_RIGHT,
     STEREO_MODE_MONO_LEFT,
-    STEREO_MODE_MONO_RIGHT,
+    STEREO_MODE_MONO_RIGHT
 };
 
 struct pin_config_t {

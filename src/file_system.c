@@ -82,9 +82,9 @@ struct pin_config_t *pin_config_lut;
 
 void file_system_init(void)
 {
-    log_i("\nwav_lu_t-> %d\nwav_file_t-> %d\nrack_lu_t-> %d\nrack_file_t-> %d\nplay_back_mode-> %d\nretrigger_mode=> %d\nnote_off_meaning-> %d, response_curve-> %d, stereo_mode -> %d", 
+    log_i("\nwav_lu_t-> %d\nwav_file_t-> %d\nrack_lu_t-> %d\nrack_file_t-> %d\nplay_back_mode-> %d\nretrigger_mode=> %d\nnote_off_meaning-> %d, response_curve-> %d, stereo_mode -> %d, velocity_mode-> %d", 
         sizeof(struct wav_lu_t), sizeof(struct wav_file_t), sizeof(struct rack_lu_t), sizeof(struct rack_file_t),
-        sizeof(enum play_back_mode), sizeof(enum retrigger_mode), sizeof(enum note_off_meaning), sizeof(enum response_curve), sizeof(enum stereo_mode)
+        sizeof(enum play_back_mode), sizeof(enum retrigger_mode), sizeof(enum note_off_meaning), sizeof(enum response_curve), sizeof(enum stereo_mode), sizeof(enum velocity_mode)
         );
 
     // alloc_luts();
@@ -252,6 +252,7 @@ void init_wav_lut(void){
             wav_lut[i][j].response_curve = RESPONSE_LINEAR;
             wav_lut[i][j].note_off_meaning = HALT;
             wav_lut[i][j].stereo_mode = STEREO_MODE_STEREO;
+            wav_lut[i][j].velocity_mode = VELOCITY_MODE_FIXED;
             wav_lut[i][j].priority = 0;
             wav_lut[i][j].mute_group = 0;
             wav_lut[i][j].loop_start = 0;
@@ -273,6 +274,7 @@ void init_wav_lut(void){
             voice[j].response_curve = RESPONSE_LINEAR;
             voice[j].note_off_meaning = HALT;
             voice[j].stereo_mode = STEREO_MODE_STEREO;
+            voice[j].velocity_mode = VELOCITY_MODE_FIXED;
             voice[j].priority = 0;
             voice[j].mute_group = 0;
             voice[j].loop_start = 0;
@@ -417,6 +419,7 @@ void read_wav_lut_from_disk(void)
             wav_lut[i][j].note_off_meaning = voice[j].note_off_meaning;
             wav_lut[i][j].response_curve = voice[j].response_curve;
             wav_lut[i][j].stereo_mode = voice[j].stereo_mode;
+            wav_lut[i][j].velocity_mode = voice[j].velocity_mode;
             wav_lut[i][j].priority = voice[j].priority;
             wav_lut[i][j].mute_group = voice[j].mute_group;
             wav_lut[i][j].loop_start = voice[j].loop_start;
@@ -524,6 +527,7 @@ struct wav_lu_t get_file_t_from_lookup_table(uint8_t voice, uint8_t note, uint8_
             wav.note_off_meaning = wav_lut[voice][note].note_off_meaning;
             wav.response_curve = wav_lut[voice][note].response_curve;
             wav.stereo_mode = wav_lut[voice][note].stereo_mode;
+            wav.velocity_mode = wav_lut[voice][note].velocity_mode;
             wav.priority = wav_lut[voice][note].priority;
             wav.mute_group = wav_lut[voice][note].mute_group;
             wav.loop_start = wav_lut[voice][note].loop_start;
@@ -874,6 +878,8 @@ cJSON* add_voice_json(uint8_t voice_num)
         if(ret==NULL){log_e("failed to make json responseCurve");continue;}
         ret = cJSON_AddNumberToObject(note, "stereoMode", voice[j].stereo_mode);
         if(ret==NULL){log_e("failed to make json stereoMode");continue;}
+        ret = cJSON_AddNumberToObject(note, "velocityMode", voice[j].velocity_mode);
+        if(ret==NULL){log_e("failed to make json velocityMode");continue;}
         ret = cJSON_AddNumberToObject(note, "priority", voice[j].priority);
         if(ret==NULL){log_e("failed to make json priority");continue;}
         ret = cJSON_AddNumberToObject(note, "muteGroup", voice[j].mute_group);
@@ -1146,6 +1152,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
         voice_data[num_note].note_off_meaning = cJSON_GetObjectItemCaseSensitive(note, "noteOff")->valueint;
         voice_data[num_note].response_curve = cJSON_GetObjectItemCaseSensitive(note, "responseCurve")->valueint;
         voice_data[num_note].stereo_mode = cJSON_GetObjectItemCaseSensitive(note, "stereoMode")->valueint;
+        voice_data[num_note].velocity_mode = cJSON_GetObjectItemCaseSensitive(note, "velocityMode")->valueint;
         voice_data[num_note].priority = cJSON_GetObjectItemCaseSensitive(note, "priority")->valueint;
         voice_data[num_note].mute_group = cJSON_GetObjectItemCaseSensitive(note, "muteGroup")->valueint;
         voice_data[num_note].loop_start = cJSON_GetObjectItemCaseSensitive(note, "loopStart")->valueint;
@@ -1193,6 +1200,7 @@ void updateSingleVoiceConfig(char *json, int num_voice){
             voice_data[num_note].note_off_meaning = HALT;
             voice_data[num_note].response_curve = RESPONSE_SQUARE_ROOT;
             voice_data[num_note].stereo_mode = STEREO_MODE_STEREO;
+            voice_data[num_note].velocity_mode = VELOCITY_MODE_FIXED;
             voice_data[num_note].priority = 0;
             voice_data[num_note].mute_group = 0;
             voice_data[num_note].loop_start = 0;

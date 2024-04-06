@@ -83,6 +83,11 @@ enum stereo_mode {
     STEREO_MODE_MONO_RIGHT
 };
 
+enum velocity_mode {
+    VELOCITY_MODE_FIXED,
+    VELOCITY_MODE_VELOCITY
+};
+
 struct pin_config_t {
     enum action action;
     enum edge edge;
@@ -134,6 +139,7 @@ struct wav_lu_t {
     enum note_off_meaning note_off_meaning;
     enum response_curve response_curve;
     enum stereo_mode stereo_mode;
+    enum velocity_mode velocity_mode;
     uint8_t priority; // 0 to 15
     uint8_t mute_group;
     uint8_t empty;
@@ -155,7 +161,8 @@ struct wav_file_t {
     uint8_t empty;
     size_t loop_start;
     size_t loop_end;
-    enum stereo_mode stereo_mode;
+    uint8_t stereo_mode;
+    uint8_t velocity_mode;
 };
 
 struct firmware_t {

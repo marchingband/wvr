@@ -592,7 +592,10 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
             bufs[i].wav_position = 0;
             bufs[i].size = bufs[i].wav_data.length / sizeof(int16_t);
             
-            if(new_wav.isRack == -2 || new_wav.response_curve == RESPONSE_FIXED) // it's a rack member or a fixed volume file
+            if(
+              ((new_wav.isRack == -2) && (new_wav.velocity_mode == VELOCITY_MODE_FIXED)) || 
+              new_wav.response_curve == RESPONSE_FIXED
+            ) // it's a rack member with fixed velocity or a fixed volume file
             {
               bufs[i].volume = 127;
             }

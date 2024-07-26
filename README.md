@@ -109,6 +109,7 @@ Congratulations! You now have the most up-to-date firmware loaded onto your WVR
 * wait for the sync to complete. You will see your pin configs have updated, and your sounds are displayed in the sounds menu. Now when you press **audition** the sound will not play in the browser, it will play on the WVR.
 * connect headphones or some line out to the WVR
 * using a wire (or a female jumper cable) connect the **GND** pin on the WVR to pin **D2**, and your sound should play.
+* note that WVR does not have an on-board amplifier. The output is line level. Most headphones will actually work ok, although there may be some distortion. In order to connect a speaker, you will need an amplifier of some kind. A bluetooth speaker with a line-in is a great way to play with WVR when getting started.
 
 ![wvr gui](https://github.com/marchingband/wvr_hardware/blob/main/images/gui_pins.png)
 
@@ -264,8 +265,8 @@ framework = arduino
 board = esp-wrover-kit
 lib_deps =
     https://github.com/marchingband/wvr.git
-    https://github.com/me-no-dev/ESPAsyncWebServer.git
-    https://github.com/me-no-dev/AsyncTCP.git
+    # https://github.com/me-no-dev/ESPAsyncWebServer.git
+    # https://github.com/me-no-dev/AsyncTCP.git
 build_flags = -DBOARD_HAS_PSRAM -mfix-esp32-psram-cache-issue
 monitor_speed = 115200
 # upload_port = /dev/cu.usbserial-A50285BI

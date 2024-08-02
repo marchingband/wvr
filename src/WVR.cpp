@@ -6,6 +6,7 @@
 #include "file_system.h"
 #include "encoder.h"
 #include "midi_in.h"
+#include "OSCx.h"
 
 WVR::WVR()
 {
@@ -77,6 +78,11 @@ void WVR::unmute(void)
 void WVR::setMidiHook(void(*fn)(uint8_t *in))
 {
     set_midi_hook(fn);
+}
+
+void WVR::setOSCHook(void(*fn)(OSCBundle *in))
+{
+    set_osc_hook(fn);
 }
 
 void WVR::encoderInit(int encA, int encB)

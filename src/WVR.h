@@ -23,7 +23,7 @@ class WVR {
         void mute(void);
         void unmute(void);
         void setMidiHook(void(*fn)(uint8_t *in));
-        void setOSCHook(void(*fn)(OSCBundle *in));
+        void setOSCHook(void(*fn)(OSCMessage *in));
         void encoderInit(int encA, int encB);
         void onEncoder(void (*handleEncoder)(bool up));
         void resetPin(int pin);

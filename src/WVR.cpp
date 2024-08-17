@@ -80,7 +80,7 @@ void WVR::setMidiHook(void(*fn)(uint8_t *in))
     set_midi_hook(fn);
 }
 
-void WVR::setOSCHook(void(*fn)(OSCBundle *in))
+void WVR::setOSCHook(void(*fn)(OSCMessage *in))
 {
     set_osc_hook(fn);
 }

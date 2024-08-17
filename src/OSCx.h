@@ -9,9 +9,10 @@ extern "C"
 {
 #endif
 
-static void OSC_handle(OSCBundle *bundle);
+static void handle_OSC(OSCMessage * msg);
 
-void set_osc_hook(void(*fn)(OSCBundle *in));
+void set_osc_hook(void(*fn)(OSCMessage *in));
+void osc_hook_default(OSCMessage * in);
 #ifdef __cplusplus
 }
 #endif

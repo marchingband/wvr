@@ -16,12 +16,6 @@ esp_err_t ret;
 WiFiUDP Udp;
 const unsigned int localPort = 4000;
 OSCErrorCode error;
-QueueHandle_t OSC_queue;
-OSCBundle *OSC_bundle;
-OSCMessage *OSC_message = NULL;
-unsigned int ledState = LOW;
-
-TaskHandle_t OSC_task_handle = NULL;
 
 // nullptr to prevent no initialized pointer
 void(*osc_hook)(OSCMessage *in) = nullptr;
@@ -42,7 +36,6 @@ static void OSC_handle(OSCMessage *msg){
 static void OSC_task(void*) {
     Serial.print("OSC task \n");
     Udp.begin(localPort);
-//    OSCBundle bundle;
     OSCMessage msg;
     for(;;) {
         OSCMessage msg;
@@ -69,7 +62,6 @@ static void OSC_task(void*) {
 extern "C" void OSC_init() {
     Serial.print("OSC init \n");
     osc_hook = osc_hook_default;
-    OSC_queue = xQueueCreate(64, sizeof(OSCMessage));
     xTaskCreatePinnedToCore(OSC_task, "OSC_task", 4096, NULL, 3, NULL, 0);
 }
 

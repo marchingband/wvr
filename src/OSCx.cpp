@@ -23,7 +23,7 @@ unsigned int ledState = LOW;
 
 TaskHandle_t OSC_task_handle = NULL;
 
-// nullptr éviter qu'il soit non initialisé
+// nullptr to prevent no initialized pointer
 void(*osc_hook)(OSCMessage *in) = nullptr;
 
 void test(OSCMessage &msg) {
@@ -38,22 +38,6 @@ static void OSC_handle(OSCMessage *msg){
     msg->dispatch("/led", test);
 }
 
-OSCMessage* OSC_parse(OSCMessage msg) {
-    int size = Udp.parsePacket();
-    if (size > 0) {
-        Serial.print("Parsing OSC \n");
-        while (size--) {
-            msg.fill(Udp.read());
-        }
-        if (!msg.hasError()) {
-            return &msg;
-        } else {
-            error = msg.getError();
-            Serial.print("error: ");
-            Serial.println(error);
-        }
-    }
-}
 
 static void OSC_task(void*) {
     Serial.print("OSC task \n");
@@ -64,13 +48,14 @@ static void OSC_task(void*) {
         OSCMessage msg;
         int size = Udp.parsePacket();
         if (size > 0) {
-            Serial.print("Parsing OSC \n");
+//            Serial.print("Parsing OSC \n");
             while (size--) {
                 msg.fill(Udp.read());
             }
             if (!msg.hasError()) {
-                Serial.print("OSC received!!!! \n");
-                msg.dispatch("/led", test);
+//                Serial.print("OSC received!!!! \n");
+                osc_hook(&msg);
+//                msg.dispatch("/led", test);
             } else {
                 error = msg.getError();
                 Serial.print("error: ");

@@ -1,0 +1,16 @@
+#N canvas 92 117 450 300 12;
+#X obj 135 237 netsend -u -b;
+#X obj 161 208 oscformat cat horse pig;
+#X obj 27 12 loadbang;
+#X msg 136 77 connect 192.168.4.1 4000;
+#X msg 66 120 format i;
+#X text 135 50 connect UDP to wvr ip address on port 4000;
+#X text 144 119 set format to integer;
+#X obj 304 167 tgl 19 0 empty empty empty 0 -10 0 12 #fcfcfc #000000 #000000 0 1;
+#X text 332 167 switch LED;
+#X connect 1 0 0 0;
+#X connect 2 0 3 0;
+#X connect 2 0 4 0;
+#X connect 3 0 0 0;
+#X connect 4 0 1 0;
+#X connect 7 0 1 0;

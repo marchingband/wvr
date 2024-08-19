@@ -14,7 +14,7 @@
 esp_err_t ret;
 
 WiFiUDP Udp;
-const unsigned int localPort = 4000;
+uint16_t localPort = 4000;
 OSCErrorCode error;
 
 // nullptr to prevent no initialized pointer
@@ -34,7 +34,8 @@ static void OSC_handle(OSCMessage *msg){
 
 
 static void OSC_task(void*) {
-    Serial.print("OSC task \n");
+//    Serial.print("OSC task \n");
+
     Udp.begin(localPort);
     OSCMessage msg;
     for(;;) {
@@ -59,12 +60,14 @@ static void OSC_task(void*) {
     }
 }
 
-extern "C" void OSC_init() {
-    Serial.print("OSC init \n");
-    osc_hook = osc_hook_default;
-    xTaskCreatePinnedToCore(OSC_task, "OSC_task", 4096, NULL, 3, NULL, 0);
+extern "C" void OSC_init(bool useOsc, uint16_t oscPort) {
+    if (useOsc) {
+        Serial.printf("Using OSC with port %d \n", oscPort);
+        osc_hook = osc_hook_default;
+        localPort = oscPort;
+        xTaskCreatePinnedToCore(OSC_task, "OSC_task", 4096, NULL, 3, NULL, 0);
+    }
 }
-
 void osc_hook_default(OSCMessage * in)
 {
     return;

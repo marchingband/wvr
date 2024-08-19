@@ -11,19 +11,14 @@
 #include "bundle.h"
 #include "favicon.h"
 #include <string>
-#include "soc/rtc_wdt.h"
 #include "cJSON.h"
 #include "ws_log.h"
 #include "wvr_0.3.h"
-#include "server.h"
 #include "file_system.h"
-#include "server.h"
 #include "esp_wifi.h"
 #include "boot.h"
 #include "wav_player.h"
-#include "file_system.h"
 #include "gpio.h"
-#include <OSCMessage.h>
 
 extern "C" size_t find_gap_in_file_system(size_t size);
 extern "C" esp_err_t write_wav_to_emmc(uint8_t* source, size_t block, size_t size);
@@ -1120,28 +1115,3 @@ void server_resume(void){
   }
   wifi_is_on = true;
 }
-/*
-WiFiUDP Udp;
-void handle_OSC() {
-    OSCMessage inmsg;
-    int size = Udp.parsePacket();
-
-    if (size > 0) {
-        while (size--) {
-            inmsg.fill(Udp.read());
-        }
-        if (!inmsg.hasError()) {
-//            inmsg.dispatch("/led", ledtoggle);
-        }
-        //else { auto error = inmsg.getError(); }
-    }
-
-}
-
-void OSC_init() {
-    xTaskCreatePinnedToCore(handle_OSC, "read_uart_task", 4096, NULL, 3, NULL, 0);
-
-    Udp.begin(4000);
-}
-
- */

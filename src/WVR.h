@@ -32,6 +32,8 @@ class WVR {
         bool wifiIsOn;
         bool useFTDI;
         bool useUsbMidi;
+        bool useOsc;
+        uint16_t oscPort;
         bool forceWifiOn;
         bool checkRecoveryModePin;
 };

@@ -6,19 +6,21 @@
 #include "file_system.h"
 #include "encoder.h"
 #include "midi_in.h"
+#include "OSCx.h"
 
 WVR::WVR()
 {
     this->wifiIsOn = get_wifi_is_on();
     this->useFTDI = false;
     this->useUsbMidi = false;
+    this->oscPort = 4000;
     this->forceWifiOn = false;
     this->checkRecoveryModePin = true;
 }
 
 void WVR::begin()
 {
-    wvr_init(useFTDI, useUsbMidi, checkRecoveryModePin);
+    wvr_init(useFTDI, useUsbMidi, checkRecoveryModePin, useOsc, oscPort);
 }
 
 void WVR::play(uint8_t voice, uint8_t note, uint8_t velocity)
@@ -77,6 +79,11 @@ void WVR::unmute(void)
 void WVR::setMidiHook(void(*fn)(uint8_t *in))
 {
     set_midi_hook(fn);
+}
+
+void WVR::setOSCHook(void(*fn)(OSCMessage *in))
+{
+    set_osc_hook(fn);
 }
 
 void WVR::encoderInit(int encA, int encB)

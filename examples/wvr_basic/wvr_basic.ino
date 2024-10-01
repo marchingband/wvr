@@ -22,6 +22,5 @@ void setup() {
 }
 
 void loop() {
-  // vTaskDelay(portMAX_DELAY);
   vTaskDelete(NULL);
 }

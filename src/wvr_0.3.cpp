@@ -28,6 +28,7 @@ void recovery_server_begin(void);
 extern "C" void emmc_init(void);
 extern "C" void dac_init(void);
 extern "C" void midi_init(bool useUsbMidi);
+extern "C" void OSC_init(bool useOsc, uint16_t oscPort);
 extern "C" void wav_player_start(void);
 extern "C" void touch_test(void);
 extern "C" void pot_init(void);
@@ -79,7 +80,7 @@ void logRam(){
 
 struct metadata_t metadata;
 
-void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
+void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin, bool useOsc, uint16_t oscPort) {
   Serial.begin(115200);
   logRam();
   log_i("arduino setup running on core %u",xPortGetCoreID());
@@ -128,6 +129,8 @@ void wvr_init(bool useFTDI, bool useUsbMidi, bool checkRecoveryModePin) {
   server_begin();
   logSize("server");
 
+  OSC_init(useOsc,oscPort);
+    logSize("osc");
   log_i("do_station_mode:%d network:%s pass:%s",get_metadata()->do_station_mode,get_metadata()->station_ssid,get_metadata()->station_passphrase);
 
   // if(get_metadata()->do_station_mode == 1)

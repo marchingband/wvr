@@ -68,13 +68,17 @@ If you have Thames : WVR in a Pedal, go here : https://github.com/marchingband/w
 
 # updating firmware
 
+For most users, the firmware that came installed on your WVR is up to date.
+Updating the firmware is only reccomended when new features are desired.
+Join our discord to keep up to date on this, but in general, most users will never need to update the firmware.
 * Create a folder on your computer where you will store firmwares for your WVR
 * download your firmwares, saving them to this new folder
 * navigate to :
 https://github.com/marchingband/wvr_binaries
-and find the folder for your board, download the .ino.bin file, which will be a link like:
-https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/3.0.9/wvr_basic.ino.bin
-Choose the newest binary (currently v3.9.0)
+and find the folder for your board. download the .ino.bin file, which will be a link like:
+https://github.com/marchingband/wvr_binaries/blob/main/wvr_basic/3.10.0/wvr_basic.ino.bin
+For most users this will be `wvr_basic`, for a normal WVR, or `wvr_usb` if your WVR has the extra MIDI USB Host module add-on installed on the back.
+Choose the newest binary (currently v3.10.0)
 * Apply power to your WVR.
 * On a computer, join the wifi network **WVR**, using the password **12345678**
 * Open Google Chrome (or another browser which [implements the Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)), navigate to the address http://192.168.5.18/, and the WVR UI will open
@@ -85,9 +89,6 @@ Choose the newest binary (currently v3.9.0)
 * Click **upload** for **slot 0**, and wait for the upload to complete
 * Click **boot** for **slot 0**, and wait for the boot to complete. 
 * Reset the WVR, rejoin the WVR wifi network, then reload the webpage.
-* if you have a WVR with USB Host Backpack, you can follow these instructions to update the firmware on that : https://github.com/marchingband/wvr_usb_backpack
-
-Congratulations! You now have the most up-to-date firmware loaded onto your WVR
 
 ![wvr gui](https://github.com/marchingband/wvr_hardware/blob/main/images/gui_firmware.png)
 

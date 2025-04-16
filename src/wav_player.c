@@ -1152,9 +1152,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
     }
     
     // apply the global volume
-    for(size_t i=0;i<DAC_BUFFER_SIZE_IN_SAMPLES;i++)
+    for (size_t i = 0; i < DAC_BUFFER_SIZE_IN_SAMPLES; i += 2)
     {
-      output_buf_16[i] = scale_sample_clamped_16(output_buf[i], metadata.global_volume);
+      // Flip L and R: write R first, then L
+      output_buf_16[i]     = scale_sample_clamped_16(output_buf[i + 1], metadata.global_volume); // Right
+      output_buf_16[i + 1] = scale_sample_clamped_16(output_buf[i],     metadata.global_volume); // Left
     }
 
     // apply the mute

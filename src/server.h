@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 
 void server_pause();

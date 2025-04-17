@@ -7,7 +7,7 @@
 #define WVR_H
 
 #include "Arduino.h"
-
+#include <OSCBundle.h>
 
 class WVR {
     public:
@@ -23,6 +23,7 @@ class WVR {
         void mute(void);
         void unmute(void);
         void setMidiHook(void(*fn)(uint8_t *in));
+        void setOSCHook(void(*fn)(OSCMessage *in));
         void encoderInit(int encA, int encB);
         void onEncoder(void (*handleEncoder)(bool up));
         void resetPin(int pin);
@@ -31,6 +32,8 @@ class WVR {
         bool wifiIsOn;
         bool useFTDI;
         bool useUsbMidi;
+        bool useOsc;
+        uint16_t oscPort;
         bool forceWifiOn;
         bool checkRecoveryModePin;
 };

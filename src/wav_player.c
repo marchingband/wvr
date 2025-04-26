@@ -1175,7 +1175,11 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
     }
     
     // clear the output buffer
-    bzero(output_buf, DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int));
+    // bzero(output_buf, DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int));
+    // set output buffer to 1 to prevent DAC shutdown
+    for(int i=0; i< DAC_BUFFER_SIZE_IN_SAMPLES; i++){
+      output_buf[i] = 1;
+    }
     bzero(output_buf_16, DAC_BUFFER_SIZE_IN_SAMPLES * sizeof(int16_t));
 
     // clean up the finished buffers

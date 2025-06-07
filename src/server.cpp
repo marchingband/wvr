@@ -49,7 +49,7 @@ void on_ws_connect(void);
 
 const char *ssid = "yourAP";
 const char *password = "yourPassword";
- 
+
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
@@ -158,7 +158,7 @@ void handleUpdateSingleVoiceConfig(AsyncWebServerRequest *request, uint8_t *data
   if(index==0){
     //start
     // log_i("start free ram : %d",ESP.getFreeHeap());
-    AsyncWebHeader* num_voice_string = request->getHeader("numVoice");
+    const AsyncWebHeader* num_voice_string = request->getHeader("numVoice");
     sscanf(num_voice_string->value().c_str(), "%d", &num_voice);
     voice_config_json = (uint8_t*)ps_malloc(total + 1);
     if(!voice_config_json){
@@ -246,16 +246,16 @@ void handleWav(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t
     //start
     //wav_player_pause();
     // log_i("start len %d", len);
-    AsyncWebHeader* size_string = request->getHeader("size");
+    const AsyncWebHeader* size_string = request->getHeader("size");
     sscanf(size_string->value().c_str(), "%d", &w_size);
     // log_i("size %d", w_size);
-    AsyncWebHeader* name = request->getHeader("name");
+    const AsyncWebHeader* name = request->getHeader("name");
     strcpy(&w_name[0], name->value().c_str());
     // log_i("name %s", w_name);
-    AsyncWebHeader* voice_string = request->getHeader("voice");
+    const AsyncWebHeader* voice_string = request->getHeader("voice");
     sscanf(voice_string->value().c_str(), "%d", &w_voice);
     // log_i("voice %d", w_voice);
-    AsyncWebHeader* note_string = request->getHeader("note");
+    const AsyncWebHeader* note_string = request->getHeader("note");
     sscanf(note_string->value().c_str(), "%d", &w_note);
     // log_i("note %d", w_note);
     // log_i("%s w_size %d w_voice %d w_note %d", w_name, w_size, w_voice, w_note);
@@ -340,11 +340,11 @@ void handleNewFirmware(AsyncWebServerRequest *request, uint8_t *data, size_t len
   //once
   if(index==0){
     //wav_player_pause();
-    AsyncWebHeader* firmware_slot_string = request->getHeader("slot-index");
+    const AsyncWebHeader* firmware_slot_string = request->getHeader("slot-index");
     sscanf(firmware_slot_string->value().c_str(), "%d", &f_firmware_slot);
-    AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
+    const AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
     sscanf(firmware_size_string->value().c_str(), "%d", &f_firmware_size);
-    AsyncWebHeader* firmware_name_string = request->getHeader("firmware-name");
+    const AsyncWebHeader* firmware_name_string = request->getHeader("firmware-name");
     strcpy(&f_firmware_name[0], firmware_name_string->value().c_str());
     log_i("firmware size %u, firmware name %s",f_firmware_size,f_firmware_name);
 
@@ -382,7 +382,7 @@ void handleNewRecoveryFirmware(AsyncWebServerRequest *request, uint8_t *data, si
   //once
   if(index==0){
     //wav_player_pause();
-    AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
+    const AsyncWebHeader* firmware_size_string = request->getHeader("firmware-size");
     sscanf(firmware_size_string->value().c_str(), "%d", &rf_firmware_size);
   }
   if(rf_firmware_size > MAX_FIRMWARE_SIZE){
@@ -412,7 +412,7 @@ void handleVoiceJSON(AsyncWebServerRequest *request){
   // wav_player_pause();
   int numVoice;
   // log_i("start : %d", ESP.getFreeHeap());
-  AsyncWebHeader* voice_string = request->getHeader("voice");
+  const AsyncWebHeader* voice_string = request->getHeader("voice");
   sscanf(voice_string->value().c_str(), "%d", &numVoice);
   char *json = print_voice_json(numVoice);
   feedLoopWDT();
@@ -643,7 +643,7 @@ void handleRPC(AsyncWebServerRequest *request){
 void handleBootFromEmmc(AsyncWebServerRequest *request){
   //wav_player_pause();
   char index = 0;
-  AsyncWebHeader* firmware_slot_string = request->getHeader("index");
+  const AsyncWebHeader* firmware_slot_string = request->getHeader("index");
   sscanf(firmware_slot_string->value().c_str(), "%d", &index);
   request->send(204);
   bootFromEmmc(index);
@@ -651,7 +651,7 @@ void handleBootFromEmmc(AsyncWebServerRequest *request){
 
 void handleDeleteFirmware(AsyncWebServerRequest *request){
   char index = 0;
-  AsyncWebHeader* firmware_slot_string = request->getHeader("index");
+  const AsyncWebHeader* firmware_slot_string = request->getHeader("index");
   sscanf(firmware_slot_string->value().c_str(), "%d", &index);
   request->send(204);
   delete_firmware(index);
@@ -669,9 +669,9 @@ void handlePlayWav(AsyncWebServerRequest *request){
   uint8_t note;
   uint8_t velocity;
 
-  AsyncWebHeader* voice_string = request->getHeader("voice");
-  AsyncWebHeader* note_string = request->getHeader("note");
-  AsyncWebHeader* velocity_string = request->getHeader("velocity");
+  const AsyncWebHeader* voice_string = request->getHeader("voice");
+  const AsyncWebHeader* note_string = request->getHeader("note");
+  const AsyncWebHeader* velocity_string = request->getHeader("velocity");
   sscanf(voice_string->value().c_str(), "%d", &voice);
   sscanf(note_string->value().c_str(), "%d", &note);
   sscanf(velocity_string->value().c_str(), "%d", &velocity);
@@ -733,7 +733,7 @@ void server_begin() {
 
   WiFi.softAP(metadata->ssid, metadata->passphrase);
   log_i("set ssid :%s, set passphrase: %s",metadata->ssid, metadata->passphrase);
- 
+
   //  again??
   // WiFi.softAPConfig(IP, gateway, NMask);
 
@@ -964,7 +964,7 @@ void recovery_server_begin() {
   WiFi.softAP("WVR", "12345678");
   log_i("recovery mode ssid :WVR, passphrase: 12345678");
   log_i("normal mode wifi ssid is :%s, passphrase is: %s",metadata->ssid, metadata->passphrase);
- 
+
   //  again??
   // WiFi.softAPConfig(IP, gateway, NMask);
 

@@ -503,8 +503,12 @@ void IRAM_ATTR wav_player_task(void* pvParameters)
                   // log_i("pruned because RESTART");
                   break;
                 case NOTE_OFF:
+                case NOTE_OFF_RESTART:
                   bufs[b].fade = FADE_OUT;
                   abort_note = 1;
+                  if (bufs[b].wav_data.retrigger_mode == NOTE_OFF_RESTART) {
+                    bufs[b].pruned = 1;
+                  }
                   if(
                     bufs[b].wav_data.play_back_mode == PAUSE ||
                     bufs[b].wav_data.play_back_mode == PAUSE_LOOP ||

@@ -234,7 +234,7 @@ void update_pitch_bends(void)
   for(int i=0; i<16; i++)
   {
     uint16_t pitch_bend = channel_pitch_bend[i]; // 14 bit
-    s15p16 bend = (pitch_bend << 16) / 8192.0 - ( 1 << 16);
+    s15p16 bend = (pitch_bend << 16) / 8192.0f - ( 1 << 16);
     // s15p16 semitones = bend >= 0 ? 12 * bend : 12 * bend;
     s15p16 semitones = bend >= 0 ? metadata.pitch_bend_semitones_up * bend : metadata.pitch_bend_semitones_down * bend;
     s15p16 pitch_factor = fxexp2_s15p16(semitones / 12);
@@ -263,9 +263,9 @@ void init_response_luts(void)
 {
   for(int i=0;i<128;i++)
   {
-    lin_response_lut[i].val      = (i / 127.0)             * 0x10000;
-    sqrt_response_lut[i].val     = (sqrt(i * 127.0) / 127) * 0x10000;
-    inv_sqrt_response_lut[i].val = (pow(i / 127.0, 2))     * 0x10000;
+    lin_response_lut[i].val      = (i / 127.0f)             * 0x10000;
+    sqrt_response_lut[i].val     = (sqrt(i * 127.0f) / 127) * 0x10000;
+    inv_sqrt_response_lut[i].val = (pow(i / 127.0f, 2))     * 0x10000;
   }
   init_response_lut_fade_pair(sqrt_response_lut, lin_response_lut);
   init_response_lut_fade_pair(inv_sqrt_response_lut, lin_response_lut);

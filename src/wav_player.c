@@ -387,6 +387,8 @@ void IRAM_ATTR update_stereo_volume(uint8_t buf, enum stereo_mode stereo_mode)
     // bufs[buf].stereo_volume.right = (uint8_t)(right / 2048383);
     bufs[buf].stereo_volume.left = stereo_mode == STEREO_MODE_STEREO ? ((uint8_t)(left / 2048383)) : stereo_mode == STEREO_MODE_MONO_LEFT ? 127 : 0; // 127*127*127
     bufs[buf].stereo_volume.right = stereo_mode == STEREO_MODE_STEREO ? ((uint8_t)(right / 2048383)) : stereo_mode == STEREO_MODE_MONO_LEFT ? 0 : 127;
+    // bufs[buf].stereo_volume.left = stereo_mode == STEREO_MODE_STEREO ? ((uint8_t)(left >> 21)) : stereo_mode == STEREO_MODE_MONO_LEFT ? 127 : 0; // 127*127*127
+    // bufs[buf].stereo_volume.right = stereo_mode == STEREO_MODE_STEREO ? ((uint8_t)(right >> 21)) : stereo_mode == STEREO_MODE_MONO_LEFT ? 0 : 127;
       // copy to target
     bufs[buf].target_stereo_volume.left = bufs[buf].stereo_volume.left;
     bufs[buf].target_stereo_volume.right = bufs[buf].stereo_volume.right;

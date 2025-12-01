@@ -40,7 +40,8 @@ enum retrigger_mode {
     RETRIGGER,
     RESTART,
     NONE,
-    NOTE_OFF
+    NOTE_OFF,
+    NOTE_OFF_RESTART
 };
 
 enum note_off_meaning {

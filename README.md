@@ -161,14 +161,14 @@ WVR can playback up to 18 stereo sounds at once. It mixes all the sounds into a 
 * A *loop* sample will loop precisely, so trim the sample carefully to avoid pops. It will continue until it receives a note-off and then immidiately stop.  
 * An *ASR-loop* sample will start at the beginning of the sample, play until loop-end, then loop between loop-start and loop-end until it receives a note off, at which time it will play from its current position, past the loop-end, to the end of the sample (if the note-off meaning is set to **release**), or immidiately stop (if the note-off meaning is set to 
 **halt**). Choose the loop-start and loop-end carefully to avoid pops. The numbers you enter into loop-start and loop-end are expressed in *samples*. These are channel samples, and WVR converts all samples to stereo, so in your DAW, when measuring and calculating these points, you may need to half or double the number, depending on if your original sample is stereo or mono, and depending on how your DAW measures sample positions. The points are shown in the waveform view as golden vertical lines, but only the first time you load a sample. When you return to modify these points after a sync, the waveform is no longer loaded, so these points wont be displayed.  
-* A *pause/resume* sample will pause when it receives a note-off message, and resume from the same position when it receives the next note-on. You can reset the sample to the beginning by triggering a sample (or an empty note) with the same exclusive group.  
+* A *pause/resume* sample will pause when it receives a note-off message, and resume from the same position when it receives the next note-on. You can reset the sample to the beginning by setting the retrigger mode to **note-off and restart**, or by triggering a note within the same exclusive group.
 * A *pause/loop* and a *pause/asr* sample behave exactly like *pause/resume* but with respect to loop and ASR-loop modes, respectively.
 
 # understanding response curve
 Every MIDI note has a velocity (or volume) attached to it. This is a value from 0 to 127. Imagine a graph with these 127 velocities on the y axis, and the playback volume that each actually triggers on the x axis. If this is a straight line, we have a **linear** response curve. Many people find other curves to be more human, or more musical. The default response curve for WVR is the **Square Root** algorithm, but you can also choose **linear** or **logarithmic**.
 
 # understanding retrigger mode
-If a sound is triggered a second time, at a time when it is already in playback, this is a "retrigger". WVR can respond to this event in a number of ways. It can respond by stopping the sound (note-off), restarting the sound from the beginning (restart), ignoring the second trigger (ignore) or by starting a new playback of the same sound without stopping the first (retrigger). In the case of **note-off**, WVR will respect this event even if **note-off** is set to **ignore**, which creates a way to use note-on events to toggle playback. The first note-on will start a sample, the next will stop it (or in the case of pasue/resume mode, they will pause and resume the note).
+If a sound is triggered a second time, at a time when it is already in playback, this is a "retrigger". WVR can respond to this event in a number of ways. It can respond by stopping the sound but keeping the current playhead (note-off), stopping the sound and moving the playhead back to the beginning (note-off and restart), replaying the sound from the beginning (restart), ignoring the second trigger (ignore) or by starting a new playback of the same sound without stopping the first (retrigger). In the case of **note-off** and **note-off and restart**, WVR will respect this event even if **note-off** is set to **ignore**, which creates a way to use note-on events to toggle playback. The first note-on will start a sample, the next will stop it (or in the case of pasue/resume mode, they will pause and resume the note).
 
 # understanding note off
 When a key is lifted on a piano, and likewise, when a pin on the WVR moves from a LOW back to a HIGH state, a "note-off" event is triggered. You can opt to ignore these events by choosing the "ignore" setting, or you can choose to observe them by selecting the "halt" setting, in which case the sound will fade out very fast, and stop, when the note-off event for that sound occurs. In the case of ASR-LOOP mode, you have the additional **release** option. Selecting **release** means that the sample will play-out to the end, whereas the **halt** option will cause the sample to immidiately stop.
@@ -268,7 +268,7 @@ lib_deps =
     https://github.com/marchingband/wvr.git
     # https://github.com/me-no-dev/ESPAsyncWebServer.git
     # https://github.com/me-no-dev/AsyncTCP.git
-build_flags = -DBOARD_HAS_PSRAM -mfix-esp32-psram-cache-issue
+build_flags = -DBOARD_HAS_PSRAM -mfix-esp32-psram-cache-issue -fpermissive
 monitor_speed = 115200
 # upload_port = /dev/cu.usbserial-A50285BI
 ```  
